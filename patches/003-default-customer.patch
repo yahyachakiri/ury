@@ -1,0 +1,150 @@
+From 0de67097b8e60c33f1720052364e3ccb19ce2373 Mon Sep 17 00:00:00 2001
+From: Yahya CHAKIRI <yahyachakiridev@gmail.com>
+Date: Tue, 15 Sep 2026 08:36:44 +0100
+Subject: [PATCH] feat(pos): default customer from POS Profile
+
+---
+ pos/src/store/pos-store.ts | 55 +++++++++++++++++++++++++-------------
+ 1 file changed, 37 insertions(+), 18 deletions(-)
+
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index fd3a1c99..d0e9444b 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -1,13 +1,14 @@
++import { MenuItem as APIMenuItem, getAggregatorMenu, getRestaurantMenu } from '../lib/menu-api';
++import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
++import { PosProfileCombined, getCombinedPosProfile, getCurrencyInfo } from '../lib/pos-profile-api';
++import { TableOrder, getTableOrder } from '../lib/order-api';
++import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
++
+ import { create } from 'zustand';
+-import { v4 as uuidv4 } from 'uuid';
+-import { storage } from '@ury/core';
+-import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
+-import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
+ import { getMenuCourses } from '../lib/menu-course-api';
+-import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
+-import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
+-import { getTableOrder, TableOrder } from '../lib/order-api';
+ import { getPaymentModes } from '../lib/payment-api';
++import { storage } from '@ury/core';
++import { v4 as uuidv4 } from 'uuid';
+ 
+ // Constants
+ const MAX_QUANTITY = 99;
+@@ -226,6 +227,19 @@ const calculateItemPrice = (item: OrderItem): number => {
+   return basePrice + addonsTotal;
+ };
+ 
++const getDefaultCustomer = (
++  posProfile: PosProfileCombined | null,
++  orderType: OrderType,
++): Customer | null => {
++  if (orderType === 'Aggregators' || !posProfile?.customer) return null;
++
++  return {
++    id: posProfile.customer,
++    name: posProfile.customer,
++    phone: '',
++  };
++};
++
+ 
+ 
+ export const generateCartHash = (state: Partial<POSState>) => {
+@@ -362,7 +376,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         set({ 
+           posProfile: profile, 
+           profileLoading: false,
+-          currency: profile.currency || 'INR'
++          currency: profile.currency || 'INR',
++          selectedCustomer: get().selectedCustomer || getDefaultCustomer(profile, get().selectedOrderType),
+         });
+         if (!storage.getItem('currencySymbol')) {
+           await get().fetchCurrencySymbol();
+@@ -377,7 +392,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       set({ 
+         posProfile: combinedProfile, 
+         profileLoading: false,
+-        currency: combinedProfile.currency || 'INR'
++        currency: combinedProfile.currency || 'INR',
++        selectedCustomer: get().selectedCustomer || getDefaultCustomer(combinedProfile, get().selectedOrderType),
+       });
+       
+       if (!storage.getItem('currencySymbol')) {
+@@ -589,11 +605,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+     }
+   },
+   setSelectedOrderType: (type) => {
+-    const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
++    const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType, selectedCustomer } = get();
+     
+     set({ 
+-          selectedOrderType: type,
+-          orderId: null
++      selectedOrderType: type,
++      orderId: null,
++      selectedCustomer: type === 'Aggregators'
++      ? (selectedCustomer?.id === posProfile?.customer ? null : selectedCustomer)
++      : (selectedCustomer || getDefaultCustomer(posProfile, type))
+     });
+     const isCurrentTypeToggleable = selectedOrderType === 'Take Away' || selectedOrderType === 'Delivery';
+     const isNewTypeToggleable = type === 'Take Away' || type === 'Delivery';
+@@ -775,7 +794,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         set({
+           tableOrder: null,
+           activeOrders: [],
+-          selectedCustomer: null,
++          selectedCustomer: getDefaultCustomer(get().posProfile, get().selectedOrderType),
+           isUpdatingOrder: false,
+           orderId: null,
+           noOfPax: 1,
+@@ -788,7 +807,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         error: 'Failed to load table order',
+         tableOrder: null,
+         activeOrders: [],
+-        selectedCustomer: null,
++        selectedCustomer: getDefaultCustomer(get().posProfile, get().selectedOrderType),
+         isUpdatingOrder: false,
+         orderId: null,
+         noOfPax: 1,
+@@ -804,7 +823,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+     set({
+       tableOrder: null,
+       activeOrders: [],
+-      selectedCustomer: null,
++      selectedCustomer: getDefaultCustomer(get().posProfile, get().selectedOrderType),
+       isUpdatingOrder: false,
+       orderId: null,
+       noOfPax: 1,
+@@ -859,7 +878,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         heldTabs: {},
+         nextTabNumber: 2,
+         activeOrders: [],
+-        selectedCustomer: null,
++        selectedCustomer: getDefaultCustomer(state.posProfile, DEFAULT_ORDER_TYPE),
+         selectedOrderType: DEFAULT_ORDER_TYPE,
+         selectedTable: null,
+         selectedRoom: null,
+@@ -901,7 +920,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       nextTabNumber: state.nextTabNumber + 1,
+       heldTabs: { ...state.heldTabs, [state.activeTabId]: currentTabState },
+       activeOrders: [],
+-      selectedCustomer: null,
++      selectedCustomer: getDefaultCustomer(state.posProfile, DEFAULT_ORDER_TYPE),
+       selectedOrderType: DEFAULT_ORDER_TYPE,
+       selectedTable: null,
+       selectedRoom: null,
+@@ -984,7 +1003,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         heldTabs: {},
+         nextTabNumber: 2,
+         activeOrders: [],
+-        selectedCustomer: null,
++        selectedCustomer: getDefaultCustomer(state.posProfile, DEFAULT_ORDER_TYPE),
+         selectedOrderType: DEFAULT_ORDER_TYPE,
+         selectedTable: null,
+         selectedRoom: null,
+-- 
+2.54.0 (Apple Git-157)
+
