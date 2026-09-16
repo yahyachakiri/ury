@@ -33,6 +33,18 @@ function formatETA(minutes: number | null): string {
     : t('dashboard.eta_hours', { count: hours });
 }
 
+function translateAttentionMessage(item: { type: string; count?: number; message: string }): string {
+  const count = item.count ?? 0;
+  const keys: Record<string, string> = {
+    pending_payment: 'dashboard.attention_pending_payment',
+    table_occupied_long: 'dashboard.attention_table_occupied_long',
+    kot_errors: 'dashboard.attention_kot_errors',
+    unclosed_pos_session: 'dashboard.attention_unclosed_pos_session',
+  };
+  const key = keys[item.type];
+  return key ? t(key, { count }) : item.message;
+}
+
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
   const [stats, setStats] = useState<any[]>([]);
@@ -183,7 +195,7 @@ export default function Dashboard() {
         if (Array.isArray(attentionData) && attentionData.length > 0) {
           const processedAttention = attentionData.map((item, idx) => ({
             id: idx,
-            message: item.message,
+            message: translateAttentionMessage(item),
             icon: item.severity === 'high' ? AlertTriangle : Clock,
             severity: item.severity
           }));
