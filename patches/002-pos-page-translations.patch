@@ -1,0 +1,327 @@
+From ca4d35faf01e6e0699e1ae92905a0e3d0237c65b Mon Sep 17 00:00:00 2001
+From: Yahya CHAKIRI <yahyachakiridev@gmail.com>
+Date: Wed, 16 Sep 2026 07:48:08 +0100
+Subject: [PATCH] feat(i18n): translate POS page states
+
+---
+ pos/src/components/POSOpeningProvider.tsx | 29 ++++++++++++++++-------
+ pos/src/i18n/locales/ar.json              |  9 +++++++
+ pos/src/i18n/locales/en.json              |  9 +++++++
+ pos/src/i18n/locales/fr.json              |  9 +++++++
+ pos/src/pages/Orders.tsx                  |  6 ++---
+ pos/src/pages/POS.tsx                     | 19 ++++++++-------
+ pos/src/pages/Settings.tsx                |  6 +++--
+ pos/src/pages/Table.tsx                   |  6 ++---
+ 8 files changed, 67 insertions(+), 26 deletions(-)
+
+diff --git a/pos/src/components/POSOpeningProvider.tsx b/pos/src/components/POSOpeningProvider.tsx
+index 83da810f..179e5503 100644
+--- a/pos/src/components/POSOpeningProvider.tsx
++++ b/pos/src/components/POSOpeningProvider.tsx
+@@ -1,19 +1,20 @@
+-import { useCallback, useEffect, useMemo, useState } from 'react';
+ import {
++  POSOpeningEntryRef,
+   checkPOSOpening,
+   parseFrappeError,
+   validatePOSClose,
+-  POSOpeningEntryRef,
+ } from '../lib/pos-opening-api';
+-import { getChecklist } from '../lib/checklist-api';
+-import { usePOSStore } from '../store/pos-store';
+-import { useRootStore } from '../store/root-store';
+-import { User } from '../store/slices/auth-slice';
+-import POSOpeningDialog from './POSOpeningDialog';
+-import POSOpeningScreen from './POSOpeningScreen';
++import { useCallback, useEffect, useMemo, useState } from 'react';
++
+ import ChecklistGateDialog from './ChecklistGateDialog';
+ import POSClosingDialog from './POSClosingDialog';
++import POSOpeningDialog from './POSOpeningDialog';
++import POSOpeningScreen from './POSOpeningScreen';
++import { User } from '../store/slices/auth-slice';
++import { getChecklist } from '../lib/checklist-api';
+ import { t } from '../i18n';
++import { usePOSStore } from '../store/pos-store';
++import { useRootStore } from '../store/root-store';
+ 
+ interface POSOpeningProviderProps {
+   children: React.ReactNode;
+@@ -54,6 +55,16 @@ function getHttpStatus(error: unknown): number | undefined {
+   return undefined;
+ }
+ 
++function translateOpeningMessage(message: string): string {
++  const previousSessionsMatch = message.match(/^(\d+) POS session\(s\) left open from a previous day$/);
++  if (previousSessionsMatch) {
++    return t('errors.posOpening.previous_sessions_open', {
++      count: Number(previousSessionsMatch[1]),
++    });
++  }
++  return message;
++}
++
+ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
+   const [isLoading, setIsLoading] = useState(true);
+   const [blockingState, setBlockingState] = useState<OpeningBlockingState | null>(null);
+@@ -185,7 +196,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
+       const status = getHttpStatus(error);
+       const fallbackMessage =
+         error instanceof Error ? error.message : t('errors.posOpening.load_failed');
+-      const message = serverMessage || fallbackMessage;
++      const message = translateOpeningMessage(serverMessage || fallbackMessage);
+ 
+       if (status === 403 || /permission/i.test(message)) {
+         setBlockingState('permissionDenied');
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index b37fd041..96570eab 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -98,6 +98,8 @@
+         "not_closed_message": "يجب إغلاق وردية نقطة البيع السابقة قبل البدء بوردية جديدة. يرجى إغلاقها للمتابعة.",
+         "reload_page": "إعادة تحميل الصفحة",
+         "switch_to_desk": "التبديل إلى لوحة التحكم (Desk)",
++        "failed_load": "فشل تحميل نقطة البيع",
++        "retry": "إعادة المحاولة",
+         "opening": {
+             "title": "فتح جلسة نقطة البيع",
+             "session_details": "تفاصيل الجلسة",
+@@ -256,6 +258,7 @@
+             "payment_mode_missing_account": "إحدى طرق الدفع غير مهيأة بالكامل ({{mode}}). تواصل مع المدير.",
+             "session_exists": "هناك جلسة مفتوحة بالفعل لهذه المحطة.",
+             "session_elsewhere": "لديك جلسة مفتوحة بالفعل في مكان آخر.",
++            "previous_sessions_open": "هناك {{count}} من جلسات نقطة البيع مفتوحة منذ يوم سابق",
+             "generic": "تعذر فتح جلسة نقطة البيع. {{message}}",
+             "load_failed": "تعذر التحقق من حالة جلسة نقطة البيع. يرجى المحاولة مرة أخرى."
+         }
+@@ -270,6 +273,8 @@
+     },
+     "orders": {
+         "no_orders_found": "لم يتم العثور على طلبات",
++        "failed_load": "فشل تحميل الطلبات",
++        "failed_load_details": "فشل تحميل تفاصيل الطلب",
+         "click_to_view": "انقر على أي بطاقة طلب لعرض تفاصيلها",
+         "status_title": "حالة الطلب",
+         "pagination": {
+@@ -408,6 +413,10 @@
+         "orders": "الطلبات",
+         "settings": "الإعدادات"
+     },
++    "settings": {
++        "title": "الإعدادات",
++        "coming_soon": "الإعدادات ستكون متاحة قريبًا."
++    },
+     "product_dialog": {
+         "special_instructions": "تعليمات خاصة",
+         "special_instructions_placeholder": "أضف أي تعليمات خاصة أو ملاحظات لهذا العنصر...",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index f65b7ddc..da6002b5 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -91,6 +91,8 @@
+     "not_closed_message": "Please close the previous POS Entry to continue.",
+     "reload_page": "Reload Page",
+     "switch_to_desk": "Switch to Desk",
++    "failed_load": "Failed to load POS",
++    "retry": "Retry",
+     "opening": {
+       "title": "Open POS Session",
+       "session_details": "Session Details",
+@@ -249,6 +251,7 @@
+       "payment_mode_missing_account": "A payment method is not fully configured ({{mode}}). Contact your manager.",
+       "session_exists": "A session is already open for this terminal.",
+       "session_elsewhere": "You already have an open session elsewhere.",
++      "previous_sessions_open": "{{count}} POS session(s) left open from a previous day",
+       "generic": "Could not open the POS session. {{message}}",
+       "load_failed": "Could not check the POS session status. Please try again."
+     }
+@@ -263,6 +266,8 @@
+   },
+   "orders": {
+     "no_orders_found": "No orders found",
++    "failed_load": "Failed to load orders",
++    "failed_load_details": "Failed to load order details",
+     "click_to_view": "Click on any order card to view its details",
+     "status_title": "Order Status",
+     "pagination": {
+@@ -401,6 +406,10 @@
+     "orders": "Orders",
+     "settings": "Settings"
+   },
++  "settings": {
++    "title": "Settings",
++    "coming_soon": "Settings coming soon."
++  },
+   "product_dialog": {
+     "special_instructions": "Special Instructions",
+     "special_instructions_placeholder": "Add any special instructions or notes for this item...",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index a1ef1169..0ba8b0f2 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -91,6 +91,8 @@
+     "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
+     "reload_page": "Recharger la page",
+     "switch_to_desk": "Accéder au bureau",
++    "failed_load": "Échec du chargement du PDV",
++    "retry": "Réessayer",
+     "opening": {
+       "title": "Ouvrir la session PDV",
+       "session_details": "Détails de la session",
+@@ -249,6 +251,7 @@
+       "payment_mode_missing_account": "Un mode de paiement n'est pas entièrement configuré ({{mode}}). Contactez votre responsable.",
+       "session_exists": "Une session est déjà ouverte pour ce terminal.",
+       "session_elsewhere": "Vous avez déjà une session ouverte ailleurs.",
++      "previous_sessions_open": "{{count}} session(s) PDV sont restées ouvertes depuis un jour précédent",
+       "generic": "Impossible d'ouvrir la session PDV. {{message}}",
+       "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
+     }
+@@ -263,6 +266,8 @@
+   },
+   "orders": {
+     "no_orders_found": "Aucune commande trouvée",
++    "failed_load": "Échec du chargement des commandes",
++    "failed_load_details": "Échec du chargement des détails de la commande",
+     "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
+     "status_title": "Statut de la commande",
+     "pagination": {
+@@ -401,6 +406,10 @@
+     "orders": "Commandes",
+     "settings": "Paramètres"
+   },
++  "settings": {
++    "title": "Paramètres",
++    "coming_soon": "Les paramètres seront bientôt disponibles."
++  },
+   "product_dialog": {
+     "special_instructions": "Instructions spéciales",
+     "special_instructions_placeholder": "Ajoutez des instructions spéciales ou des notes pour cet article...",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 9d18bca5..4db2c1f2 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -212,7 +212,7 @@ export default function Orders() {
+     setEditLoading(true);
+     try {
+       const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
+-      if (!res.ok) throw new Error('Failed to fetch order details');
++      if (!res.ok) throw new Error(t('errors.failed_fetch_order'));
+       const data = await res.json();
+       const order = data.message;
+ 
+@@ -362,7 +362,7 @@ export default function Orders() {
+     return (
+       <div className="flex items-center justify-center h-screen">
+         <div className="text-center">
+-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
++          <p className="text-xl font-semibold text-red-600 mb-2">{t('orders.failed_load')}</p>
+           <p className="text-gray-600">{error}</p>
+         </div>
+       </div>
+@@ -533,7 +533,7 @@ export default function Orders() {
+           </div>
+         ) : selectedOrderError ? (
+           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
+-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
++            <p className="text-lg font-medium mb-2">{t('orders.failed_load_details')}</p>
+             <p className="text-sm">{selectedOrderError}</p>
+           </div>
+         ) : (
+diff --git a/pos/src/pages/POS.tsx b/pos/src/pages/POS.tsx
+index f35a94d6..81412bec 100644
+--- a/pos/src/pages/POS.tsx
++++ b/pos/src/pages/POS.tsx
+@@ -1,14 +1,15 @@
+-import { useState, useRef, useEffect } from 'react';
+-import { t } from '../i18n';
+ import { Star, TrendingUp } from 'lucide-react';
+-import Sidebar from '../components/Sidebar';
++import { useEffect, useRef, useState } from 'react';
++
++import InitialLoader from '../components/InitialLoader';
++import MenuList from '../components/MenuList';
+ import OrderPanel from '../components/OrderPanel';
+ import ProductDialog from '../components/ProductDialog';
+-import MenuList from '../components/MenuList';
+-import { usePOSStore } from '../store/pos-store';
+-import { cn } from '@ury/ui';
++import Sidebar from '../components/Sidebar';
+ import { Spinner } from '@ury/ui';
+-import InitialLoader from '../components/InitialLoader';
++import { cn } from '@ury/ui';
++import { t } from '../i18n';
++import { usePOSStore } from '../store/pos-store';
+ 
+ export default function POS() {
+   const {
+@@ -85,13 +86,13 @@ export default function POS() {
+     return (
+       <div className="flex items-center justify-center h-screen">
+         <div className="text-center">
+-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
++          <p className="text-xl font-semibold text-red-600 mb-2">{t('pos.failed_load')}</p>
+           <p className="text-gray-600">{error}</p>
+           <button 
+             onClick={() => window.location.reload()}
+             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+           >
+-            Retry
++            {t('pos.retry')}
+           </button>
+         </div>
+       </div>
+diff --git a/pos/src/pages/Settings.tsx b/pos/src/pages/Settings.tsx
+index c478c2ab..9d96406d 100644
+--- a/pos/src/pages/Settings.tsx
++++ b/pos/src/pages/Settings.tsx
+@@ -1,12 +1,14 @@
+ import { Card, CardContent } from '@ury/ui';
+ 
++import { t } from '../i18n';
++
+ export default function Settings() {
+   return (
+     <div className="h-full overflow-y-auto p-6 bg-gray-50 flex items-center justify-center">
+       <Card className="bg-white border border-gray-200 max-w-md w-full">
+         <CardContent className="p-8 text-center">
+-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
+-          <p className="text-gray-600 text-sm">Settings coming soon.</p>
++          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('settings.title')}</h1>
++          <p className="text-gray-600 text-sm">{t('settings.coming_soon')}</p>
+         </CardContent>
+       </Card>
+     </div>
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 7d1cd719..266a7595 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -81,7 +81,7 @@ const TableView = () => {
+         }
+       } catch (e) {
+         console.error(e);
+-        setError('Failed to load rooms');
++        setError(t('errors.failed_load_rooms'));
+       } finally {
+         setLoadingRooms(false);
+       }
+@@ -150,7 +150,7 @@ const TableView = () => {
+         setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
+       } catch (e) {
+         console.error(e);
+-        setError('Failed to load tables');
++        setError(t('errors.failed_load_tables'));
+         setTables([]);
+       } finally {
+         setLoadingTables(false);
+@@ -212,7 +212,7 @@ const TableView = () => {
+       showToast.success('Printed successfully');
+       await loadTables(table.restaurant_room, { useCache: false });
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : 'Failed to print order');
++      showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
+     } finally {
+       setPrintingTable(null);
+     }
+-- 
+2.54.0 (Apple Git-157)
+
