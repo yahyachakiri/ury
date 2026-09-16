@@ -61,29 +61,30 @@ reapply the same replacement logic against the new files.
 ### Patch 02 — French and Arabic locale content
 
 Files touched:
+- `pos/src/i18n/locales/en.json`
 - `pos/src/i18n/locales/fr.json`
 - `pos/src/i18n/locales/ar.json`
+- `pos/src/pages/Dashboard.tsx`
 
-What it does: fills in missing or corrects wrong translation keys. Does
-**not** change `pos/src/i18n/index.ts`, `loader.ts`, `config.ts`, or
-`resolve-language.ts` — the loading mechanism itself is untouched,
-because it already works correctly: language is resolved from
-`frappe.boot.lang`, loaded via dynamic import, and falls back gracefully
-to English on a missing key.
+What it does: routes Dashboard user-facing text through the existing
+translation function and fills in missing or incorrect English, French,
+and Arabic translation keys. Does **not** change `pos/src/i18n/index.ts`,
+`loader.ts`, `config.ts`, or `resolve-language.ts` — the loading mechanism
+itself is untouched, because it already works correctly: language is
+resolved from `frappe.boot.lang`, loaded via dynamic import, and falls back
+gracefully to English on a missing key.
 
 Why it can't be done upstream-agnostic: locale JSON is loaded via a
 relative dynamic `import()` at build time (see `pos/src/i18n/loader.ts`),
-there's no external or runtime-fetchable locale source to point
-elsewhere.
+and Dashboard literals must be replaced in the compiled React source; there
+is no external or runtime-fetchable locale source to point elsewhere.
 
-Risk profile: medium. This is a content-only diff, so conflicts are
-rare, but every upstream update can add new keys to `en.json` that don't
-yet exist in `fr.json` / `ar.json`. On every update: diff the new
-`en.json` against the previous version, find any new keys, and add
-translated equivalents to `fr.json` and `ar.json` before rebuilding.
-Missing keys will not break anything (they fall back to English), so this
-can be treated as a content backlog rather than a blocking bug, but don't
-let it silently accumulate.
+Risk profile: medium. This is mostly content with a small Dashboard
+rendering change. Every upstream update can add new keys to `en.json` or
+new hardcoded Dashboard text. On every update, compare the catalogs and
+audit Dashboard for new literals before rebuilding. Missing keys will not
+break anything (they fall back to English), but untranslated user-facing
+text should not silently accumulate.
 
 ### Patch 03 — Default customer from POS Profile
 
