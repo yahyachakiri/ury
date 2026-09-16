@@ -212,7 +212,7 @@ export default function Orders() {
     setEditLoading(true);
     try {
       const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
-      if (!res.ok) throw new Error('Failed to fetch order details');
+      if (!res.ok) throw new Error(t('errors.failed_fetch_order'));
       const data = await res.json();
       const order = data.message;
 
@@ -362,7 +362,7 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('orders.failed_load')}</p>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -533,7 +533,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('orders.failed_load_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (

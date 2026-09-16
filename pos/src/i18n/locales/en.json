@@ -91,6 +91,8 @@
     "not_closed_message": "Please close the previous POS Entry to continue.",
     "reload_page": "Reload Page",
     "switch_to_desk": "Switch to Desk",
+    "failed_load": "Failed to load POS",
+    "retry": "Retry",
     "opening": {
       "title": "Open POS Session",
       "session_details": "Session Details",
@@ -249,6 +251,7 @@
       "payment_mode_missing_account": "A payment method is not fully configured ({{mode}}). Contact your manager.",
       "session_exists": "A session is already open for this terminal.",
       "session_elsewhere": "You already have an open session elsewhere.",
+      "previous_sessions_open": "{{count}} POS session(s) left open from a previous day",
       "generic": "Could not open the POS session. {{message}}",
       "load_failed": "Could not check the POS session status. Please try again."
     }
@@ -263,6 +266,8 @@
   },
   "orders": {
     "no_orders_found": "No orders found",
+    "failed_load": "Failed to load orders",
+    "failed_load_details": "Failed to load order details",
     "click_to_view": "Click on any order card to view its details",
     "status_title": "Order Status",
     "pagination": {
@@ -400,6 +405,10 @@
     "tables": "Tables",
     "orders": "Orders",
     "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "coming_soon": "Settings coming soon."
   },
   "product_dialog": {
     "special_instructions": "Special Instructions",

@@ -81,7 +81,7 @@ const TableView = () => {
         }
       } catch (e) {
         console.error(e);
-        setError('Failed to load rooms');
+        setError(t('errors.failed_load_rooms'));
       } finally {
         setLoadingRooms(false);
       }
@@ -150,7 +150,7 @@ const TableView = () => {
         setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
         console.error(e);
-        setError('Failed to load tables');
+        setError(t('errors.failed_load_tables'));
         setTables([]);
       } finally {
         setLoadingTables(false);
@@ -212,7 +212,7 @@ const TableView = () => {
       showToast.success('Printed successfully');
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to print order');
+      showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
     } finally {
       setPrintingTable(null);
     }

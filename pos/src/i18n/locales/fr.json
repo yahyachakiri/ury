@@ -91,6 +91,8 @@
     "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
     "reload_page": "Recharger la page",
     "switch_to_desk": "Accéder au bureau",
+    "failed_load": "Échec du chargement du PDV",
+    "retry": "Réessayer",
     "opening": {
       "title": "Ouvrir la session PDV",
       "session_details": "Détails de la session",
@@ -249,6 +251,7 @@
       "payment_mode_missing_account": "Un mode de paiement n'est pas entièrement configuré ({{mode}}). Contactez votre responsable.",
       "session_exists": "Une session est déjà ouverte pour ce terminal.",
       "session_elsewhere": "Vous avez déjà une session ouverte ailleurs.",
+      "previous_sessions_open": "{{count}} session(s) PDV sont restées ouvertes depuis un jour précédent",
       "generic": "Impossible d'ouvrir la session PDV. {{message}}",
       "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
     }
@@ -263,6 +266,8 @@
   },
   "orders": {
     "no_orders_found": "Aucune commande trouvée",
+    "failed_load": "Échec du chargement des commandes",
+    "failed_load_details": "Échec du chargement des détails de la commande",
     "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
     "status_title": "Statut de la commande",
     "pagination": {
@@ -400,6 +405,10 @@
     "tables": "Tables",
     "orders": "Commandes",
     "settings": "Paramètres"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "coming_soon": "Les paramètres seront bientôt disponibles."
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",

@@ -1,14 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
-import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import { useEffect, useRef, useState } from 'react';
+
+import InitialLoader from '../components/InitialLoader';
+import MenuList from '../components/MenuList';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
-import MenuList from '../components/MenuList';
-import { usePOSStore } from '../store/pos-store';
-import { cn } from '@ury/ui';
+import Sidebar from '../components/Sidebar';
 import { Spinner } from '@ury/ui';
-import InitialLoader from '../components/InitialLoader';
+import { cn } from '@ury/ui';
+import { t } from '../i18n';
+import { usePOSStore } from '../store/pos-store';
 
 export default function POS() {
   const {
@@ -85,13 +86,13 @@ export default function POS() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('pos.failed_load')}</p>
           <p className="text-gray-600">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
           >
-            Retry
+            {t('pos.retry')}
           </button>
         </div>
       </div>

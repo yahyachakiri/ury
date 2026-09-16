@@ -1,19 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  POSOpeningEntryRef,
   checkPOSOpening,
   parseFrappeError,
   validatePOSClose,
-  POSOpeningEntryRef,
 } from '../lib/pos-opening-api';
-import { getChecklist } from '../lib/checklist-api';
-import { usePOSStore } from '../store/pos-store';
-import { useRootStore } from '../store/root-store';
-import { User } from '../store/slices/auth-slice';
-import POSOpeningDialog from './POSOpeningDialog';
-import POSOpeningScreen from './POSOpeningScreen';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import ChecklistGateDialog from './ChecklistGateDialog';
 import POSClosingDialog from './POSClosingDialog';
+import POSOpeningDialog from './POSOpeningDialog';
+import POSOpeningScreen from './POSOpeningScreen';
+import { User } from '../store/slices/auth-slice';
+import { getChecklist } from '../lib/checklist-api';
 import { t } from '../i18n';
+import { usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
 
 interface POSOpeningProviderProps {
   children: React.ReactNode;
@@ -52,6 +53,16 @@ function getHttpStatus(error: unknown): number | undefined {
   if (typeof e.status === 'number') return e.status;
   if (typeof e.statusCode === 'number') return e.statusCode;
   return undefined;
+}
+
+function translateOpeningMessage(message: string): string {
+  const previousSessionsMatch = message.match(/^(\d+) POS session\(s\) left open from a previous day$/);
+  if (previousSessionsMatch) {
+    return t('errors.posOpening.previous_sessions_open', {
+      count: Number(previousSessionsMatch[1]),
+    });
+  }
+  return message;
 }
 
 const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
@@ -185,7 +196,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       const status = getHttpStatus(error);
       const fallbackMessage =
         error instanceof Error ? error.message : t('errors.posOpening.load_failed');
-      const message = serverMessage || fallbackMessage;
+      const message = translateOpeningMessage(serverMessage || fallbackMessage);
 
       if (status === 403 || /permission/i.test(message)) {
         setBlockingState('permissionDenied');
