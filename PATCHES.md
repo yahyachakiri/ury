@@ -65,10 +65,16 @@ Files touched:
 - `pos/src/i18n/locales/fr.json`
 - `pos/src/i18n/locales/ar.json`
 - `pos/src/pages/Dashboard.tsx`
+- `pos/src/components/POSOpeningProvider.tsx`
+- `pos/src/pages/Orders.tsx`
+- `pos/src/pages/POS.tsx`
+- `pos/src/pages/Settings.tsx`
+- `pos/src/pages/Table.tsx`
 
-What it does: routes Dashboard user-facing text through the existing
-translation function and fills in missing or incorrect English, French,
-and Arabic translation keys. Does **not** change `pos/src/i18n/index.ts`,
+What it does: routes Dashboard and POS page user-facing text, including
+the previous-day session warning, through the existing translation function
+and fills in missing or incorrect English, French, and Arabic translation
+keys. Does **not** change `pos/src/i18n/index.ts`,
 `loader.ts`, `config.ts`, or `resolve-language.ts` — the loading mechanism
 itself is untouched, because it already works correctly: language is
 resolved from `frappe.boot.lang`, loaded via dynamic import, and falls back
