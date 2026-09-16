@@ -147,6 +147,21 @@
     "session_opened_success": "Session PDV ouverte"
   },
   "pos_closing": {
+    "title": "Clôturer le PDV",
+    "description": "Vérifiez les ventes de votre session et saisissez les montants réels de clôture.",
+    "loading": "Chargement des détails de clôture...",
+    "no_open_entry": "Aucune écriture d'ouverture PDV ouverte n'a été trouvée pour votre session.",
+    "period_start": "Début de la période",
+    "period_end": "Fin de la période",
+    "grand_total": "Total général",
+    "net_total": "Total net",
+    "total_qty": "Quantité totale",
+    "total_invoices": "Nombre total de factures",
+    "no_invoices": "Aucune facture n'a été trouvée pour cette période.",
+    "submitting": "Clôture du PDV...",
+    "submit": "Clôturer le PDV",
+    "submit_failed": "Échec de la clôture du PDV",
+    "load_failed": "Échec du chargement des détails de clôture",
     "help_expected": "Le montant attendu par le systeme pour ce mode de paiement, base sur les factures du jour.",
     "help_closing": "Saisissez le montant reel compte pour ce mode de paiement.",
     "help_difference": "Montant compte moins montant attendu. Positif signifie un excedent, negatif un manque.",
@@ -159,6 +174,18 @@
     "confirm_back": "Retour",
     "checklist_skip": "Ignorer pour l'instant",
     "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
+  },
+  "checklist": {
+    "title_opening": "Liste de contrôle d'ouverture",
+    "title_closing": "Liste de contrôle de clôture",
+    "description": "Veuillez terminer la liste de contrôle ci-dessous avant de continuer.",
+    "loading": "Chargement de la liste de contrôle...",
+    "remarks_placeholder": "Remarques",
+    "submit": "Soumettre la liste de contrôle",
+    "submitting": "Soumission...",
+    "load_failed": "Échec du chargement de la liste de contrôle",
+    "submit_failed": "Échec de la soumission de la liste de contrôle",
+    "incomplete_error": "Tous les éléments obligatoires doivent être cochés avant de terminer cette liste de contrôle."
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
