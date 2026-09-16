@@ -70,8 +70,10 @@ Files touched:
 - `pos/src/pages/POS.tsx`
 - `pos/src/pages/Settings.tsx`
 - `pos/src/pages/Table.tsx`
+- `frontend/src/i18n.ts`
+- `frontend/src/main.tsx`
 
-What it does: routes Dashboard and POS page user-facing text, including
+What it does: routes Dashboard, management frontend, and POS page user-facing text, including
 the previous-day session warning, through the existing translation function
 and fills in missing or incorrect English, French, and Arabic translation
 keys. Does **not** change `pos/src/i18n/index.ts`,
