@@ -1,0 +1,129 @@
+From 88acafc901d13f48fbfdb2ef59a23dfc19460cbd Mon Sep 17 00:00:00 2001
+From: Yahya CHAKIRI <yahyachakiridev@gmail.com>
+Date: Wed, 16 Sep 2026 08:09:09 +0100
+Subject: [PATCH] feat(i18n): translate dashboard attention messages
+
+---
+ pos/src/i18n/locales/ar.json |  4 ++++
+ pos/src/i18n/locales/en.json |  4 ++++
+ pos/src/i18n/locales/fr.json |  4 ++++
+ pos/src/pages/Dashboard.tsx  | 14 +++++++++++++-
+ ury/ury/api/ury_dashboard.py |  4 ++++
+ 5 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 96570eab..2d0dcac4 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -475,6 +475,10 @@
+         "table_running_over_time": "طاولة واحدة متأخرة",
+         "tables_running_over_time": "{{count}} طاولات متأخرة",
+         "needs_attention": "يحتاج إلى انتباه",
++        "attention_pending_payment": "هناك {{count}} من الطلبات بانتظار الدفع لأكثر من 15 دقيقة",
++        "attention_table_occupied_long": "هناك {{count}} من الطاولات مشغولة لأكثر من 60 دقيقة",
++        "attention_kot_errors": "هناك {{count}} من مشكلات إنشاء طلبات المطبخ خلال الساعة الأخيرة",
++        "attention_unclosed_pos_session": "هناك {{count}} من جلسات نقطة البيع مفتوحة منذ يوم سابق",
+         "nothing_needs_attention": "لا يوجد ما يحتاج إلى انتباه الآن.",
+         "tonight_vs_baseline": "الليلة مقارنة بالخط الأساسي",
+         "no_data_available": "لا توجد بيانات متاحة",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index da6002b5..f5d482e6 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -468,6 +468,10 @@
+     "table_running_over_time": "{{count}} table running over time",
+     "tables_running_over_time": "{{count}} tables running over time",
+     "needs_attention": "Needs Attention",
++    "attention_pending_payment": "{{count}} order(s) pending payment for over 15 minutes",
++    "attention_table_occupied_long": "{{count}} table(s) occupied for over 60 minutes",
++    "attention_kot_errors": "{{count}} KOT generation issue(s) in the last hour",
++    "attention_unclosed_pos_session": "{{count}} POS session(s) left open from a previous day",
+     "nothing_needs_attention": "Nothing needs attention right now.",
+     "tonight_vs_baseline": "Tonight vs Baseline",
+     "no_data_available": "No data available",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 0ba8b0f2..ad696a96 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -468,6 +468,10 @@
+     "table_running_over_time": "{{count}} table en retard",
+     "tables_running_over_time": "{{count}} tables en retard",
+     "needs_attention": "Points à surveiller",
++    "attention_pending_payment": "{{count}} commande(s) en attente de paiement depuis plus de 15 minutes",
++    "attention_table_occupied_long": "{{count}} table(s) occupée(s) depuis plus de 60 minutes",
++    "attention_kot_errors": "{{count}} problème(s) de génération de KOT au cours de la dernière heure",
++    "attention_unclosed_pos_session": "{{count}} session(s) PDV restée(s) ouverte(s) depuis un jour précédent",
+     "nothing_needs_attention": "Rien à signaler pour le moment.",
+     "tonight_vs_baseline": "Ce soir par rapport à la référence",
+     "no_data_available": "Aucune donnée disponible",
+diff --git a/pos/src/pages/Dashboard.tsx b/pos/src/pages/Dashboard.tsx
+index e47380a5..d2106185 100644
+--- a/pos/src/pages/Dashboard.tsx
++++ b/pos/src/pages/Dashboard.tsx
+@@ -33,6 +33,18 @@ function formatETA(minutes: number | null): string {
+     : t('dashboard.eta_hours', { count: hours });
+ }
+ 
++function translateAttentionMessage(item: { type: string; count?: number; message: string }): string {
++  const count = item.count ?? 0;
++  const keys: Record<string, string> = {
++    pending_payment: 'dashboard.attention_pending_payment',
++    table_occupied_long: 'dashboard.attention_table_occupied_long',
++    kot_errors: 'dashboard.attention_kot_errors',
++    unclosed_pos_session: 'dashboard.attention_unclosed_pos_session',
++  };
++  const key = keys[item.type];
++  return key ? t(key, { count }) : item.message;
++}
++
+ export default function Dashboard() {
+   const { posProfile } = usePOSStore();
+   const [stats, setStats] = useState<any[]>([]);
+@@ -183,7 +195,7 @@ export default function Dashboard() {
+         if (Array.isArray(attentionData) && attentionData.length > 0) {
+           const processedAttention = attentionData.map((item, idx) => ({
+             id: idx,
+-            message: item.message,
++            message: translateAttentionMessage(item),
+             icon: item.severity === 'high' ? AlertTriangle : Clock,
+             severity: item.severity
+           }));
+diff --git a/ury/ury/api/ury_dashboard.py b/ury/ury/api/ury_dashboard.py
+index 9120d69b..55157ec1 100644
+--- a/ury/ury/api/ury_dashboard.py
++++ b/ury/ury/api/ury_dashboard.py
+@@ -96,6 +96,7 @@ def get_needs_attention(branch=None):
+ 	if pending:
+ 		items.append({
+ 			"type": "pending_payment",
++			"count": len(pending),
+ 			"message": f"{len(pending)} order(s) pending payment for over 15 minutes",
+ 			"severity": "high",
+ 			"reference": None,
+@@ -109,6 +110,7 @@ def get_needs_attention(branch=None):
+ 	if tables:
+ 		items.append({
+ 			"type": "table_occupied_long",
++			"count": len(tables),
+ 			"message": f"{len(tables)} table(s) occupied for over 60 minutes",
+ 			"severity": "medium",
+ 			"reference": None,
+@@ -122,6 +124,7 @@ def get_needs_attention(branch=None):
+ 	if kot_errors:
+ 		items.append({
+ 			"type": "kot_errors",
++			"count": len(kot_errors),
+ 			"message": f"{len(kot_errors)} KOT generation issue(s) in the last hour",
+ 			"severity": "high",
+ 			"reference": None,
+@@ -135,6 +138,7 @@ def get_needs_attention(branch=None):
+ 	if stale_sessions:
+ 		items.append({
+ 			"type": "unclosed_pos_session",
++			"count": len(stale_sessions),
+ 			"message": f"{len(stale_sessions)} POS session(s) left open from a previous day",
+ 			"severity": "high",
+ 			"reference": None,
+-- 
+2.54.0 (Apple Git-157)
+
