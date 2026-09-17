@@ -35,6 +35,7 @@ import { EmployeeSales } from './pages/Reports/EmployeeSales';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
+import { initFrontendI18n } from './i18n';
 
 interface WizardStatus {
   step1_complete: boolean;
@@ -43,6 +44,11 @@ interface WizardStatus {
 
 function SetupGuard() {
   const [status, setStatus] = useState<WizardStatus | null>(null);
+
+  useEffect(() => {
+    initFrontendI18n();
+  }, []);
+
 
   useEffect(() => {
     let cancelled = false;

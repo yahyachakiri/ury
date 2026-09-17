@@ -392,7 +392,21 @@ export function initFrontendI18n(): void {
   document.documentElement.lang = language;
   document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   if (language === 'en') return;
-  const translate = () => translateNode(document.body, language);
-  translate();
-  new MutationObserver(translate).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label'] });
+
+  const observerOptions: MutationObserverInit = {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['placeholder', 'title', 'aria-label'],
+  };
+
+  const observer = new MutationObserver(() => {
+    observer.disconnect();
+    translateNode(document.body, language);
+    observer.observe(document.body, observerOptions);
+  });
+
+  translateNode(document.body, language);
+  observer.observe(document.body, observerOptions);
 }
