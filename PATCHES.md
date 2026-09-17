@@ -132,6 +132,36 @@ correctly — retest the specific acceptance criteria above (default
 applied, override respected, edit-preserves-customer, aggregator
 excluded, no-default-configured fallback) after every reapply.
 
+### Patch 04 — Hardcoded currency symbol replaced with Frappe currency label
+ 
+Files touched:
+- frontend/src/pages/Dashboard/MenuPage.tsx
+- frontend/src/pages/Dashboard/QuickActions.tsx
+What it does: replaces a hardcoded "₹" in two form labels (Standard
+Rate and Price fields) with the site's actual configured currency,
+read from `frappe.boot.sysdefaults.currency`, the same global already
+used elsewhere in this fork for language detection.
+ 
+Why it can't be done upstream-agnostic: the currency symbol was typed
+directly into JSX label text, not read from any config at render time.
+ 
+Commit: dfd562a530af626ef65d3a99bbf3998f2e778bf5
+ 
+Risk profile: low, static label text, unlikely to conflict on future
+upstream updates.
+ 
+KNOWN GAP, not covered by this patch: `frontend/src/utils/format.ts`'s
+`formatCurrency()` function still falls back to a hardcoded "₹" when
+`storage.getItem('currencySymbol')` returns nothing, and nothing found
+so far writes that key. This function is called from 18 files across
+the reports pages and the Dashboard KPI grid, meaning every formatted
+monetary amount in those views may still be showing the wrong currency
+symbol regardless of this patch. The same function also hardcodes
+`toLocaleString('en-IN')` number grouping. Needs its own patch, tracked
+separately, before the currency ticket can be considered actually done
+end to end, not just the two labels this commit addressed.
+
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
