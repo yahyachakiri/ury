@@ -1,0 +1,81 @@
+From 9a527ee140c6bd8837876526d4c48b5325aaea20 Mon Sep 17 00:00:00 2001
+From: Yahya CHAKIRI <yahyachakiridev@gmail.com>
+Date: Thu, 17 Sep 2026 07:08:59 +0100
+Subject: [PATCH] fix(i18n): stop MutationObserver feedback loop crashing
+ dashboard
+
+---
+ frontend/src/App.tsx  |  6 ++++++
+ frontend/src/i18n.ts  | 20 +++++++++++++++++---
+ frontend/src/main.tsx |  2 --
+ 3 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 5f64088..1ed6e49 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -35,6 +35,7 @@ import { EmployeeSales } from './pages/Reports/EmployeeSales';
+ import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
+ import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
+ import { DailyPnl } from './pages/Reports/DailyPnl';
++import { initFrontendI18n } from './i18n';
+ 
+ interface WizardStatus {
+   step1_complete: boolean;
+@@ -44,6 +45,11 @@ interface WizardStatus {
+ function SetupGuard() {
+   const [status, setStatus] = useState<WizardStatus | null>(null);
+ 
++  useEffect(() => {
++    initFrontendI18n();
++  }, []);
++
++
+   useEffect(() => {
+     let cancelled = false;
+ 
+diff --git a/frontend/src/i18n.ts b/frontend/src/i18n.ts
+index 902364d..535eefd 100644
+--- a/frontend/src/i18n.ts
++++ b/frontend/src/i18n.ts
+@@ -392,7 +392,21 @@ export function initFrontendI18n(): void {
+   document.documentElement.lang = language;
+   document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+   if (language === 'en') return;
+-  const translate = () => translateNode(document.body, language);
+-  translate();
+-  new MutationObserver(translate).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label'] });
++
++  const observerOptions: MutationObserverInit = {
++    childList: true,
++    subtree: true,
++    characterData: true,
++    attributes: true,
++    attributeFilter: ['placeholder', 'title', 'aria-label'],
++  };
++
++  const observer = new MutationObserver(() => {
++    observer.disconnect();
++    translateNode(document.body, language);
++    observer.observe(document.body, observerOptions);
++  });
++
++  translateNode(document.body, language);
++  observer.observe(document.body, observerOptions);
+ }
+diff --git a/frontend/src/main.tsx b/frontend/src/main.tsx
+index 38f1a7f..44b7432 100644
+--- a/frontend/src/main.tsx
++++ b/frontend/src/main.tsx
+@@ -5,9 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
+ import { StrictMode } from 'react'
+ import { ToastProvider } from '@ury/ui'
+ import { createRoot } from 'react-dom/client'
+-import { initFrontendI18n } from './i18n'
+ 
+-initFrontendI18n()
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+     <BrowserRouter basename="/ury">
+-- 
+2.43.0

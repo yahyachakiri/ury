@@ -73,6 +73,13 @@ Files touched:
 - `frontend/src/i18n.ts`
 - `frontend/src/main.tsx`
 
+### Patch 03 — Management frontend translation, dashboard loop fix
+
+Files touched:
+- `frontend/src/i18n.ts`
+- `frontend/src/main.tsx`
+- `frontend/src/App.tsx (SetupGuard component)`
+
 What it does: routes Dashboard, management frontend, and POS page user-facing text, including
 the previous-day session warning, through the existing translation function
 and fills in missing or incorrect English, French, and Arabic translation
