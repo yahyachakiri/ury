@@ -35,6 +35,7 @@ interface MenuItemRow {
 type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course';
 
 export const MenuPage: React.FC = () => {
+  const currencyLabel = (window as any).frappe?.boot?.sysdefaults?.currency;
   const { activeBranchId } = useBranchContext();
   const [menus, setMenus] = useState<URYMenuRecord[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<string>('');
@@ -1014,7 +1015,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Standard Rate (₹) <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">Standard Rate ({currencyLabel}) <span className="text-red-500">*</span></label>
             <Input
               type="number"
               value={newItem.rate}
@@ -1076,7 +1077,7 @@ export const MenuPage: React.FC = () => {
               {/* Header Row */}
               <div className="flex gap-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 <div className="flex-[3]">Item</div>
-                <div className="flex-[1.5]">Price (₹)</div>
+                <div className="flex-[1.5]">Price ({currencyLabel})</div>
                 {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
               </div>
 

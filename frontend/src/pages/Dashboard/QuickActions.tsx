@@ -7,6 +7,7 @@ import { useBranchContext } from '../../context/BranchContext';
 type ModalType = 'menu' | 'table' | 'room' | 'branch' | 'user' | null;
 
 export const QuickActions: React.FC = () => {
+  const currencyLabel = (window as any).frappe?.boot?.sysdefaults?.currency;
   const navigate = useNavigate();
   const { refreshDashboard } = useBranchContext();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -255,7 +256,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
+              <label className="block font-semibold text-gray-700 mb-1">Price ({currencyLabel})</label>
               <Input
                 type="number"
                 placeholder="280"
