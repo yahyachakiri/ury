@@ -49,6 +49,7 @@ Files touched:
 - `pos/index.html` (the `<title>URY POS</title>` line)
 - `pos/src/components/HufLogo.tsx` (or its usage site)
 - `pos/src/pages/Dashboard.tsx` (where `HufLogo` is rendered)
+- `pos/src/components/Header.tsx` (the header logo image)
 - `frontend/Public/URY-bg.png`
 - `frontend/Public/photo_2026-08-19_13-24-09.jpg`
 - `mosaic/src/assets/logos/mosaic.jpg`
@@ -59,7 +60,9 @@ What it does: replaces the favicon and POS icon assets, the browser tab
 title, and removes or replaces the small branding SVG rendered on the
 Dashboard page. It also replaces the logo images used by the management
 frontend and the Mosaic app, and shortens the two dashboard link card
-labels to `POS` and `MOSAIC`.
+labels to `POS` and `MOSAIC`. The POS header no longer renders the logo
+image and shows the plain text "POS" instead, still linking to
+`/dashboard`.
 
 Image files are replaced in place, keeping the same filename and path,
 so no import or reference needs to change. This keeps the diff against
@@ -70,10 +73,13 @@ Why it can't be done upstream-agnostic: these are static assets and
 hardcoded markup, not read from any Frappe setting or config file at
 runtime.
 
-Risk profile: low. These files change rarely upstream. A conflict here
-usually means upstream changed their own branding, in which case just
-reapply the same replacement logic against the new files. For a
-conflict on an image file, keep this fork's version.
+Risk profile: low to medium. Most of these files change rarely upstream.
+`pos/src/components/Header.tsx` is an actively edited component, so a
+conflict there means reapplying the same replacement by hand (replace
+the logo `img` with the text "POS"). A conflict elsewhere usually means
+upstream changed their own branding, in which case just reapply the
+same replacement logic against the new files. For a conflict on an
+image file, keep this fork's version.
 
 Rebuild note: `pos`, `frontend` and `mosaic` are built separately, so
 rebuild each one after applying this patch, then clear cache and
@@ -211,7 +217,8 @@ silently overwrite this output.
 5. For patch 04 specifically: manually re-verify all five acceptance
    criteria listed above, not just that the diff applied cleanly.
 6. For patch 01 specifically: keep this fork's version of any conflicting
-   image file, and re-check the two KPIGrid labels.
+   image file, re-check the two KPIGrid labels, and re-check the header
+in `pos/src/components/Header.tsx`.
 7. Rebuild `pos`, `frontend` and `mosaic`, confirm output at
    `ury/public/pos`.
 8. Update the pinned commit hash and date at the top of this file.
