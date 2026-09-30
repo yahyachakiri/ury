@@ -4,7 +4,7 @@ This repository is a fork of `https://github.com/ury-erp/ury`
 (AGPL-3.0), maintained privately to carry a small, deliberately minimal
 patch set on top of a pinned upstream commit. It exists only because URY
 POS is a compiled React application with no runtime configuration point
-for the three things listed below — everything else about this project's
+for the things listed below — everything else about this project's
 customizations lives in the separate `erp_restaurant` Frappe app instead,
 as ordinary hooks, and does not touch this repo at all. See
 `erp_restaurant`'s `URY_FORK_MAINTENANCE.md` for the full picture of how
@@ -37,6 +37,10 @@ file under `patches/`, naming convention `NN-short-description.patch`),
 kept as small as possible so it's easy to reapply and easy to reason
 about in isolation.
 
+Patches containing binary files (currently Patch 01) must be generated
+with `git diff --binary`, not a plain `git diff`, otherwise the images
+are not included. Use `make-patch.sh` for this.
+
 ### Patch 01 — Branding replacement
 
 Files touched:
@@ -45,10 +49,22 @@ Files touched:
 - `pos/index.html` (the `<title>URY POS</title>` line)
 - `pos/src/components/HufLogo.tsx` (or its usage site)
 - `pos/src/pages/Dashboard.tsx` (where `HufLogo` is rendered)
+- `frontend/Public/URY-bg.png`
+- `frontend/Public/photo_2026-08-19_13-24-09.jpg`
+- `mosaic/src/assets/logos/mosaic.jpg`
+- `frontend/src/pages/Dashboard/KPIGrid.tsx` (the `URY POS` and
+  `URY MOSAIC` link card labels)
 
 What it does: replaces the favicon and POS icon assets, the browser tab
 title, and removes or replaces the small branding SVG rendered on the
-Dashboard page.
+Dashboard page. It also replaces the logo images used by the management
+frontend and the Mosaic app, and shortens the two dashboard link card
+labels to `POS` and `MOSAIC`.
+
+Image files are replaced in place, keeping the same filename and path,
+so no import or reference needs to change. This keeps the diff against
+upstream small. The filenames still contain "ury", which is only visible
+in the repo, not in the UI.
 
 Why it can't be done upstream-agnostic: these are static assets and
 hardcoded markup, not read from any Frappe setting or config file at
@@ -56,7 +72,17 @@ runtime.
 
 Risk profile: low. These files change rarely upstream. A conflict here
 usually means upstream changed their own branding, in which case just
-reapply the same replacement logic against the new files.
+reapply the same replacement logic against the new files. For a
+conflict on an image file, keep this fork's version.
+
+Rebuild note: `pos`, `frontend` and `mosaic` are built separately, so
+rebuild each one after applying this patch, then clear cache and
+hard-refresh the browser.
+
+KNOWN GAP, not yet verified: other places that may still show URY
+branding, such as the management frontend tab title, favicon, PWA
+manifest name, print formats, and locale strings containing "URY". Check
+these before treating the logo removal as complete.
 
 ### Patch 02 — French and Arabic locale content
 
@@ -101,7 +127,7 @@ audit Dashboard for new literals before rebuilding. Missing keys will not
 break anything (they fall back to English), but untranslated user-facing
 text should not silently accumulate.
 
-### Patch 03 — Default customer from POS Profile
+### Patch 04 — Default customer from POS Profile
 
 Files touched:
 - `pos/src/store/pos-store.ts`
@@ -132,24 +158,25 @@ correctly — retest the specific acceptance criteria above (default
 applied, override respected, edit-preserves-customer, aggregator
 excluded, no-default-configured fallback) after every reapply.
 
-### Patch 04 — Hardcoded currency symbol replaced with Frappe currency label
- 
+### Patch 05 — Hardcoded currency symbol replaced with Frappe currency label
+
 Files touched:
-- frontend/src/pages/Dashboard/MenuPage.tsx
-- frontend/src/pages/Dashboard/QuickActions.tsx
+- `frontend/src/pages/Dashboard/MenuPage.tsx`
+- `frontend/src/pages/Dashboard/QuickActions.tsx`
+
 What it does: replaces a hardcoded "₹" in two form labels (Standard
 Rate and Price fields) with the site's actual configured currency,
 read from `frappe.boot.sysdefaults.currency`, the same global already
 used elsewhere in this fork for language detection.
- 
+
 Why it can't be done upstream-agnostic: the currency symbol was typed
 directly into JSX label text, not read from any config at render time.
- 
-Commit: dfd562a530af626ef65d3a99bbf3998f2e778bf5
- 
+
+Commit: `dfd562a530af626ef65d3a99bbf3998f2e778bf5`
+
 Risk profile: low, static label text, unlikely to conflict on future
 upstream updates.
- 
+
 KNOWN GAP, not covered by this patch: `frontend/src/utils/format.ts`'s
 `formatCurrency()` function still falls back to a hardcoded "₹" when
 `storage.getItem('currencySymbol')` returns nothing, and nothing found
@@ -161,39 +188,42 @@ symbol regardless of this patch. The same function also hardcodes
 separately, before the currency ticket can be considered actually done
 end to end, not just the two labels this commit addressed.
 
-
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
 same repo. There is no separate output directory to manage — building
 `pos` from this patched tree, and deploying this repo's `ury/public/pos`
-output, is what puts the patches live. See
-`erp_restaurant`'s `URY_FORK_MAINTENANCE.md` for the full deployment
-sequence, including the gotcha where a plain `bench build` against a
-freshly updated, unpatched `ury` checkout will silently overwrite this
-output.
+output, is what puts the patches live. The `frontend` and `mosaic` apps
+are built separately and must also be rebuilt when their files change
+(Patches 01, 03, 05). See `erp_restaurant`'s `URY_FORK_MAINTENANCE.md`
+for the full deployment sequence, including the gotcha where a plain
+`bench build` against a freshly updated, unpatched `ury` checkout will
+silently overwrite this output.
 
 ## Update checklist (short form)
 
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01, 02, 03 in order against the new base.
-4. For patch 02 specifically: check `en.json` for new keys and translate
-   them into `fr.json` and `ar.json`.
-5. For patch 03 specifically: manually re-verify all five acceptance
+3. Reapply patches 01 to 05 in order against the new base.
+4. For patches 02 and 03 specifically: check `en.json` for new keys and
+   translate them into `fr.json` and `ar.json`.
+5. For patch 04 specifically: manually re-verify all five acceptance
    criteria listed above, not just that the diff applied cleanly.
-6. Rebuild `pos`, confirm output at `ury/public/pos`.
-7. Update the pinned commit hash and date at the top of this file.
-8. Update the same information in `erp_restaurant`'s
+6. For patch 01 specifically: keep this fork's version of any conflicting
+   image file, and re-check the two KPIGrid labels.
+7. Rebuild `pos`, `frontend` and `mosaic`, confirm output at
+   `ury/public/pos`.
+8. Update the pinned commit hash and date at the top of this file.
+9. Update the same information in `erp_restaurant`'s
    `URY_FORK_MAINTENANCE.md` so the two repos stay in sync.
 
 ## Explicit non-goals
 
 This fork is not a general-purpose customization surface. Anything that
 can be implemented as a Frappe hook, custom field, or server-side API in
-`erp_restaurant` belongs there, not here. Keeping this patch set to
-exactly these three items is a deliberate choice to minimize what has to
-survive every URY update — resist the urge to add a fourth patch here
+`erp_restaurant` belongs there, not here. Keeping this patch set as
+small as possible is a deliberate choice to minimize what has to
+survive every URY update — resist the urge to add another patch here
 without first confirming it truly can't be done from `erp_restaurant`
 instead.

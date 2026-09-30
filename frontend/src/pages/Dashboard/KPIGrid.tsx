@@ -68,13 +68,13 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LinkCard
           logoSrc={uryPosLogo}
-          label="URY POS"
+          label="POS"
           href="/pos"
         />
 
         <LinkCard
           logoSrc={uryMosaicLogo}
-          label="URY MOSAIC"
+          label="MOSAIC"
           href="/mosaic"
         />
 
