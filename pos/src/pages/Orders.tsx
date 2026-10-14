@@ -243,6 +243,7 @@ export default function Orders() {
         table: order.restaurant_table || null,
         room: order.custom_restaurant_room || null,
         items,
+        lastModifiedTime: order.modified || null,
       });
 
       // Redirect to POS page

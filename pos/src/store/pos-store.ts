@@ -102,6 +102,8 @@ interface OrderTabState {
   isUpdatingOrder: boolean;
   orderComment: string;
   originalCartHash: string;
+  // Optional so tabs saved to localStorage before this field existed still load.
+  lastModifiedTime?: string | null;
 }
 
 interface POSState {
@@ -198,6 +200,7 @@ interface POSStore extends POSState {
     table: string | null;
     room: string | null;
     items: OrderItem[];
+    lastModifiedTime?: string | null;
   }) => void;
   reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
   setNoOfPax: (pax: number) => void;
@@ -865,6 +868,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: targetTabState.isUpdatingOrder,
         orderComment: targetTabState.orderComment,
         originalCartHash: targetTabState.originalCartHash,
+        lastModifiedTime: targetTabState.lastModifiedTime ?? null,
         selectedItem: null,
         orderLoading: false,
         error: null,
@@ -887,6 +891,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: false,
         orderComment: '',
         originalCartHash: '',
+        lastModifiedTime: null,
         selectedItem: null,
         orderLoading: false,
         error: null,
@@ -909,6 +914,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: state.isUpdatingOrder,
       orderComment: state.orderComment,
       originalCartHash: state.originalCartHash,
+      lastModifiedTime: state.lastModifiedTime,
     };
     
     const newTabId = uuidv4();
@@ -966,6 +972,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: state.isUpdatingOrder,
       orderComment: state.orderComment,
       originalCartHash: state.originalCartHash,
+      lastModifiedTime: state.lastModifiedTime,
     };
 
     const newHeldTabs = { ...state.heldTabs, [state.activeTabId]: currentTabState };
@@ -984,6 +991,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: targetTabState.isUpdatingOrder,
       orderComment: targetTabState.orderComment,
         originalCartHash: targetTabState.originalCartHash,
+      lastModifiedTime: targetTabState.lastModifiedTime ?? null,
     });
   },
 
@@ -1012,6 +1020,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: false,
         orderComment: '',
         originalCartHash: '',
+        lastModifiedTime: null,
         selectedItem: null,
         orderLoading: false,
         error: null,
@@ -1041,6 +1050,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: targetTabState.isUpdatingOrder,
         orderComment: targetTabState.orderComment,
         originalCartHash: targetTabState.originalCartHash,
+        lastModifiedTime: targetTabState.lastModifiedTime ?? null,
         selectedItem: null,
         orderLoading: false,
         error: null,
@@ -1078,6 +1088,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: state.isUpdatingOrder,
         orderComment: state.orderComment,
       originalCartHash: state.originalCartHash,
+      lastModifiedTime: state.lastModifiedTime,
       };
       const newHeldTabs = { ...state.heldTabs, [state.activeTabId]: currentTabState };
       const targetTabState = newHeldTabs[existingTabId];
@@ -1094,6 +1105,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         isUpdatingOrder: targetTabState.isUpdatingOrder,
         orderComment: targetTabState.orderComment,
         originalCartHash: targetTabState.originalCartHash,
+        lastModifiedTime: targetTabState.lastModifiedTime ?? null,
       });
       return;
     }
@@ -1110,6 +1122,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: state.isUpdatingOrder,
       orderComment: state.orderComment,
       originalCartHash: state.originalCartHash,
+      lastModifiedTime: state.lastModifiedTime,
     };
 
     // Create a new tab for the draft order
@@ -1132,6 +1145,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: true,
       orderComment: '',
       originalCartHash: generateCartHash({ activeOrders: draft.items, selectedCustomer: draft.customer, orderComment: '' }),
+      lastModifiedTime: draft.lastModifiedTime ?? null,
       selectedItem: null,
       error: null,
     });
