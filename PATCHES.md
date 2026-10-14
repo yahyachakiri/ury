@@ -194,6 +194,63 @@ symbol regardless of this patch. The same function also hardcodes
 separately, before the currency ticket can be considered actually done
 end to end, not just the two labels this commit addressed.
 
+### Patch 06 — Carry the order's last modified time through draft tabs
+
+Files touched:
+- `pos/src/store/pos-store.ts` (`OrderTabState`, `openDraftOrderInNewTab`,
+  `addTab`, `switchTab`, `closeTab`, `resetOrderState`)
+- `pos/src/pages/Orders.tsx` (`handleEditOrder`)
+
+What it does: an order reopened from the Orders page ("Edit") opens in a
+draft tab, and that path never set `lastModifiedTime`, nor did tab
+save/restore carry it. `OrderPanel.tsx` then sent the update without
+`last_modified_time`, and `sync_order` in
+`ury/ury/doctype/ury_order/ury_order.py` skipped its concurrency check
+and fell into the "Table occupied: None is already occupied" branch for
+any user without a billing role. The patch passes the POS Invoice's
+`modified` value into the draft tab, stores it in each held tab, restores
+it on tab switch/close, and clears it in the fresh-tab branches of
+`resetOrderState` and `closeTab` (`addTab` already did). Previously
+`resetOrderState` left the last submitted order's value in
+place, which could make the next update fail with "Order has been
+modified"). The field is optional on `OrderTabState` so tabs saved in
+localStorage before this patch still load.
+
+Why it can't be done in `erp_restaurant`: the value is missing from the
+browser request. Relaxing the server check instead would remove the
+concurrency protection, and `sync_order` is URY source.
+
+Acceptance criteria (manual, on the server, as a cashier without a role
+in the POS Profile's "Allowed roles for billing"):
+1. Send a takeaway order, reopen it from Orders, add an item, send again:
+   succeeds, and the new KOT holds only the added item.
+2. Same for a dine-in order on a table.
+3. With two draft tabs open, switch between them, then update each:
+   both succeed.
+4. A printed invoice still returns "Invoice Already Billed" for that
+   cashier (intended lock, unchanged).
+5. Patch 04 default customer still behaves as described above.
+6. A second cashier still cannot overwrite a table occupied by another
+   cashier's unpaid order (intended lock, unchanged).
+7. Expected side effect: the draft path now runs the concurrency check
+   for every user, billing users included. If the order changes
+   elsewhere while its tab is held, the next send fails with "Order has
+   been modified". Fix: close that tab and reopen the order from Orders.
+
+Deploy note: draft tabs held in a browser before this patch have no
+stored timestamp and will hit the old error once. After deploying, close
+open draft tabs or log out (logout clears the saved tabs).
+
+Commit: `5e0f06808b136f89933771de7555d40d7b6ff985`
+
+Depends on Patch 04: the patch file's context lines include Patch 04's
+`getDefaultCustomer` calls, so apply it after 04.
+
+Risk profile: high. `pos-store.ts` is actively edited upstream; on a
+conflict, re-add `lastModifiedTime` next to every `originalCartHash`
+line in the tab save/restore blocks and to the draft object built in
+`Orders.tsx`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
@@ -211,7 +268,7 @@ silently overwrite this output.
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01 to 05 in order against the new base.
+3. Reapply patches 01 to 06 in order against the new base.
 4. For patches 02 and 03 specifically: check `en.json` for new keys and
    translate them into `fr.json` and `ar.json`.
 5. For patch 04 specifically: manually re-verify all five acceptance
