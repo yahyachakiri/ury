@@ -70,6 +70,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     fetchPaymentModes();
   }, [fetchPaymentModes]);
 
+  // Patch 09: the POS Profile decides the rounding (erp_restaurant
+  // custom_round_to_half): up to the next 0.5, or the exact total. The server
+  // applies the same rule to the invoice, so the change is 0. null = loading.
+  const [roundToHalf, setRoundToHalf] = useState<boolean | null>(null);
+  useEffect(() => {
+    call.get('erp_restaurant.erp_restaurant.pos_rounding.get_pos_rounding', { pos_profile: posProfile })
+      .then((res: any) => setRoundToHalf(res?.message?.round_to_half === 1))
+      .catch(() => setRoundToHalf(false));
+  }, [posProfile]);
+
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
 
@@ -85,7 +95,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setError(t('errors.discount_exceeds_max'));
       return;
     }
-    const calculatedDiscount = (baseTotal * value) / 100;
+    // Patch 09: whole cents, as ERPNext rounds discount_amount, so the amount
+    // asked matches the saved total.
+    const calculatedDiscount = Math.round(baseTotal * value) / 100;
     setAppliedDiscount(calculatedDiscount);
     setAppliedPercent(value);
     setDiscountAmountValue(round2(calculatedDiscount));
@@ -116,8 +128,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
-  // If discount is applied, round up; else, round normally
-  const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+  // Patch 09: up to the next 0.5 or exact (was: up to 1 MAD with a discount,
+  // nearest MAD without). Merged bills keep upstream rounding: their total
+  // spans two invoices, each rounded by the server.
+  const centsTotal = Math.round(discountedTotal * 100) / 100;
+  const finalTotal = !allowDiscount
+    ? Math.round(discountedTotal)
+    : roundToHalf
+      ? Math.ceil(Number((centsTotal * 2).toFixed(6))) / 2
+      : centsTotal;
 
   // Calculate split payment total
   const payments = paymentModes
@@ -361,8 +380,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0 || isShort}
-            variant={isProcessing || payments.length === 0 || isShort ? "secondary" : "default"}
+            disabled={isProcessing || roundToHalf === null || payments.length === 0 || isShort}
+            variant={isProcessing || roundToHalf === null || payments.length === 0 || isShort ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
