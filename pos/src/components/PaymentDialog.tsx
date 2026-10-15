@@ -22,6 +22,9 @@ interface PaymentDialogProps {
   clearSelectedOrder: () => void;
   discountPercentage?: number;
   discountAmount?: number;
+  // Patch 07: false for merged bills. make_invoice applies the percentage to the
+  // primary invoice only, while grandTotal here is the combined total.
+  allowDiscount?: boolean;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -38,12 +41,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   fetchOrders,
   clearSelectedOrder,
   discountPercentage,
-  discountAmount
+  discountAmount,
+  allowDiscount = true
 }) => {
-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
+  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile, currencySymbol, currency } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
+  // Patch 07: the cashier enters either a percentage or a fixed amount (two
+  // fields, each fills the other); make_invoice always receives a percentage.
   
   // Calculate effective percentage if only amount is provided (for invoice-level discounts)
   const effectivePercentage = discountPercentage 
@@ -53,7 +58,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         : 0);
         
   const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
+  const [discountAmountValue, setDiscountAmountValue] = useState<string>(discountAmount ? String(discountAmount) : '');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
+  // Percentage sent to make_invoice, which sets additional_discount_percentage
+  // from it. Before Patch 07 the amount was sent here and applied as a
+  // percentage (10% of 250 MAD sent 25, the invoice got 25% off).
+  const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
 
   useEffect(() => {
@@ -62,6 +72,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
+
+  const round2 = (n: number) => String(Math.round(n * 100) / 100);
 
   const handleApplyDiscount = () => {
     const value = parseFloat(discountValue);
@@ -75,6 +87,25 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     }
     const calculatedDiscount = (baseTotal * value) / 100;
     setAppliedDiscount(calculatedDiscount);
+    setAppliedPercent(value);
+    setDiscountAmountValue(round2(calculatedDiscount));
+    setError(null);
+  };
+
+  const handleApplyDiscountAmount = () => {
+    const value = parseFloat(discountAmountValue);
+    if (isNaN(value) || value <= 0) {
+      setError(t('errors.invalid_discount'));
+      return;
+    }
+    if (value > baseTotal) {
+      setError(t('errors.discount_exceeds_total'));
+      return;
+    }
+    const percent = baseTotal > 0 ? (value / baseTotal) * 100 : 0;
+    setAppliedDiscount(value);
+    setAppliedPercent(percent);
+    setDiscountValue(round2(percent));
     setError(null);
   };
 
@@ -142,7 +173,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: appliedDiscount > 0 ? appliedDiscount : null,
+        additionalDiscount: appliedPercent > 0 ? appliedPercent : null,
         cashier,
         customer,
         invoice,
@@ -182,13 +213,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
 
           {/* Discount Section (conditional) */}
-          {storePosProfile?.enable_discount === 1 && (
+          {storePosProfile?.enable_discount === 1 && allowDiscount && (
             <div className="space-y-4 mb-6">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Percent className="w-5 h-5" />
                 {t('payment.apply_discount')}
               </h3>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <span className="w-12 text-sm font-medium text-gray-700">%</span>
                 <Input
                   type="number"
                   value={discountValue}
@@ -199,6 +231,26 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 />
                 <Button
                   onClick={handleApplyDiscount}
+                  variant="default"
+                  size="sm"
+                >
+                  {t('common.apply')}
+                </Button>
+              </div>
+              <div className="flex gap-2 items-center">
+                <span className="w-12 text-sm font-medium text-gray-700">{currencySymbol || currency}</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={discountAmountValue}
+                  onChange={(e) => setDiscountAmountValue(e.target.value)}
+                  placeholder={t('payment.discount_amount_placeholder')}
+                  size="sm"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleApplyDiscountAmount}
                   variant="default"
                   size="sm"
                 >
