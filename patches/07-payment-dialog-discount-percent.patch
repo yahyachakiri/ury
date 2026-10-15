@@ -1,0 +1,205 @@
+diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
+index 8e72336f..a6598a4c 100644
+--- a/pos/src/components/PaymentDialog.tsx
++++ b/pos/src/components/PaymentDialog.tsx
+@@ -22,6 +22,9 @@ interface PaymentDialogProps {
+   clearSelectedOrder: () => void;
+   discountPercentage?: number;
+   discountAmount?: number;
++  // Patch 07: false for merged bills. make_invoice applies the percentage to the
++  // primary invoice only, while grandTotal here is the combined total.
++  allowDiscount?: boolean;
+ }
+ 
+ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -38,12 +41,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+   fetchOrders,
+   clearSelectedOrder,
+   discountPercentage,
+-  discountAmount
++  discountAmount,
++  allowDiscount = true
+ }) => {
+-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
++  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile, currencySymbol, currency } = usePOSStore();
+   const [isProcessing, setIsProcessing] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
++  // Patch 07: the cashier enters either a percentage or a fixed amount (two
++  // fields, each fills the other); make_invoice always receives a percentage.
+   
+   // Calculate effective percentage if only amount is provided (for invoice-level discounts)
+   const effectivePercentage = discountPercentage 
+@@ -53,7 +58,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+         : 0);
+         
+   const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
++  const [discountAmountValue, setDiscountAmountValue] = useState<string>(discountAmount ? String(discountAmount) : '');
+   const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
++  // Percentage sent to make_invoice, which sets additional_discount_percentage
++  // from it. Before Patch 07 the amount was sent here and applied as a
++  // percentage (10% of 250 MAD sent 25, the invoice got 25% off).
++  const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
+   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
+ 
+   useEffect(() => {
+@@ -63,6 +73,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
+   const baseTotal = grandTotal + (discountAmount || 0);
+ 
++  const round2 = (n: number) => String(Math.round(n * 100) / 100);
++
+   const handleApplyDiscount = () => {
+     const value = parseFloat(discountValue);
+     if (isNaN(value) || value <= 0) {
+@@ -75,6 +87,25 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+     }
+     const calculatedDiscount = (baseTotal * value) / 100;
+     setAppliedDiscount(calculatedDiscount);
++    setAppliedPercent(value);
++    setDiscountAmountValue(round2(calculatedDiscount));
++    setError(null);
++  };
++
++  const handleApplyDiscountAmount = () => {
++    const value = parseFloat(discountAmountValue);
++    if (isNaN(value) || value <= 0) {
++      setError(t('errors.invalid_discount'));
++      return;
++    }
++    if (value > baseTotal) {
++      setError(t('errors.discount_exceeds_total'));
++      return;
++    }
++    const percent = baseTotal > 0 ? (value / baseTotal) * 100 : 0;
++    setAppliedDiscount(value);
++    setAppliedPercent(percent);
++    setDiscountValue(round2(percent));
+     setError(null);
+   };
+ 
+@@ -142,7 +173,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+     setError(null);
+     try {
+       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+-        additionalDiscount: appliedDiscount > 0 ? appliedDiscount : null,
++        additionalDiscount: appliedPercent > 0 ? appliedPercent : null,
+         cashier,
+         customer,
+         invoice,
+@@ -182,13 +213,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+           </div>
+ 
+           {/* Discount Section (conditional) */}
+-          {storePosProfile?.enable_discount === 1 && (
++          {storePosProfile?.enable_discount === 1 && allowDiscount && (
+             <div className="space-y-4 mb-6">
+               <h3 className="text-lg font-semibold flex items-center gap-2">
+                 <Percent className="w-5 h-5" />
+                 {t('payment.apply_discount')}
+               </h3>
+-              <div className="flex gap-2">
++              <div className="flex gap-2 items-center">
++                <span className="w-12 text-sm font-medium text-gray-700">%</span>
+                 <Input
+                   type="number"
+                   value={discountValue}
+@@ -205,6 +237,26 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+                   {t('common.apply')}
+                 </Button>
+               </div>
++              <div className="flex gap-2 items-center">
++                <span className="w-12 text-sm font-medium text-gray-700">{currencySymbol || currency}</span>
++                <Input
++                  type="number"
++                  min="0"
++                  step="0.01"
++                  value={discountAmountValue}
++                  onChange={(e) => setDiscountAmountValue(e.target.value)}
++                  placeholder={t('payment.discount_amount_placeholder')}
++                  size="sm"
++                  className="flex-1"
++                />
++                <Button
++                  onClick={handleApplyDiscountAmount}
++                  variant="default"
++                  size="sm"
++                >
++                  {t('common.apply')}
++                </Button>
++              </div>
+             </div>
+           )}
+ 
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 2d0dcac4..a28ec15c 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -77,6 +77,7 @@
+         "title": "الدفع",
+         "apply_discount": "تطبيق الخصم",
+         "discount_placeholder": "أدخل نسبة %",
++        "discount_amount_placeholder": "أدخل المبلغ",
+         "payment_methods": "طرق الدفع",
+         "amount_placeholder": "المبلغ",
+         "total_entered": "الإجمالي المدخل",
+@@ -243,6 +244,7 @@
+         "print_failed": "فشلت الطباعة: {{reason}}",
+         "invalid_discount": "يرجى إدخال قيمة خصم صحيحة",
+         "discount_exceeds_max": "لا يمكن أن تتجاوز نسبة الخصم 100٪",
++        "discount_exceeds_total": "لا يمكن أن يتجاوز الخصم إجمالي الطلب",
+         "please_print_first": "يرجى طباعة الفاتورة قبل إتمام عملية الدفع",
+         "enter_cancel_reason": "يرجى إدخال سبب للإلغاء.",
+         "dine_in_restricted": "الطلبات المحلية غير متاحة للدور الخاص بك",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index f5d482e6..b369d778 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -70,6 +70,7 @@
+     "title": "Payment",
+     "apply_discount": "Apply Discount",
+     "discount_placeholder": "Enter %",
++    "discount_amount_placeholder": "Enter amount",
+     "payment_methods": "Payment Methods",
+     "amount_placeholder": "Amount",
+     "total_entered": "Total Entered",
+@@ -236,6 +237,7 @@
+     "print_failed": "Print failed: {{reason}}",
+     "invalid_discount": "Please enter a valid discount value",
+     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
++    "discount_exceeds_total": "Discount cannot exceed the order total",
+     "please_print_first": "Please print invoice before making payment",
+     "enter_cancel_reason": "Please enter a reason for cancellation.",
+     "dine_in_restricted": "Dine In is not available for your role",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index ad696a96..ac1c8655 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -70,6 +70,7 @@
+     "title": "Paiement",
+     "apply_discount": "Appliquer une remise",
+     "discount_placeholder": "Entrer %",
++    "discount_amount_placeholder": "Entrer le montant",
+     "payment_methods": "Modes de paiement",
+     "amount_placeholder": "Montant",
+     "total_entered": "Total saisi",
+@@ -236,6 +237,7 @@
+     "print_failed": "Échec d'impression : {{reason}}",
+     "invalid_discount": "Veuillez entrer une valeur de remise valide",
+     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
++    "discount_exceeds_total": "La remise ne peut pas dépasser le total de la commande",
+     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
+     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
+     "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index d7992a7d..4a2762a2 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -781,6 +781,7 @@ export default function Orders() {
+           clearSelectedOrder={clearSelectedOrder}
+           discountPercentage={selectedOrder.additional_discount_percentage}
+           discountAmount={selectedOrder.discount_amount}
++          allowDiscount={!isMergedBill(selectedOrder)}
+         />
+       )}
+       {selectedOrder && (

@@ -251,6 +251,78 @@ conflict, re-add `lastModifiedTime` next to every `originalCartHash`
 line in the tab save/restore blocks and to the draft object built in
 `Orders.tsx`.
 
+### Patch 07 — Payment dialog discount: send a percentage, add a fixed-amount mode
+
+Bug fix plus feature (PRD 7.5, ticket 05): the fix is sending the percentage;
+the amount field is the amount entry the PRD asks for.
+
+Files touched:
+- `pos/src/components/PaymentDialog.tsx`
+- `pos/src/pages/Orders.tsx` (passes `allowDiscount={!isMergedBill(...)}`)
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (keys
+  `payment.discount_amount_placeholder`, `errors.discount_exceeds_total`)
+
+What it does: upstream, the dialog took a percentage, converted it to an
+amount for display, and sent that amount as `additionalDiscount` to
+`ury.ury.doctype.ury_order.ury_order.make_invoice`, which applies it as
+`additional_discount_percentage`. Seen live on 2026-10-15: a 250 MAD pizza
+with 10% was collected at 225, but the POS Invoice got 25% off (187.5). The
+patch keeps the displayed amount and sends the percentage instead. It also
+adds an amount field under the percentage field: the cashier types either a
+percentage or a MAD amount (at most the order total), applying one fills the
+other with the equivalent, and the dialog always sends the percentage
+(amount / total x 100, full precision), so make_invoice stays unchanged.
+The discount section is hidden on merged bills: make_invoice applies the
+percentage to the primary invoice only, while the dialog's total is the
+combined one (already wrong upstream in percentage mode). The legacy Vue
+client (`urypos/src/stores/recentOrder.js`) also sends a percentage, which
+confirms what make_invoice expects.
+
+Why it can't be done in `erp_restaurant`: the wrong value is computed and sent
+by the browser. The server cannot tell an amount from a percentage in that
+parameter. The cashier discount cap is enforced server-side in
+`erp_restaurant` (`pos_invoice_discount.py`, POS Profile field
+`custom_max_cashier_discount`), not here.
+
+Preconditions: POS Profile "Enable Discount" on and "Apply Additional
+Discount On" = Grand Total (ERPNext default). With Net Total and exclusive
+taxes, the saved discount_amount is the typed amount divided by (1 + tax).
+
+Acceptance criteria:
+1. 250 MAD order, 10%: dialog shows 225, POS Invoice has
+   additional_discount_percentage 10 and grand total 225.
+2. Same order, 5 in the amount field: the percentage field shows 2, dialog
+   shows 245, POS Invoice grand total 245 (discount amount 5).
+3. Amount above the order total is refused in the dialog
+   ("Discount cannot exceed the order total").
+4. Merged bill: no discount section in the dialog.
+5. Non-whole total, 15% of 33 MAD: dialog asks 29 (it rounds up when a
+   discount applies, upstream behavior); record rounded_total, paid_amount
+   and change_amount (up to 1 MAD of change is expected).
+6. French and Arabic placeholders show; the two rows are labelled "%" and
+   the currency symbol.
+
+Manual test (cashier login, then manager login, POS Profile cap from
+`erp_restaurant` set to 10%):
+1. Cashier: 250 MAD order, 10%, pay 225. Desk: POS Invoice fields
+   additional_discount_percentage, discount_amount, grand_total,
+   rounded_total, paid_amount, change_amount.
+2. Cashier: 250 MAD order, 5 in the amount field, pay 245. Same fields.
+3. Cashier: 250 MAD order, 15%: payment refused with "Discount limit".
+4. Manager: same order, 15%: accepted, grand total 212.5.
+5. Cashier: 33 MAD order, 15%: as in criterion 5.
+6. Merged bill: open its payment dialog, no discount section.
+
+Depends on `erp_restaurant` commit with `pos_invoice_discount.py` for the cap
+(steps 3 and 4).
+
+Commit: `ea5b7449be9331e02e8c139d2378f4b3a92f7d61`
+
+Risk profile: medium. PaymentDialog.tsx is a self-contained component but
+actively edited upstream. On a conflict, keep: the amount field and
+`handleApplyDiscountAmount`, `appliedPercent`, and
+`additionalDiscount: appliedPercent`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
@@ -268,7 +340,7 @@ silently overwrite this output.
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01 to 06 in order against the new base.
+3. Reapply patches 01 to 07 in order against the new base.
 4. For patches 02 and 03 specifically: check `en.json` for new keys and
    translate them into `fr.json` and `ar.json`.
 5. For patch 04 specifically: manually re-verify all five acceptance
