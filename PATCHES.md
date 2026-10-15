@@ -323,6 +323,53 @@ actively edited upstream. On a conflict, keep: the amount field and
 `handleApplyDiscountAmount`, `appliedPercent`, and
 `additionalDiscount: appliedPercent`.
 
+### Patch 08 — Takeaway order opens in Orders, already selected
+
+Feature (PRD 7.6, ticket 06).
+
+Files touched:
+- `pos/src/components/OrderPanel.tsx`
+
+What it does: upstream, confirming an order on the POS page clears the cart
+and stays there; to take payment the cashier opens Orders, finds the order,
+prints it and opens Payment. After this patch, when the order type is
+Take Away and `sync_order` succeeds (new order or update of an existing
+takeaway draft), the POS clears the Orders search, switches the status tab
+to Draft (newest first), selects the saved POS Invoice and navigates to
+`/orders`. The cashier then prints and pays there as before. Dine In,
+Delivery, Phone In and Aggregators are unchanged. No new strings.
+
+Why it can't be done in `erp_restaurant`: it is what the POS React app does
+after a click (route and selected order are browser state). There is no
+server hook or POS Profile setting that changes it. `sync_order` already
+returns the saved invoice, so no backend change is needed.
+
+Acceptance criteria:
+1. New Take Away order, confirm: the POS shows Orders, tab Draft, with the
+   new order selected (its items and total on the right). No search, no click.
+2. Print, then Payment, pay: invoice paid as before (Patch 07 discount still works).
+3. Dine In order, confirm: stays on the POS page as before.
+4. A search typed earlier in Orders does not hide the new order.
+5. Reopen a takeaway draft from Orders, edit, confirm: back in Orders with it selected.
+6. 10 takeaway orders in a row: confirm to Orders screen in under 2 seconds
+   each (record the times).
+
+Manual test (cashier login, POS shift open):
+1. Take Away, 1 x Test Cheeseburger, confirm: Orders, Draft tab, order selected.
+2. Print, Payment, pay: POS Invoice paid, Recently Paid shows it.
+3. Dine In order on a free table, confirm: stays on POS. Cancel it after.
+4. In Orders, type a search, go back to POS, new Take Away order: it is selected.
+5. Reopen a takeaway draft, add an item, confirm: Orders with it selected.
+6. Ten takeaway orders in a row, time each; cancel the test invoices after.
+7. Same flow in French and Arabic (RTL), no new strings expected.
+
+Commit: `d3640cb1f7c7ff67f478213ded27f302adfde24c`
+
+Risk profile: medium. OrderPanel.tsx is a high-risk file (actively edited
+upstream, also changed by Patch 04), but this patch only adds a block after
+the success toast in `handleSubmit`, two imports and `useNavigate`. On a
+conflict, keep that block as is.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
@@ -340,7 +387,7 @@ silently overwrite this output.
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01 to 07 in order against the new base.
+3. Reapply patches 01 to 08 in order against the new base.
 4. For patches 02 and 03 specifically: check `en.json` for new keys and
    translate them into `fr.json` and `ar.json`.
 5. For patch 04 specifically: manually re-verify all five acceptance

@@ -1,0 +1,40 @@
+diff --git a/pos/src/components/OrderPanel.tsx b/pos/src/components/OrderPanel.tsx
+index 71d0dc4e..34e14190 100644
+--- a/pos/src/components/OrderPanel.tsx
++++ b/pos/src/components/OrderPanel.tsx
+@@ -1,4 +1,5 @@
+ import { useState } from 'react';
++import { useNavigate } from 'react-router-dom';
+ import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
+ import { usePOSStore } from '../store/pos-store';
+ import { cn } from '@ury/ui';
+@@ -43,6 +44,7 @@ const OrderPanel = () => {
+     lastModifiedTime
+   } = usePOSStore();
+   const user = useRootStore((state: RootState) => state.user);
++  const navigate = useNavigate();
+   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [showCommentDialog, setShowCommentDialog] = useState(false);
+@@ -142,6 +144,21 @@ const OrderPanel = () => {
+       // Reset all states after successful order submission
+       resetOrderState();
+       showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
++
++      // Patch 08: a takeaway order opens in Orders, already selected, so the
++      // cashier can print and pay without searching for it. sync_order returns
++      // the saved draft POS Invoice; new drafts are first in the Draft list.
++      const savedName = result?.message && 'name' in result.message ? result.message.name : undefined;
++      if (selectedOrderType === 'Take Away' && savedName) {
++        const rootStore = useRootStore.getState();
++        rootStore.setOrderSearchQuery('');
++        await rootStore.setSelectedStatus('Draft');
++        const listed = useRootStore.getState().orders.find((o) => o.name === savedName);
++        if (listed) {
++          useRootStore.getState().selectOrder(listed);
++        }
++        navigate('/orders');
++      }
+     } catch (error) {
+       console.error('Failed to sync order:', error);
+       showToast.error(parseFrappeError(error, t('errors.failed_process_order')));
