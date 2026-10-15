@@ -370,6 +370,58 @@ upstream, also changed by Patch 04), but this patch only adds a block after
 the success toast in `handleSubmit`, two imports and `useNavigate`. On a
 conflict, keep that block as is.
 
+### Patch 09 — Payment dialog rounding follows the POS Profile (0.5 up or exact)
+
+Bug fix plus feature (ticket 05, owner decision 2026-10-15).
+
+Files touched:
+- `pos/src/components/PaymentDialog.tsx`
+
+What it does: upstream, the dialog rounds the amount to collect up to the
+next whole MAD when a discount applies and to the nearest MAD otherwise,
+while ERPNext rounds the saved invoice its own way (halves to even). Live
+2026-10-15: 212.5 collected as 213, invoice rounded total 212, change 1.00
+recorded but never given (ACC-PSINV-2026-00042, -00048). After this patch
+the dialog reads the POS Profile checkbox `custom_round_to_half` through
+`erp_restaurant.erp_restaurant.pos_rounding.get_pos_rounding`: on, the total
+rounds up to the next 0.5 (324.28 -> 324.5); off, the exact total is asked.
+The server applies the same rule in the POS Invoice class
+(`erp_restaurant` `pos_rounding.py`, `override_doctype_class`), so the
+amount asked equals the saved rounded total. A percentage discount is
+rounded to whole cents before it is subtracted, as ERPNext does. The Pay
+button waits for the setting. Merged bills keep upstream rounding on both
+sides (dialog and server).
+No new strings (the "Ajustement" line already exists).
+
+Why it can't be done in `erp_restaurant`: the amount to collect and the
+autofilled cash amount are computed in the browser. The server side of the
+rule lives in `erp_restaurant`.
+
+Acceptance criteria:
+1. Checkbox off: 330 MAD order with 5.5 MAD discount asks 324.5, no
+   Ajustement line; invoice grand total and rounded total 324.5, change 0.
+2. Checkbox on: same order asks 324.5; a 250 MAD order with 15% asks 212.5
+   (no Ajustement); 30 MAD with 2 MAD off (28) asks 28; 324.28 asks 324.5
+   with "Ajustement +0.22". Invoice rounded total equals the amount asked,
+   change 0 when paying exactly.
+3. No discount, checkbox off: exact total asked; 30 MAD with 4.7% (28.59)
+   asks 28.59 and is accepted (not refused as partial payment).
+4. Merged bill: unchanged from upstream.
+5. Split bill with a non-whole total: each part pays its asked total.
+6. Return of a rounded invoice: refund equals the original rounded total.
+
+Depends on `erp_restaurant` `pos_rounding.py` and the POS Profile field
+`custom_round_to_half` (migrate). Without them the setting reads as off.
+
+Commit: `45aaa51fd06e4ad746d07f372279bd1628cd6807`
+
+Risk profile: medium. Same self-contained dialog as Patch 07. It relies on
+`make_invoice` (merged-bill payment split) and `ury_pos_invoice.py` (split
+bill payments) reading `rounded_total` after ERPNext's totals, which the
+`erp_restaurant` class override keeps consistent. On a conflict, keep
+`roundToHalf`, the `finalTotal` rule, the cents rounding of the percentage
+discount and the Pay button wait.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
@@ -387,7 +439,7 @@ silently overwrite this output.
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01 to 08 in order against the new base.
+3. Reapply patches 01 to 09 in order against the new base.
 4. For patches 02 and 03 specifically: check `en.json` for new keys and
    translate them into `fr.json` and `ar.json`.
 5. For patch 04 specifically: manually re-verify all five acceptance
