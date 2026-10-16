@@ -65,6 +65,10 @@ export interface PosProfileFull {
   role_restricted_for_table_order?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
+  // Patch 10: erp_restaurant custom fields (kitchen printing through QZ Tray)
+  custom_auto_print_kitchen_ticket?: number;
+  custom_kitchen_printer?: string | null;
+  custom_bill_printer?: string | null;
 }
 
 // Combined POS Profile with both limited and full fields

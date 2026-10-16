@@ -494,5 +494,11 @@
     "shift_brief_description": "Les résumés de session générés par IA ne sont pas encore connectés. Ce panneau affichera les observations de HUF une fois l'intégration terminée.",
     "recent_notifications": "Notifications récentes",
     "no_recent_notifications": "Aucune notification récente."
+  },
+  "kitchen": {
+    "reprint": "Réimprimer le ticket cuisine",
+    "reprinted": "Ticket cuisine imprimé ({{count}})",
+    "nothing_to_print": "Aucun ticket cuisine pour cette commande",
+    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes."
   }
 }

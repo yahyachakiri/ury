@@ -494,5 +494,11 @@
     "shift_brief_description": "AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.",
     "recent_notifications": "Recent Notifications",
     "no_recent_notifications": "No recent notifications."
+  },
+  "kitchen": {
+    "reprint": "Reprint kitchen ticket",
+    "reprinted": "Kitchen ticket printed ({{count}})",
+    "nothing_to_print": "No kitchen ticket for this order",
+    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders."
   }
 }

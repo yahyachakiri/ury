@@ -12,6 +12,7 @@ import OrderTabs from './OrderTabs';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
+import { printKitchenTickets } from '../lib/print';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from '@ury/ui';
@@ -149,6 +150,14 @@ const OrderPanel = () => {
       // cashier can print and pay without searching for it. sync_order returns
       // the saved draft POS Invoice; new drafts are first in the Draft list.
       const savedName = result?.message && 'name' in result.message ? result.message.name : undefined;
+
+      // Patch 10: print the kitchen tickets sync_order just created, without
+      // blocking the cashier. A failed ticket stays unprinted for Reprint.
+      if (savedName && posProfile.custom_auto_print_kitchen_ticket) {
+        printKitchenTickets({ invoice: savedName, posProfile }).catch((err) => {
+          showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
+        });
+      }
       if (selectedOrderType === 'Take Away' && savedName) {
         const rootStore = useRootStore.getState();
         rootStore.setOrderSearchQuery('');

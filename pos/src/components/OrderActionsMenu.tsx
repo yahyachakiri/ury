@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
+import { ChefHat, GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
@@ -10,6 +10,9 @@ interface OrderActionsMenuProps {
   onSplitBill?: () => void;
   showMergeBill?: boolean;
   onMergeBill?: () => void;
+  // Patch 10: reprint the order's kitchen tickets through QZ Tray.
+  showKitchenReprint?: boolean;
+  onKitchenReprint?: () => void;
 }
 
 const OrderActionsMenu = ({
@@ -19,6 +22,8 @@ const OrderActionsMenu = ({
   onSplitBill,
   showMergeBill = false,
   onMergeBill,
+  showKitchenReprint = false,
+  onKitchenReprint,
 }: OrderActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +40,7 @@ const OrderActionsMenu = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
-  if (!showSplitBill && !showMergeBill) {
+  if (!showSplitBill && !showMergeBill && !showKitchenReprint) {
     return null;
   }
 
@@ -54,6 +59,12 @@ const OrderActionsMenu = ({
     event.stopPropagation();
     onOpenChange(false);
     onMergeBill?.();
+  };
+
+  const handleKitchenReprint = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onKitchenReprint?.();
   };
 
   return (
@@ -89,6 +100,16 @@ const OrderActionsMenu = ({
             >
               <SplitSquareHorizontal className="h-4 w-4 shrink-0" />
               {t('bill_split.split_bill')}
+            </Button>
+          )}
+          {showKitchenReprint && (
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+              onClick={handleKitchenReprint}
+            >
+              <ChefHat className="h-4 w-4 shrink-0" />
+              {t('kitchen.reprint')}
             </Button>
           )}
         </div>

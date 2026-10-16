@@ -16,7 +16,7 @@ import BillMergeDialog from '../components/BillMergeDialog';
 import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
-import { printOrder } from '../lib/print';
+import { printKitchenTickets, printOrder } from '../lib/print';
 import { call } from '@ury/core';
 import { splitBill } from '../lib/order-api';
 import {
@@ -280,6 +280,25 @@ export default function Orders() {
       showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
     } finally {
       setIsPrinting(false);
+    }
+  }
+
+  // Patch 10: reprint every kitchen ticket of the selected order.
+  async function handleKitchenReprint() {
+    if (!selectedOrder || !posStore.posProfile) return;
+    try {
+      const count = await printKitchenTickets({
+        invoice: selectedOrder.name,
+        posProfile: posStore.posProfile,
+        reprint: true,
+      });
+      if (count === 0) {
+        showToast.info(t('kitchen.nothing_to_print'));
+      } else {
+        showToast.success(t('kitchen.reprinted', { count }));
+      }
+    } catch (err: any) {
+      showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
     }
   }
 
@@ -555,6 +574,8 @@ export default function Orders() {
                         onMergeBill={() => setShowMergeDialog(true)}
                         showSplitBill={canSplitBill}
                         onSplitBill={() => setShowSplitDialog(true)}
+                        showKitchenReprint={posStore.posProfile?.print_type === 'qz'}
+                        onKitchenReprint={handleKitchenReprint}
                       />
                       <button
                         type="button"
