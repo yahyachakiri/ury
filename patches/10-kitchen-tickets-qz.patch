@@ -1,0 +1,328 @@
+diff --git a/packages/core/src/print/qz.ts b/packages/core/src/print/qz.ts
+index 5b29ca92..b85e51ce 100644
+--- a/packages/core/src/print/qz.ts
++++ b/packages/core/src/print/qz.ts
+@@ -3,6 +3,7 @@ import axios from 'axios';
+ import { KEYUTIL, KJUR, stob64, hextorstr } from 'jsrsasign';
+ 
+ let injectedSignKey: string | null = null;
++let connecting: Promise<void> | null = null;
+ 
+ export function initPrinting(opts: { signKey: string }) {
+   injectedSignKey = opts.signKey;
+@@ -24,7 +25,14 @@ export async function loadQzPrinter(host: string): Promise<void> {
+       .catch((err) => reject('Error fetching certificate: ' + String(err)));
+   });
+   if (!qz.websocket.isActive()) {
+-    await qz.websocket.connect({ host, usingSecure: false });
++    // Patch 10: kitchen and bill prints can start together; QZ refuses a
++    // second connect while one is pending, so they share the same attempt.
++    if (!connecting) {
++      connecting = qz.websocket.connect({ host, usingSecure: false }).finally(() => {
++        connecting = null;
++      });
++    }
++    await connecting;
+   }
+ }
+ 
+@@ -32,7 +40,9 @@ export function disconnectQzPrinter(): void {
+   if (qz.websocket.isActive()) qz.websocket.disconnect();
+ }
+ 
+-export async function printWithQz(host: string, htmlToPrint: string): Promise<void> {
++// Patch 10: printerName picks a printer installed on the QZ Tray machine;
++// empty keeps upstream behavior (the machine's default printer).
++export async function printWithQz(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
+   const signKey = ensureSignKey();
+ 
+   qz.security.setSignatureAlgorithm('SHA512');
+@@ -50,7 +60,10 @@ export async function printWithQz(host: string, htmlToPrint: string): Promise<vo
+   });
+ 
+   const printing = async () => {
+-    const printer = await qz.printers.getDefault();
++    const wanted = printerName?.trim();
++    // find(name) resolves the first installed printer whose name contains it
++    // (so use the full name) and rejects when none matches.
++    const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
+     const data = [{ type: 'html', format: 'plain', data: htmlToPrint }];
+     const config = qz.configs.create(printer);
+     await qz.print(config, data as any);
+diff --git a/pos/src/components/OrderActionsMenu.tsx b/pos/src/components/OrderActionsMenu.tsx
+index a817cda7..510aa3bf 100644
+--- a/pos/src/components/OrderActionsMenu.tsx
++++ b/pos/src/components/OrderActionsMenu.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+-import { GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
++import { ChefHat, GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
+ import { Button } from '@ury/ui';
+ import { t } from '../i18n';
+ 
+@@ -10,6 +10,9 @@ interface OrderActionsMenuProps {
+   onSplitBill?: () => void;
+   showMergeBill?: boolean;
+   onMergeBill?: () => void;
++  // Patch 10: reprint the order's kitchen tickets through QZ Tray.
++  showKitchenReprint?: boolean;
++  onKitchenReprint?: () => void;
+ }
+ 
+ const OrderActionsMenu = ({
+@@ -19,6 +22,8 @@ const OrderActionsMenu = ({
+   onSplitBill,
+   showMergeBill = false,
+   onMergeBill,
++  showKitchenReprint = false,
++  onKitchenReprint,
+ }: OrderActionsMenuProps) => {
+   const menuRef = useRef<HTMLDivElement>(null);
+ 
+@@ -35,7 +40,7 @@ const OrderActionsMenu = ({
+     return () => document.removeEventListener('mousedown', handleClickOutside);
+   }, [isOpen, onOpenChange]);
+ 
+-  if (!showSplitBill && !showMergeBill) {
++  if (!showSplitBill && !showMergeBill && !showKitchenReprint) {
+     return null;
+   }
+ 
+@@ -56,6 +61,12 @@ const OrderActionsMenu = ({
+     onMergeBill?.();
+   };
+ 
++  const handleKitchenReprint = (event: ReactMouseEvent<HTMLButtonElement>) => {
++    event.stopPropagation();
++    onOpenChange(false);
++    onKitchenReprint?.();
++  };
++
+   return (
+     <div className="relative shrink-0" ref={menuRef}>
+       <Button
+@@ -91,6 +102,16 @@ const OrderActionsMenu = ({
+               {t('bill_split.split_bill')}
+             </Button>
+           )}
++          {showKitchenReprint && (
++            <Button
++              variant="ghost"
++              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
++              onClick={handleKitchenReprint}
++            >
++              <ChefHat className="h-4 w-4 shrink-0" />
++              {t('kitchen.reprint')}
++            </Button>
++          )}
+         </div>
+       )}
+     </div>
+diff --git a/pos/src/components/OrderPanel.tsx b/pos/src/components/OrderPanel.tsx
+index 34e14190..93e5eed2 100644
+--- a/pos/src/components/OrderPanel.tsx
++++ b/pos/src/components/OrderPanel.tsx
+@@ -12,6 +12,7 @@ import OrderTabs from './OrderTabs';
+ import { Button } from '@ury/ui';
+ import { Spinner } from '@ury/ui';
+ import { syncOrder } from '../lib/order-api';
++import { printKitchenTickets } from '../lib/print';
+ import { useRootStore } from '../store/root-store';
+ import type { RootState } from '../store/root-store';
+ import { showToast } from '@ury/ui';
+@@ -149,6 +150,14 @@ const OrderPanel = () => {
+       // cashier can print and pay without searching for it. sync_order returns
+       // the saved draft POS Invoice; new drafts are first in the Draft list.
+       const savedName = result?.message && 'name' in result.message ? result.message.name : undefined;
++
++      // Patch 10: print the kitchen tickets sync_order just created, without
++      // blocking the cashier. A failed ticket stays unprinted for Reprint.
++      if (savedName && posProfile.custom_auto_print_kitchen_ticket) {
++        printKitchenTickets({ invoice: savedName, posProfile }).catch((err) => {
++          showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
++        });
++      }
+       if (selectedOrderType === 'Take Away' && savedName) {
+         const rootStore = useRootStore.getState();
+         rootStore.setOrderSearchQuery('');
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index a28ec15c..9f4ade77 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -501,5 +501,11 @@
+         "shift_brief_description": "لم يتم ربط ملخصات الوردية المكتوبة بالذكاء الاصطناعي بعد. ستعرض هذه اللوحة ملاحظات HUF عن الوردية بعد اكتمال التكامل.",
+         "recent_notifications": "الإشعارات الأخيرة",
+         "no_recent_notifications": "لا توجد إشعارات حديثة."
++    },
++    "kitchen": {
++        "reprint": "إعادة طباعة تذكرة المطبخ",
++        "reprinted": "تمت طباعة تذكرة المطبخ ({{count}})",
++        "nothing_to_print": "لا توجد تذكرة مطبخ لهذا الطلب",
++        "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات."
+     }
+ }
+\ No newline at end of file
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index b369d778..d61f9715 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -494,5 +494,11 @@
+     "shift_brief_description": "AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.",
+     "recent_notifications": "Recent Notifications",
+     "no_recent_notifications": "No recent notifications."
++  },
++  "kitchen": {
++    "reprint": "Reprint kitchen ticket",
++    "reprinted": "Kitchen ticket printed ({{count}})",
++    "nothing_to_print": "No kitchen ticket for this order",
++    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders."
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index ac1c8655..21c4a73b 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -494,5 +494,11 @@
+     "shift_brief_description": "Les résumés de session générés par IA ne sont pas encore connectés. Ce panneau affichera les observations de HUF une fois l'intégration terminée.",
+     "recent_notifications": "Notifications récentes",
+     "no_recent_notifications": "Aucune notification récente."
++  },
++  "kitchen": {
++    "reprint": "Réimprimer le ticket cuisine",
++    "reprinted": "Ticket cuisine imprimé ({{count}})",
++    "nothing_to_print": "Aucun ticket cuisine pour cette commande",
++    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes."
+   }
+ }
+diff --git a/pos/src/lib/pos-profile-api.ts b/pos/src/lib/pos-profile-api.ts
+index 8e030cc8..faec9dde 100644
+--- a/pos/src/lib/pos-profile-api.ts
++++ b/pos/src/lib/pos-profile-api.ts
+@@ -65,6 +65,10 @@ export interface PosProfileFull {
+   role_restricted_for_table_order?: RolePermission[];
+   transfer_role_permissions?: RolePermission[];
+   paid_limit?: number;
++  // Patch 10: erp_restaurant custom fields (kitchen printing through QZ Tray)
++  custom_auto_print_kitchen_ticket?: number;
++  custom_kitchen_printer?: string | null;
++  custom_bill_printer?: string | null;
+ }
+ 
+ // Combined POS Profile with both limited and full fields
+diff --git a/pos/src/lib/print.ts b/pos/src/lib/print.ts
+index e617148a..bdc023d4 100644
+--- a/pos/src/lib/print.ts
++++ b/pos/src/lib/print.ts
+@@ -1,4 +1,4 @@
+-import { printWithQz } from '@ury/core';
++import { call, printWithQz } from '@ury/core';
+ import {
+   getInvoicePrintHtml,
+   networkPrint,
+@@ -22,7 +22,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
+       throw new Error('QZ host is not set');
+     }
+     const html = await getInvoicePrintHtml(orderId, format as string);
+-    await printWithQz(qz_host, html);
++    await printWithQz(qz_host, html, posProfile.custom_bill_printer);
+     await updatePrintStatus(orderId);
+     return 'qz';
+   } else if (print_type === 'network') {
+@@ -40,4 +40,47 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
+     await updatePrintStatus(orderId);
+     return 'socket';
+   }
+-}
+\ No newline at end of file
++}
++
++// Patch 10: kitchen tickets (URY KOTs) rendered by erp_restaurant and printed
++// through QZ Tray on the cashier PC. URY's own KOT print is server-side, which
++// a cloud server cannot do for a printer in the restaurant.
++interface KitchenTicket {
++  name: string;
++  type: string;
++  html: string;
++}
++
++const KITCHEN_API = 'erp_restaurant.erp_restaurant.api.kitchen_print';
++
++export async function printKitchenTickets({
++  invoice,
++  posProfile,
++  reprint = false,
++}: {
++  invoice: string;
++  posProfile: PosProfileCombined;
++  reprint?: boolean;
++}): Promise<number> {
++  const host = posProfile.qz_host;
++  if (posProfile.print_type !== 'qz' || !host) {
++    throw new Error('QZ Print is not enabled on the POS Profile');
++  }
++  const res = await call.get<{ message: KitchenTicket[] }>(`${KITCHEN_API}.get_kitchen_tickets`, {
++    invoice,
++    only_unprinted: reprint ? 0 : 1,
++  });
++  const tickets = res.message || [];
++  const printed: string[] = [];
++  try {
++    for (const ticket of tickets) {
++      await printWithQz(host, ticket.html, posProfile.custom_kitchen_printer);
++      printed.push(ticket.name);
++    }
++  } finally {
++    if (printed.length) {
++      await call.post(`${KITCHEN_API}.mark_kitchen_tickets_printed`, { invoice, kots: printed });
++    }
++  }
++  return tickets.length;
++}
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 4a2762a2..a6b4d9ed 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -16,7 +16,7 @@ import BillMergeDialog from '../components/BillMergeDialog';
+ import OrderActionsMenu from '../components/OrderActionsMenu';
+ import SplitGroupPanel from '../components/SplitGroupPanel';
+ import MergedBillPanel from '../components/MergedBillPanel';
+-import { printOrder } from '../lib/print';
++import { printKitchenTickets, printOrder } from '../lib/print';
+ import { call } from '@ury/core';
+ import { splitBill } from '../lib/order-api';
+ import {
+@@ -283,6 +283,25 @@ export default function Orders() {
+     }
+   }
+ 
++  // Patch 10: reprint every kitchen ticket of the selected order.
++  async function handleKitchenReprint() {
++    if (!selectedOrder || !posStore.posProfile) return;
++    try {
++      const count = await printKitchenTickets({
++        invoice: selectedOrder.name,
++        posProfile: posStore.posProfile,
++        reprint: true,
++      });
++      if (count === 0) {
++        showToast.info(t('kitchen.nothing_to_print'));
++      } else {
++        showToast.success(t('kitchen.reprinted', { count }));
++      }
++    } catch (err: any) {
++      showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
++    }
++  }
++
+   async function handleSplitBill(payload: {
+     itemsToMove: Array<{ name: string; qty: number }>;
+     customer?: string;
+@@ -555,6 +574,8 @@ export default function Orders() {
+                         onMergeBill={() => setShowMergeDialog(true)}
+                         showSplitBill={canSplitBill}
+                         onSplitBill={() => setShowSplitDialog(true)}
++                        showKitchenReprint={posStore.posProfile?.print_type === 'qz'}
++                        onKitchenReprint={handleKitchenReprint}
+                       />
+                       <button
+                         type="button"

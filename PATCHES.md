@@ -422,6 +422,83 @@ bill payments) reading `rounded_total` after ERPNext's totals, which the
 `roundToHalf`, the `finalTotal` rule, the cents rounding of the percentage
 discount and the Pay button wait.
 
+### Patch 10 — Kitchen tickets printed from the POS through QZ Tray, printer choice
+
+Feature (PRD 7.4, ticket 04).
+
+Files touched:
+- `packages/core/src/print/qz.ts` (`printWithQz` takes an optional printer name)
+- `pos/src/lib/print.ts` (bill uses `custom_bill_printer`; new `printKitchenTickets`)
+- `pos/src/lib/pos-profile-api.ts` (types for the erp_restaurant fields)
+- `pos/src/components/OrderPanel.tsx` (auto print after a successful `sync_order`)
+- `pos/src/components/OrderActionsMenu.tsx`, `pos/src/pages/Orders.tsx`
+  ("Reprint kitchen ticket" action)
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`kitchen.*` keys)
+
+What it does: URY creates URY KOTs in `sync_order` (`kot_execute`: new
+items, added items, cancelled items) and prints them only from the server
+(`print_by_server`), which a cloud server cannot do for a printer in the
+restaurant (and failures are swallowed by `except: pass`). After this patch,
+when POS Profile "Auto-print Kitchen Ticket" is on and QZ Print is on, the
+POS asks `erp_restaurant.erp_restaurant.api.kitchen_print.get_kitchen_tickets`
+for the order's unprinted KOTs rendered with the "Kitchen Ticket" format,
+prints each through QZ Tray on "Kitchen Printer" (empty = the PC's default),
+then calls `mark_kitchen_tickets_printed`. It runs in the background: the
+cashier is not blocked, a failure shows a toast and leaves the KOT unprinted.
+Orders gets "Reprint kitchen ticket" (all KOTs of the order, marked REPRINT on
+paper). Bills printed through QZ now go to "Bill Printer" (empty = default).
+`printWithQz` without a printer name behaves as upstream. The `qz.ts` change
+lives in `@ury/core`, so it also reaches the management frontend (same
+behavior there; rebuild both apps). `loadQzPrinter` now shares one pending
+connect, because the background kitchen print and a bill print can start
+together and QZ refuses a second connect while one is pending. A printer name
+matches the first installed printer whose name contains it: enter the full
+name.
+
+Known gap: the captain (waiter) app (`pos/src/captain/pages/CaptainOrder.tsx`)
+also calls `sync_order` and does not auto-print. Its KOTs stay unprinted and
+print, late and labelled by their type, on the next cashier send of the same
+order, or from Reprint. Fine for counter-only fast food; revisit if a client
+uses waiter tablets.
+
+Why it can't be done in `erp_restaurant`: only the browser on the cashier PC
+can reach QZ Tray and the local printers. The fields, the print format, the
+rendering and the printed state are in `erp_restaurant` (custom fields on POS
+Profile and `URY KOT.custom_kitchen_printed_on`).
+
+Preconditions: QZ Print and QZ Host set on the POS Profile, QZ Tray running
+and trusting the site certificate on the cashier PC, URY KOT naming series and
+a URY Production Unit configured (URY requires them to create KOTs), no
+printer rows with "KOT print" on the Production Unit, Room or POS Profile
+(URY would still try `print_by_server` and could print twice), and
+`erp_restaurant` migrated (fields and "Kitchen Ticket" format). Every edit to
+`kitchen_ticket.json` must bump its `modified` date, or migrate skips it.
+
+Acceptance criteria:
+1. Takeaway order with a note on one line, confirm: a kitchen ticket prints
+   within a few seconds with order number, "Take Away", items, quantities,
+   the note and the time.
+2. Add an item to the order and confirm: one ticket "ADDED ITEMS" with only
+   the new item.
+3. Remove an item (as a user allowed to): a "CANCELLED" ticket for it.
+4. Orders, Reprint kitchen ticket: every ticket of the order prints again,
+   marked REPRINT.
+5. Printer off or wrong name: a "Kitchen ticket not printed" toast, the order
+   is still saved, Reprint prints it once the printer is back.
+6. Auto-print off: nothing prints automatically; Reprint still works.
+7. Bill print goes to "Bill Printer" when set.
+8. French and Arabic: menu label and toasts; Arabic ticket right to left.
+9. Bill print and kitchen auto print right after each other (takeaway: confirm,
+   then Print at once in Orders): both print, no QZ connection error.
+
+Commit: `a8489c4fcb58d1002a139de3e1496fd50f6ad8f8`
+
+Risk profile: medium. Small additions in OrderPanel.tsx (high-risk file,
+also changed by Patches 04 and 08) and Orders.tsx; the shared `qz.ts`
+change is backward compatible. On a conflict, keep the Patch 10 block after
+the Patch 08 `savedName` line, `printKitchenTickets` and the `printerName`
+argument.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
@@ -439,7 +516,7 @@ silently overwrite this output.
 1. Fetch new upstream `develop` commits.
 2. Diff against the currently pinned commit, scoped to the files listed
    under each patch above.
-3. Reapply patches 01 to 09 in order against the new base.
+3. Reapply patches 01 to 10 in order against the new base.
 4. For patches 02 and 03 specifically: check `en.json` for new keys and
    translate them into `fr.json` and `ar.json`.
 5. For patch 04 specifically: manually re-verify all five acceptance
