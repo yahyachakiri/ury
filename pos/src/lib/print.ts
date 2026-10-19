@@ -6,6 +6,7 @@ import {
   updatePrintStatus
 } from './invoice-api';
 import { PosProfileCombined } from './pos-profile-api';
+import { t } from '../i18n';
 
 interface PrintOrderParams {
   orderId: string;
@@ -19,7 +20,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
 
   if (print_type === 'qz') {
     if (!qz_host) {
-      throw new Error('QZ host is not set');
+      throw new Error(t('kitchen.qz_host_missing'));
     }
     const html = await getInvoicePrintHtml(orderId, format as string);
     await printWithQz(qz_host, html, posProfile.custom_bill_printer);
@@ -64,7 +65,7 @@ export async function printKitchenTickets({
 }): Promise<number> {
   const host = posProfile.qz_host;
   if (posProfile.print_type !== 'qz' || !host) {
-    throw new Error('QZ Print is not enabled on the POS Profile');
+    throw new Error(t('kitchen.qz_disabled'));
   }
   const res = await call.get<{ message: KitchenTicket[] }>(`${KITCHEN_API}.get_kitchen_tickets`, {
     invoice,

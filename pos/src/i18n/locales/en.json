@@ -21,7 +21,12 @@
     "cancelling": "Cancelling...",
     "confirm_cancel": "Confirm Cancel",
     "loading_ury_pos": "Loading URY POS...",
-    "please_wait_setup": "Please wait while we set things up"
+    "please_wait_setup": "Please wait while we set things up",
+    "not_permitted": "Not permitted",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "undo": "Undo",
+    "more_actions": "More actions"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -256,7 +261,15 @@
       "previous_sessions_open": "{{count}} POS session(s) left open from a previous day",
       "generic": "Could not open the POS session. {{message}}",
       "load_failed": "Could not check the POS session status. Please try again."
-    }
+    },
+    "api_error": "Server error",
+    "fetch_notifications": "Failed to load notifications",
+    "fetch_invoices": "Failed to load orders",
+    "fetch_invoice_items": "Failed to load the order items",
+    "update_invoice_status": "Failed to update the order status",
+    "fetch_print": "Failed to load the bill for printing",
+    "branch_not_in_profile": "No branch on the POS profile",
+    "create_customer_failed": "Failed to create the customer"
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",
@@ -276,7 +289,9 @@
       "previous": "Previous",
       "next": "Next",
       "page": "Page {{number}}"
-    }
+    },
+    "close_tab": "Close order",
+    "edit_order": "Edit order"
   },
   "tables": {
     "layout_view": "Layout View",
@@ -356,7 +371,11 @@
     "no_destination_tables": "No vacant tables available in this branch",
     "transfer_not_for_merged": "Table transfer is not allowed for merged tables. Unmerge first.",
     "order_already_billed": "This order has already been billed",
-    "no_captains_found": "No captains found"
+    "no_captains_found": "No captains found",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "loading_rooms": "Loading rooms…",
+    "reset_zoom": "Reset zoom"
   },
   "bill_split": {
     "split_bill": "Split bill",
@@ -499,6 +518,49 @@
     "reprint": "Reprint kitchen ticket",
     "reprinted": "Kitchen ticket printed ({{count}})",
     "nothing_to_print": "No kitchen ticket for this order",
-    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders."
+    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders.",
+    "qz_host_missing": "QZ host is not set on the POS profile",
+    "qz_disabled": "QZ printing is not enabled on the POS profile"
+  },
+  "captain": {
+    "load_context_failed": "Unable to load the waiter screen",
+    "reduce_qty": "Reduce quantity",
+    "remove_item": "Remove item",
+    "undo_reduction": "Undo reduction",
+    "search_menu": "Search menu",
+    "no_rooms": "No rooms available for your account.",
+    "no_tables_in_room": "No tables found in this room.",
+    "no_permission_order": "You do not have permission to modify this order.",
+    "add_item_first": "Add at least one item before sending the order.",
+    "select_customer_first": "Please select a customer before sending the order.",
+    "send_failed": "Failed to send the order.",
+    "no_order_reprint": "No active order to reprint.",
+    "kot_reprinted": "Kitchen ticket reprinted.",
+    "no_order_print": "No active order to print.",
+    "no_order_transfer": "No active order to transfer.",
+    "transfer_failed": "Unable to transfer this table.",
+    "no_items_yet": "No items yet.",
+    "load_table_failed": "Unable to load this table",
+    "back_to_tables": "Back to tables",
+    "modified_elsewhere": "This order was modified by someone else. Please reopen the table and try again.",
+    "send_failed_retry": "Failed to send the order. Please try again.",
+    "reprint_failed": "Failed to reprint the kitchen ticket.",
+    "print_bill_failed": "Failed to print the bill.",
+    "load_destinations_failed": "Failed to load the destination tables.",
+    "browse_menu": "Browse menu",
+    "loading_table": "Loading table…",
+    "no_access_table": "You don't have access to this table's order. It may belong to another captain.",
+    "loading_context": "Loading…",
+    "no_table_orders": "You do not have permission to take table orders.",
+    "refresh": "Refresh",
+    "loading_menu": "Loading menu…"
+  },
+  "auth": {
+    "access_denied": "Access denied",
+    "config_error": "Configuration error",
+    "permission_required": "Permission required",
+    "no_app_permission": "You do not have permission to access this application.",
+    "pos_profile_missing": "POS profile not found or not configured.",
+    "required_roles": "Required roles: {{roles}}"
   }
 }

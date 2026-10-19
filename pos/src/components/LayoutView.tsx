@@ -374,7 +374,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Zoom In"
+            title={t('tables.zoom_in')}
           >
             <ZoomIn className="w-5 h-5" />
           </Button>
@@ -383,7 +383,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Zoom Out"
+            title={t('tables.zoom_out')}
           >
             <ZoomOut className="w-5 h-5" />
           </Button>
@@ -392,7 +392,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Reset Zoom & Pan"
+            title={t('tables.reset_zoom')}
           >
             <RotateCcw className="w-5 h-5" />
           </Button>

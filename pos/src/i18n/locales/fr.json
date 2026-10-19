@@ -21,7 +21,12 @@
     "cancelling": "Annulation en cours...",
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
+    "not_permitted": "Non autorisé",
+    "decrease": "Diminuer",
+    "increase": "Augmenter",
+    "undo": "Annuler",
+    "more_actions": "Plus d'actions"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -256,7 +261,15 @@
       "previous_sessions_open": "{{count}} session(s) PDV sont restées ouvertes depuis un jour précédent",
       "generic": "Impossible d'ouvrir la session PDV. {{message}}",
       "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
-    }
+    },
+    "api_error": "Erreur du serveur",
+    "fetch_notifications": "Échec du chargement des notifications",
+    "fetch_invoices": "Échec du chargement des commandes",
+    "fetch_invoice_items": "Échec du chargement des articles de la commande",
+    "update_invoice_status": "Échec de la mise à jour du statut de la commande",
+    "fetch_print": "Échec du chargement de la note à imprimer",
+    "branch_not_in_profile": "Aucune succursale sur le profil PDV",
+    "create_customer_failed": "Échec de la création du client"
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -276,7 +289,9 @@
       "previous": "Précédent",
       "next": "Suivant",
       "page": "Page {{number}}"
-    }
+    },
+    "close_tab": "Fermer la commande",
+    "edit_order": "Modifier la commande"
   },
   "tables": {
     "layout_view": "Vue de mise en page",
@@ -356,7 +371,11 @@
     "no_destination_tables": "Aucune table libre disponible dans cet établissement",
     "transfer_not_for_merged": "Le transfert de table n'est pas autorisé pour les tables fusionnées. Séparez d'abord les tables.",
     "order_already_billed": "Cette commande a déjà été facturée",
-    "no_captains_found": "Aucun capitaine trouvé"
+    "no_captains_found": "Aucun capitaine trouvé",
+    "zoom_in": "Zoom avant",
+    "zoom_out": "Zoom arrière",
+    "loading_rooms": "Chargement des salles…",
+    "reset_zoom": "Réinitialiser le zoom"
   },
   "bill_split": {
     "split_bill": "Diviser l'addition",
@@ -499,6 +518,49 @@
     "reprint": "Réimprimer le ticket cuisine",
     "reprinted": "Ticket cuisine imprimé ({{count}})",
     "nothing_to_print": "Aucun ticket cuisine pour cette commande",
-    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes."
+    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes.",
+    "qz_host_missing": "L'hôte QZ n'est pas défini sur le profil PDV",
+    "qz_disabled": "L'impression QZ n'est pas activée sur le profil PDV"
+  },
+  "captain": {
+    "load_context_failed": "Impossible de charger l'écran capitaine",
+    "reduce_qty": "Réduire la quantité",
+    "remove_item": "Retirer l'article",
+    "undo_reduction": "Annuler la réduction",
+    "search_menu": "Rechercher dans le menu",
+    "no_rooms": "Aucune salle disponible pour votre compte.",
+    "no_tables_in_room": "Aucune table dans cette salle.",
+    "no_permission_order": "Vous n'avez pas le droit de modifier cette commande.",
+    "add_item_first": "Ajoutez au moins un article avant d'envoyer la commande.",
+    "select_customer_first": "Choisissez un client avant d'envoyer la commande.",
+    "send_failed": "Échec de l'envoi de la commande.",
+    "no_order_reprint": "Aucune commande en cours à réimprimer.",
+    "kot_reprinted": "Ticket cuisine réimprimé.",
+    "no_order_print": "Aucune commande en cours à imprimer.",
+    "no_order_transfer": "Aucune commande en cours à transférer.",
+    "transfer_failed": "Impossible de transférer cette table.",
+    "no_items_yet": "Aucun article pour l'instant.",
+    "load_table_failed": "Impossible de charger cette table",
+    "back_to_tables": "Retour aux tables",
+    "modified_elsewhere": "Cette commande a été modifiée par quelqu'un d'autre. Rouvrez la table et réessayez.",
+    "send_failed_retry": "Échec de l'envoi de la commande. Réessayez.",
+    "reprint_failed": "Échec de la réimpression du ticket cuisine.",
+    "print_bill_failed": "Échec de l'impression de l'addition.",
+    "load_destinations_failed": "Échec du chargement des tables de destination.",
+    "browse_menu": "Parcourir le menu",
+    "loading_table": "Chargement de la table…",
+    "no_access_table": "Vous n'avez pas accès à la commande de cette table. Elle appartient peut-être à un autre capitaine.",
+    "loading_context": "Chargement…",
+    "no_table_orders": "Vous n'avez pas le droit de prendre des commandes à table.",
+    "refresh": "Actualiser",
+    "loading_menu": "Chargement du menu…"
+  },
+  "auth": {
+    "access_denied": "Accès refusé",
+    "config_error": "Erreur de configuration",
+    "permission_required": "Autorisation requise",
+    "no_app_permission": "Vous n'avez pas le droit d'accéder à cette application.",
+    "pos_profile_missing": "Profil PDV introuvable ou non configuré.",
+    "required_roles": "Rôles requis : {{roles}}"
   }
 }

@@ -187,7 +187,7 @@ const TableView = () => {
     event.stopPropagation();
 
     if (!posProfile) {
-      showToast.error('POS profile not loaded yet');
+      showToast.error(t('errors.pos_profile_not_loaded'));
       return;
     }
 
@@ -197,7 +197,7 @@ const TableView = () => {
       const invoiceId = orderResponse.message?.name;
 
       if (!invoiceId) {
-        showToast.error('No active order found for this table');
+        showToast.error(t('errors.no_active_order'));
         return;
       }
 
@@ -209,7 +209,7 @@ const TableView = () => {
           posProfile.print_format
         ),
       });
-      showToast.success('Printed successfully');
+      showToast.success(t('success.printed'));
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
@@ -440,7 +440,7 @@ const TableView = () => {
               <div className="flex flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
-                    <Spinner message="Loading rooms..." />
+                    <Spinner message={t('tables.loading_rooms')} />
                   </div>
                 )}
 

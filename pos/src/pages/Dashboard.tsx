@@ -222,7 +222,7 @@ export default function Dashboard() {
         const notificationsRes = await fetch(
           `/api/method/frappe.client.get_list?${params.toString()}`
         );
-        if (!notificationsRes.ok) throw new Error('Failed to fetch notifications');
+        if (!notificationsRes.ok) throw new Error(t('errors.fetch_notifications'));
         const notificationsData = await notificationsRes.json();
         const processedNotifications = (notificationsData.message || []).map((notif: any) => ({
           id: notif.name,

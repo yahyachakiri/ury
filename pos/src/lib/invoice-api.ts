@@ -2,6 +2,7 @@ import { DOCTYPES } from '../data/doctypes';
 import { call, db } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
+import { t } from '../i18n';
 
 export interface POSInvoice {
   name: string;
@@ -102,7 +103,7 @@ export async function getPOSInvoices({
     };
   } catch (error) {
     console.error('Error fetching POS invoices:', error);
-    throw new Error('Failed to fetch POS invoices');
+    throw new Error(t('errors.fetch_invoices'));
   }
 }
 
@@ -121,7 +122,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
     };
   } catch (error) {
     console.error('Error fetching POS invoice items:', error);
-    throw new Error('Failed to fetch POS invoice items');
+    throw new Error(t('errors.fetch_invoice_items'));
   }
 }
 
@@ -136,7 +137,7 @@ export async function updateInvoiceStatus(
     });
   } catch (error) {
     console.error('Error updating invoice status:', error);
-    throw new Error('Failed to update invoice status');
+    throw new Error(t('errors.update_invoice_status'));
   }
 }
 
@@ -225,7 +226,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
     return response.message.html;
   } catch (error) {
     console.error('Error fetching invoice print HTML:', error);
-    throw new Error('Failed to fetch invoice print HTML');
+    throw new Error(t('errors.fetch_print'));
   }
 }
 
@@ -329,11 +330,11 @@ const MERGE_CANDIDATE_FIELDS = [
 function getBranchFromSession(): string {
   const raw = sessionStorage.getItem('posProfile');
   if (!raw) {
-    throw new Error('POS profile not loaded');
+    throw new Error(t('errors.pos_profile_not_loaded'));
   }
   const profile = JSON.parse(raw) as { branch?: string };
   if (!profile.branch) {
-    throw new Error('Branch not found in POS profile');
+    throw new Error(t('errors.branch_not_in_profile'));
   }
   return profile.branch;
 }

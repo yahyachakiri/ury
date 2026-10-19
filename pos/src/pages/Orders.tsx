@@ -580,7 +580,7 @@ export default function Orders() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Edit order"
+                        aria-label={t('orders.edit_order')}
                         onClick={handleEditOrder}
                         disabled={editLoading}
                       >
@@ -591,7 +591,7 @@ export default function Orders() {
                         <button
                           type="button"
                           className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          aria-label="Cancel order"
+                          aria-label={t('order.cancel_order')}
                           onClick={() => setCancelDialogOpen(true)}
                         >
                           <X className="w-4 h-4" />
@@ -750,7 +750,7 @@ export default function Orders() {
                   size="icon"
                   className="flex-shrink-0"
                   onClick={handlePrintOrder}
-                  aria-label="Print"
+                  aria-label={t('order.print')}
                   disabled={isPrinting}
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}

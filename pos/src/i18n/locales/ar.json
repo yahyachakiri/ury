@@ -28,7 +28,12 @@
         "cancelling": "جاري الإلغاء...",
         "confirm_cancel": "تأكيد الإلغاء",
         "loading_ury_pos": "جاري تحميل URY POS...",
-        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء..."
+        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء...",
+        "not_permitted": "غير مسموح",
+        "decrease": "إنقاص",
+        "increase": "زيادة",
+        "undo": "تراجع",
+        "more_actions": "إجراءات أخرى"
     },
     "header": {
         "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
@@ -263,7 +268,15 @@
             "previous_sessions_open": "هناك {{count}} من جلسات نقطة البيع مفتوحة منذ يوم سابق",
             "generic": "تعذر فتح جلسة نقطة البيع. {{message}}",
             "load_failed": "تعذر التحقق من حالة جلسة نقطة البيع. يرجى المحاولة مرة أخرى."
-        }
+        },
+        "api_error": "خطأ في الخادم",
+        "fetch_notifications": "فشل تحميل الإشعارات",
+        "fetch_invoices": "فشل تحميل الطلبات",
+        "fetch_invoice_items": "فشل تحميل أصناف الطلب",
+        "update_invoice_status": "فشل تحديث حالة الطلب",
+        "fetch_print": "فشل تحميل الفاتورة للطباعة",
+        "branch_not_in_profile": "لا يوجد فرع في ملف نقطة البيع",
+        "create_customer_failed": "فشل إنشاء الزبون"
     },
     "success": {
         "order_cancelled": "تم إلغاء الطلب بنجاح",
@@ -283,7 +296,9 @@
             "previous": "السابق",
             "next": "التالي",
             "page": "صفحة {{number}}"
-        }
+        },
+        "close_tab": "إغلاق الطلب",
+        "edit_order": "تعديل الطلب"
     },
     "tables": {
         "layout_view": "عرض المخطط",
@@ -363,7 +378,11 @@
         "no_destination_tables": "لا توجد طاولات شاغرة متاحة في هذا الفرع",
         "transfer_not_for_merged": "لا يُسمح بنقل الطاولات المدمجة. افصلها أولًا.",
         "order_already_billed": "تم إصدار فاتورة لهذا الطلب بالفعل",
-        "no_captains_found": "لم يتم العثور على مسؤولين"
+        "no_captains_found": "لم يتم العثور على مسؤولين",
+        "zoom_in": "تكبير",
+        "zoom_out": "تصغير",
+        "loading_rooms": "جارٍ تحميل القاعات…",
+        "reset_zoom": "إعادة ضبط التكبير"
     },
     "bill_split": {
         "split_bill": "تقسيم الفاتورة",
@@ -506,6 +525,49 @@
         "reprint": "إعادة طباعة تذكرة المطبخ",
         "reprinted": "تمت طباعة تذكرة المطبخ ({{count}})",
         "nothing_to_print": "لا توجد تذكرة مطبخ لهذا الطلب",
-        "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات."
+        "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات.",
+        "qz_host_missing": "مضيف QZ غير محدد في ملف نقطة البيع",
+        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع"
+    },
+    "captain": {
+        "load_context_failed": "تعذّر تحميل شاشة النادل",
+        "reduce_qty": "تقليل الكمية",
+        "remove_item": "إزالة الصنف",
+        "undo_reduction": "التراجع عن التقليل",
+        "search_menu": "البحث في القائمة",
+        "no_rooms": "لا توجد قاعات متاحة لحسابك.",
+        "no_tables_in_room": "لا توجد طاولات في هذه القاعة.",
+        "no_permission_order": "ليس لديك صلاحية تعديل هذا الطلب.",
+        "add_item_first": "أضف صنفًا واحدًا على الأقل قبل إرسال الطلب.",
+        "select_customer_first": "اختر زبونًا قبل إرسال الطلب.",
+        "send_failed": "فشل إرسال الطلب.",
+        "no_order_reprint": "لا يوجد طلب نشط لإعادة طباعته.",
+        "kot_reprinted": "تمت إعادة طباعة تذكرة المطبخ.",
+        "no_order_print": "لا يوجد طلب نشط للطباعة.",
+        "no_order_transfer": "لا يوجد طلب نشط لنقله.",
+        "transfer_failed": "تعذّر نقل هذه الطاولة.",
+        "no_items_yet": "لا توجد أصناف بعد.",
+        "load_table_failed": "تعذّر تحميل هذه الطاولة",
+        "back_to_tables": "العودة إلى الطاولات",
+        "modified_elsewhere": "تم تعديل هذا الطلب من قبل شخص آخر. أعد فتح الطاولة وحاول مرة أخرى.",
+        "send_failed_retry": "فشل إرسال الطلب. حاول مرة أخرى.",
+        "reprint_failed": "فشلت إعادة طباعة تذكرة المطبخ.",
+        "print_bill_failed": "فشلت طباعة الفاتورة.",
+        "load_destinations_failed": "فشل تحميل طاولات الوجهة.",
+        "browse_menu": "تصفح القائمة",
+        "loading_table": "جارٍ تحميل الطاولة…",
+        "no_access_table": "ليس لديك صلاحية الوصول إلى طلب هذه الطاولة. قد يكون تابعًا لنادل آخر.",
+        "loading_context": "جارٍ التحميل…",
+        "no_table_orders": "ليس لديك صلاحية أخذ طلبات الطاولات.",
+        "refresh": "تحديث",
+        "loading_menu": "جارٍ تحميل القائمة…"
+    },
+    "auth": {
+        "access_denied": "تم رفض الوصول",
+        "config_error": "خطأ في الإعداد",
+        "permission_required": "الإذن مطلوب",
+        "no_app_permission": "ليس لديك صلاحية الوصول إلى هذا التطبيق.",
+        "pos_profile_missing": "ملف نقطة البيع غير موجود أو غير مُعدّ.",
+        "required_roles": "الأدوار المطلوبة: {{roles}}"
     }
 }
