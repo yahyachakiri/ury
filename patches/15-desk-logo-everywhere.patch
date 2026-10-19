@@ -1,0 +1,198 @@
+diff --git a/frontend/index.html b/frontend/index.html
+index da849f82..d4d035fa 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -4,7 +4,9 @@
+ <html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
+   <head>
+     <meta charset="UTF-8" />
+-    <link rel="icon" href="/assets/ury/pos/ury.ico" />
++    <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
++    <link rel="icon" href="{{ favicon }}" />
++    <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+     <title>URY</title>
+diff --git a/frontend/src/components/layout/Header.tsx b/frontend/src/components/layout/Header.tsx
+index b884bdb0..c1659aed 100644
+--- a/frontend/src/components/layout/Header.tsx
++++ b/frontend/src/components/layout/Header.tsx
+@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
+ import { useNavigate, Link } from 'react-router-dom';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+-import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
++// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
++const uryLogo: string = (window as any).app_logo_url || '';
+ import {
+   Bell,
+   User,
+@@ -133,7 +134,7 @@ export const Header: React.FC = () => {
+         {/* Left Section: Logo & Brand */}
+         <div className="flex items-center space-x-3">
+           <Link to="/dashboard" className="flex items-center space-x-3 group">
+-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
++            <img src={uryLogo} alt="Logo" className="h-7 w-auto" />
+           </Link>
+         </div>
+ 
+diff --git a/frontend/src/components/setup/WizardLayout.tsx b/frontend/src/components/setup/WizardLayout.tsx
+index 7255059a..054d2a98 100644
+--- a/frontend/src/components/setup/WizardLayout.tsx
++++ b/frontend/src/components/setup/WizardLayout.tsx
+@@ -1,7 +1,8 @@
+ import { ReactNode } from 'react';
+ import { Button } from '@ury/ui';
+ import { Check } from 'lucide-react';
+-import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
++// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
++const uryLogo: string = (window as any).app_logo_url || '';
+ 
+ interface WizardLayoutProps {
+   step: 1 | 2;
+@@ -35,7 +36,7 @@ export function WizardLayout({
+       <header className="w-full border-b border-border bg-card">
+         <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
+           <div className="flex items-center gap-3">
+-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
++            <img src={uryLogo} alt="Logo" className="h-7 w-auto" />
+             <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
+           </div>
+ 
+diff --git a/frontend/src/pages/Dashboard/KPIGrid.tsx b/frontend/src/pages/Dashboard/KPIGrid.tsx
+index 84408f32..c16059d3 100644
+--- a/frontend/src/pages/Dashboard/KPIGrid.tsx
++++ b/frontend/src/pages/Dashboard/KPIGrid.tsx
+@@ -2,8 +2,9 @@ import React from 'react';
+ import { formatCurrency } from '@ury/core';
+ import { Card, Spinner } from '@ury/ui';
+ import { DashboardSummary } from '../../services/dashboard';
+-import uryPosLogo from '../../../../pos/public/ury_pos.png';
+-import uryMosaicLogo from '../../../../mosaic/src/assets/logos/mosaic.jpg';
++// Patch 15: desk logo on both link cards (set by the page, erp_restaurant branding.py).
++const uryPosLogo: string = (window as any).app_logo_url || '';
++const uryMosaicLogo = uryPosLogo;
+ 
+ interface LinkCardProps {
+   logoSrc: string;
+diff --git a/mosaic/index.html b/mosaic/index.html
+index 5ea4248e..26273c9a 100644
+--- a/mosaic/index.html
++++ b/mosaic/index.html
+@@ -3,7 +3,9 @@
+ 
+ <head>
+   <meta charset="UTF-8" />
+-  <link rel="icon" href="/ury.ico" />
++  <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
++  <link rel="icon" href="{{ favicon }}" />
++  <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>Mosaic</title>
+ </head>
+diff --git a/mosaic/src/components/Header.vue b/mosaic/src/components/Header.vue
+index 25595a58..41fcbbdb 100644
+--- a/mosaic/src/components/Header.vue
++++ b/mosaic/src/components/Header.vue
+@@ -68,7 +68,8 @@
+ </template>
+ 
+ <script>
+-import urimosaicImage from "@/assets/logos/mosaic.jpg";
++// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
++const urimosaicImage = window.app_logo_url || "";
+ 
+ export default {
+   name: "Header",
+diff --git a/pos/index.html b/pos/index.html
+index 4c273d2c..40dee05d 100644
+--- a/pos/index.html
++++ b/pos/index.html
+@@ -4,7 +4,9 @@
+ <html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
+   <head>
+     <meta charset="UTF-8" />
+-    <link rel="icon" href="/ury.ico" />
++    <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
++    <link rel="icon" href="{{ favicon }}" />
++    <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+     <title>URY POS</title>
+diff --git a/pos/src/components/Header.tsx b/pos/src/components/Header.tsx
+index 0be610cd..0f1a1d32 100644
+--- a/pos/src/components/Header.tsx
++++ b/pos/src/components/Header.tsx
+@@ -115,12 +115,12 @@ const Header = () => {
+         {/* Logo */}
+         <div className="flex items-center">
+         <Link to="/dashboard" className="flex items-center gap-3">
+-            {/* <img
+-              src="/assets/ury/pos/ury_pos.png"
+-              alt="URY POS" 
+-              className="h-10 w-auto"
+-            /> */}
+-            <p>POS</p>
++            {/* Patch 15: desk logo, text when none */}
++            {(window as any).app_logo_url ? (
++              <img src={(window as any).app_logo_url} alt="POS" className="h-10 w-auto" />
++            ) : (
++              <p>POS</p>
++            )}
+           </Link>
+         </div>
+ 
+diff --git a/pos/src/pages/Dashboard.tsx b/pos/src/pages/Dashboard.tsx
+index d2106185..3453085e 100644
+--- a/pos/src/pages/Dashboard.tsx
++++ b/pos/src/pages/Dashboard.tsx
+@@ -3,7 +3,6 @@ import { Card, CardContent } from '@ury/ui';
+ import { call, formatCurrency } from '@ury/core';
+ import { useEffect, useState } from 'react';
+ 
+-import HufLogo from '../components/HufLogo';
+ import { t } from '../i18n';
+ import { usePOSStore } from '../store/pos-store';
+ 
+@@ -522,9 +521,10 @@ export default function Dashboard() {
+             <CardContent className="p-6">
+               <div className="flex items-center justify-between gap-2 mb-4">
+                 <h3 className="text-lg font-semibold text-gray-900">{t('dashboard.shift_brief')}</h3>
+-                <span className="inline-flex items-center justify-center px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
+-                  <HufLogo className="h-3.5 w-auto" />
+-                </span>
++                {/* Patch 15: desk logo instead of the HUF mark */}
++                {(window as any).app_logo_url && (
++                  <img src={(window as any).app_logo_url} alt="" className="h-6 w-auto" />
++                )}
+               </div>
+               <p className="text-sm text-gray-600">
+                 {t('dashboard.shift_brief_description')}
+diff --git a/self-order/index.html b/self-order/index.html
+index 91dbfbf4..88bec3b1 100644
+--- a/self-order/index.html
++++ b/self-order/index.html
+@@ -2,7 +2,8 @@
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <link rel="icon" href="/ury.ico" />
++    <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
++    <link rel="icon" href="{{ favicon }}" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+     <title>Order</title>
+diff --git a/ury/hooks.py b/ury/hooks.py
+index d4696739..01d2f9ba 100644
+--- a/ury/hooks.py
++++ b/ury/hooks.py
+@@ -14,7 +14,8 @@ required_apps = ["erpnext"]
+ add_to_apps_screen = [
+   {
+     "name": "ury",
+-    "logo": "/assets/ury/Images/ury.png",
++    # Patch 15: desk logo through erp_restaurant (redirect).
++    "logo": "/api/method/erp_restaurant.erp_restaurant.branding.desk_logo",
+     "title": "URY",
+     "route": "/ury",
+     "has_permission": "ury.permission.check_app_permission"
