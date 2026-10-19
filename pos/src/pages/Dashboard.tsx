@@ -516,21 +516,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Shift Brief Section (with HUF Logo) */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{t('dashboard.shift_brief')}</h3>
-                {/* Patch 15: desk logo instead of the HUF mark */}
-                {(window as any).app_logo_url && (
-                  <img src={(window as any).app_logo_url} alt="" className="h-6 w-auto" />
-                )}
-              </div>
-              <p className="text-sm text-gray-600">
-                {t('dashboard.shift_brief_description')}
-              </p>
-            </CardContent>
-          </Card>
+          {/* Patch 19: Shift Brief panel removed (unfinished upstream feature, named HUF). */}
 
           {/* Recent Notifications Section */}
           <Card className="bg-white border border-gray-200">

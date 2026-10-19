@@ -1,0 +1,55 @@
+diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
+index 81f5939b..7a0e2d0d 100644
+--- a/pos/src/components/PaymentDialog.tsx
++++ b/pos/src/components/PaymentDialog.tsx
+@@ -201,7 +201,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+         pos_profile: posProfile,
+         table,
+       });
+-      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
++      // The order total, not the cash tendered (the change is not "received").
++      showToast.success(t('payment.success', { amount: formatCurrency(finalTotal) }));
+       onClose();
+       clearSelectedOrder();
+       await fetchOrders();
+@@ -294,7 +295,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+                       step="0.01"
+                       value={paymentInputs[id] || ''}
+                       onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
+-                      onFocus={() => handlePaymentInputFocus(id)}
++                      onFocus={(e) => {
++                        handlePaymentInputFocus(id);
++                        // Select the prefilled amount so typing the tendered cash replaces it (100, not 68100).
++                        const input = e.currentTarget;
++                        requestAnimationFrame(() => input.select());
++                      }}
+                       placeholder={t('payment.amount_placeholder')}
+                       className="flex-1"
+                       size="sm"
+diff --git a/pos/src/pages/Dashboard.tsx b/pos/src/pages/Dashboard.tsx
+index 4b596d38..9e00b64c 100644
+--- a/pos/src/pages/Dashboard.tsx
++++ b/pos/src/pages/Dashboard.tsx
+@@ -516,21 +516,7 @@ export default function Dashboard() {
+             </CardContent>
+           </Card>
+ 
+-          {/* Shift Brief Section (with HUF Logo) */}
+-          <Card className="bg-white border border-gray-200">
+-            <CardContent className="p-6">
+-              <div className="flex items-center justify-between gap-2 mb-4">
+-                <h3 className="text-lg font-semibold text-gray-900">{t('dashboard.shift_brief')}</h3>
+-                {/* Patch 15: desk logo instead of the HUF mark */}
+-                {(window as any).app_logo_url && (
+-                  <img src={(window as any).app_logo_url} alt="" className="h-6 w-auto" />
+-                )}
+-              </div>
+-              <p className="text-sm text-gray-600">
+-                {t('dashboard.shift_brief_description')}
+-              </p>
+-            </CardContent>
+-          </Card>
++          {/* Patch 19: Shift Brief panel removed (unfinished upstream feature, named HUF). */}
+ 
+           {/* Recent Notifications Section */}
+           <Card className="bg-white border border-gray-200">

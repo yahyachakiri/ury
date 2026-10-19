@@ -869,6 +869,65 @@ Risk profile: medium. One-line changes spread over ury_order.py and api.py,
 which upstream edits often; on a conflict, re-wrap the message in `_()`.
 Backend only: restart, no build; translations need a clear-cache.
 
+### Patch 19 — Payment amount replaced on typing, no unfinished Shift Brief
+
+Bug fix (browser audit 2026-10-19, findings 6, 16 and 30).
+
+Files touched:
+- `pos/src/components/PaymentDialog.tsx`
+- `pos/src/pages/Dashboard.tsx`
+
+What it does: clicking an empty payment field prefills the remaining amount
+(upstream); the cursor sat after it, so typing the tendered cash 100 gave
+68100 and a change of 68 032. The prefilled amount is now selected, so typing
+replaces it. The success toast shows the order total instead of the cash
+tendered. The POS dashboard no longer shows the "Shift Brief" panel ("AI-written
+shift summaries are not yet connected... HUF's shift observations"), an
+unfinished upstream feature naming another product; the desk logo Patch 15
+put in that panel goes with it. No new strings.
+
+Why it can't be done in `erp_restaurant`: input behaviour and the panel are
+in the POS bundle.
+
+Acceptance criteria:
+1. Payment of a 68 order: click Cash, type 100: field shows 100, change 32.
+2. Toast after payment shows 68, not 100.
+3. POS dashboard: no Shift Brief panel; notifications panel unchanged.
+
+Risk profile: low. On a conflict in Dashboard.tsx keep the panel removed; in
+PaymentDialog.tsx keep the `select()` in the payment input's onFocus.
+
+### Patch 20 — /ury translations on whole words only
+
+Bug fix (browser audit 2026-10-19, finding 11).
+
+Files touched: `frontend/src/i18n.ts`
+
+What it does: the management app (/ury) translates the page text with a
+dictionary. When a text was not a key, every key found anywhere inside it was
+replaced, inside words too: "Total" became "Autal" (To -> Au), "Cancelled"
+became "Annulerled", "Tables" became "الطاولةS". Keys are now replaced only as
+whole words (Unicode letters and digits around them block a match), with one
+precompiled pattern per language. Added fr/ar for the labels the audit found
+in English (dashboard cards, Live POS Transactions, statuses, report columns,
+Users form). Many report labels remain English (not in the dictionary): they
+stay English rather than half-translated.
+
+Why it can't be done in `erp_restaurant`: the dictionary and the translation
+code are compiled into the /ury bundle.
+
+Acceptance criteria:
+1. /ury in French: "Total général", "Total des factures", "Annulée par",
+   "Exporter en CSV"; no "Autal", "Autes", "Annulerled", "Exporterer".
+2. /ury in Arabic: no Latin letters glued to Arabic words ("الطاولةS").
+3. English unchanged.
+
+Build: frontend only. The server deploy does not build it: run
+`cd apps/ury/frontend && yarn build` on the server after pulling.
+
+Risk profile: low. On a conflict keep `phrasePattern` and the whole-word
+replace; new upstream keys go in the same maps.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

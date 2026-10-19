@@ -201,7 +201,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         pos_profile: posProfile,
         table,
       });
-      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
+      // The order total, not the cash tendered (the change is not "received").
+      showToast.success(t('payment.success', { amount: formatCurrency(finalTotal) }));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
@@ -294,7 +295,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                       step="0.01"
                       value={paymentInputs[id] || ''}
                       onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
-                      onFocus={() => handlePaymentInputFocus(id)}
+                      onFocus={(e) => {
+                        handlePaymentInputFocus(id);
+                        // Select the prefilled amount so typing the tendered cash replaces it (100, not 68100).
+                        const input = e.currentTarget;
+                        requestAnimationFrame(() => input.select());
+                      }}
                       placeholder={t('payment.amount_placeholder')}
                       className="flex-1"
                       size="sm"

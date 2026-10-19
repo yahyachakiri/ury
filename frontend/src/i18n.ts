@@ -177,6 +177,37 @@ const translations: Record<Exclude<Language, 'en'>, TranslationMap> = {
     'Menu saved': 'Menu enregistré',
     'No records found': 'Aucun enregistrement trouvé',
     'Failed to load dashboard data:': 'Échec du chargement des données du tableau de bord :',
+    // Patch 20 (audit 2026-10-19)
+    'Orders Today': 'Commandes du jour',
+    'Table Occupancy': 'Occupation des tables',
+    'Occupied Tables': 'Tables occupées',
+    'Average Order Value': 'Panier moyen',
+    'Pending Kitchen Orders': 'Commandes en cuisine',
+    'Live POS Transactions': 'Ventes en direct',
+    'Customer': 'Client',
+    'Round Off': 'Arrondi',
+    'Cash Discounts': 'Remises',
+    'Payment Mode': 'Mode de paiement',
+    'Paid': 'Payée',
+    'Return': 'Retour',
+    'Consolidated': 'Consolidée',
+    'Take Away': 'À emporter',
+    'Dine In': 'Sur place',
+    'Total Invoices': 'Total des factures',
+    'Item Total': 'Total article',
+    'Invoice ID': 'N° de facture',
+    'Cancelled By': 'Annulée par',
+    'Total Cancelled': 'Total annulé',
+    'Unique Cancellers': 'Utilisateurs ayant annulé',
+    'Avg Repeat Rate': 'Taux moyen de retour',
+    'Repeat Rate': 'Taux de retour',
+    'Export CSV': 'Exporter en CSV',
+    'Search and select': 'Rechercher et choisir',
+    'First Name': 'Prénom',
+    'Last Name': 'Nom',
+    'Full Name': 'Nom complet',
+    'Create User': 'Créer l\'utilisateur',
+    'Email Address': 'Adresse e-mail',
   },
   ar: {
     'Dashboard': 'لوحة التحكم',
@@ -350,6 +381,37 @@ const translations: Record<Exclude<Language, 'en'>, TranslationMap> = {
     'Menu saved': 'تم حفظ القائمة',
     'No records found': 'لم يتم العثور على سجلات',
     'Failed to load dashboard data:': 'فشل تحميل بيانات لوحة التحكم:',
+    // Patch 20 (audit 2026-10-19)
+    'Orders Today': 'طلبات اليوم',
+    'Table Occupancy': 'إشغال الطاولات',
+    'Occupied Tables': 'الطاولات المشغولة',
+    'Average Order Value': 'متوسط قيمة الطلب',
+    'Pending Kitchen Orders': 'طلبات المطبخ المعلقة',
+    'Live POS Transactions': 'مبيعات الصندوق المباشرة',
+    'Customer': 'الزبون',
+    'Round Off': 'التقريب',
+    'Cash Discounts': 'الخصومات',
+    'Payment Mode': 'طريقة الدفع',
+    'Paid': 'مدفوعة',
+    'Return': 'مرتجع',
+    'Consolidated': 'مجمعة',
+    'Take Away': 'سفري',
+    'Dine In': 'في المطعم',
+    'Total Invoices': 'مجموع الفواتير',
+    'Item Total': 'مجموع الصنف',
+    'Invoice ID': 'رقم الفاتورة',
+    'Cancelled By': 'ألغاها',
+    'Total Cancelled': 'مجموع الملغى',
+    'Unique Cancellers': 'المستخدمون الذين ألغوا',
+    'Avg Repeat Rate': 'متوسط معدل العودة',
+    'Repeat Rate': 'معدل العودة',
+    'Export CSV': 'تصدير CSV',
+    'Search and select': 'ابحث واختر',
+    'First Name': 'الاسم الأول',
+    'Last Name': 'اسم العائلة',
+    'Full Name': 'الاسم الكامل',
+    'Create User': 'إنشاء المستخدم',
+    'Email Address': 'البريد الإلكتروني',
   },
 };
 
@@ -362,18 +424,28 @@ export function translateText(value: string, language = getFrontendLanguage()): 
   return language === 'en' ? value : translations[language][value] || value;
 }
 
-function translateNode(node: Node, language: Language): void {
+const phrasePatterns: Partial<Record<Language, RegExp>> = {};
+
+function phrasePattern(language: Exclude<Language, 'en'>): RegExp {
+  if (!phrasePatterns[language]) {
+    const phrases = Object.keys(translations[language])
+      .sort((a, b) => b.length - a.length)
+      .map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    phrasePatterns[language] = new RegExp(`(?<![\\p{L}\\p{N}])(?:${phrases.join('|')})(?![\\p{L}\\p{N}])`, 'gu');
+  }
+  return phrasePatterns[language]!;
+}
+
+function translateNode(node: Node, language: Exclude<Language, 'en'>): void {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent || '';
     const trimmed = text.trim();
     if (trimmed && translations[language][trimmed]) {
       node.textContent = text.replace(trimmed, translations[language][trimmed]);
     } else if (trimmed) {
-      const phrases = Object.keys(translations[language]).sort((a, b) => b.length - a.length);
-      let translated = text;
-      for (const phrase of phrases) {
-        if (translated.includes(phrase)) translated = translated.replaceAll(phrase, translations[language][phrase]);
-      }
+      // Whole words only (Patch 20): replacing inside words gave "Autal" (To -> Au in Total)
+      // and, once re-run on its own output, "Annulerled" (Cancel in Cancelled).
+      const translated = text.replace(phrasePattern(language), (match) => translations[language][match] ?? match);
       if (translated !== text) node.textContent = translated;
     }
     return;
