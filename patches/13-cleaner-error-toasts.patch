@@ -1,0 +1,35 @@
+diff --git a/packages/core/src/frappe/errors.ts b/packages/core/src/frappe/errors.ts
+index b3b3bd90..1a07b3d3 100644
+--- a/packages/core/src/frappe/errors.ts
++++ b/packages/core/src/frappe/errors.ts
+@@ -24,6 +24,7 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+ 
+   const e = err as Record<string, unknown>;
+   const parsedMessages: string[] = [];
++  const seenMessages = new Set<string>(); // Patch 13
+ 
+   // Helper to sanitize HTML markup into readable multiline text
+   const cleanHtml = (str: string): string => {
+@@ -63,7 +64,8 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+           msgObj = item as Record<string, unknown>;
+         }
+ 
+-        if (msgObj) {
++        // Patch 13: alerts are side notices (e.g. "Item Price added"), not the error.
++        if (msgObj && !msgObj.alert) {
+           const mainMsg =
+             typeof msgObj.message === 'string'
+               ? msgObj.message
+@@ -80,8 +82,10 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+               : '';
+ 
+           if (mainMsg) {
+-            const cleaned = cleanHtml(mainMsg);
+-            if (cleaned) {
++            // Patch 13: URY repeats the cause as "Error while updating order: <cause>".
++            const cleaned = cleanHtml(mainMsg).replace(/^Error while (updating|settling) order:\s*/, '');
++            if (cleaned && !seenMessages.has(cleaned)) {
++              seenMessages.add(cleaned);
+               parsedMessages.push(title ? `${title}: ${cleaned}` : cleaned);
+             }
+           }

@@ -578,6 +578,55 @@ Commit: `c87750920be2ed13b4fb1b3d29519fdce21a8515`
 Risk profile: low. One removed early return in `handleSubmit`. On a
 conflict, drop upstream's zero-balance early return again.
 
+### Patch 13 — Cleaner error toasts (no side notices, no URY wrapper duplicate)
+
+Bug fix (owner request 2026-10-19, out-of-stock order).
+
+Files touched:
+- `packages/core/src/frappe/errors.ts` (`parseFrappeError`)
+
+What it does: the POS toast joins every server message of a failed call.
+Adding a meal whose ingredients are short showed three: an "Item Price
+added" alert from ERPNext (rolled back anyway), ERPNext's stock error, and
+URY's copy of it ("Error while updating order: <same error>", from
+`sync_order`; `make_invoice` does the same with "Error while settling
+order:"). After this patch the parser skips alert messages, strips those two
+URY prefixes, and drops a message identical to one already kept. With
+`erp_restaurant` `pos_stock_message.py` (short translated stock message),
+the toast is one line: "Stock insuffisant pour Salad (manque Tomato,
+Avocado). Modifiez la commande ou mettez à jour le stock."
+Shared code, but only the POS calls `parseFrappeError` (OrderPanel,
+PaymentDialog, Orders, POSOpeningScreen, POSOpeningProvider); the
+management frontend does not. Rebuild pos. No new strings.
+
+Why it can't be done in `erp_restaurant`: the messages are joined in the
+browser. The backend alternative was wrapping URY's `sync_order` and
+`make_invoice` endpoints to rewrite the message log, a larger and riskier
+override of the two busiest POS calls. The message text itself is in
+`erp_restaurant`.
+
+Acceptance criteria:
+Setup: POS Profile "Validate Stock on Save" on, a Test meal whose recipe
+has an ingredient with 0 stock. The server text follows the cashier's User
+language, not the POS language toggle.
+
+1. Add that meal and send the order: one toast line naming the meal and the
+   missing ingredients; no "Error while updating order", no "Item Price
+   added".
+2. Same order paid with "Validate Stock on Save" off: the payment is refused
+   with the same one-line toast.
+3. Another error (e.g. "Order has been modified" from a stale tab): its
+   message shows once, without URY's prefix or side notices.
+4. Cashier user in French, then Arabic: same single line, translated;
+   Arabic right to left.
+
+Commit: `fd1b039a610603cd64e45f18525f5f0044f5bfe4`
+
+Risk profile: low. A few lines in the parser. Messages are deduplicated on
+their text without the title (localized titles such as "رسالة" are not
+filtered). On a conflict, keep the alert
+skip, the prefix strip and the duplicate check.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
