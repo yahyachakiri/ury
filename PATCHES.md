@@ -737,6 +737,51 @@ Risk profile: low to medium. `pos/src/components/Header.tsx` is a
 conflict-prone file; on a conflict, keep the conditional logo block. HTML
 entry conflicts: keep the two Jinja lines.
 
+### Patch 16 — Money icon and site currency instead of the rupee
+
+Bug fix (backlog B4, owner request 2026-10-19). Completes Patch 05.
+
+Files touched:
+- 13 management report pages under `frontend/src/pages/Reports/` and
+  `frontend/src/pages/Reports/reportsRegistry.ts` (lucide `IndianRupee` ->
+  `Banknote`)
+- `frontend/src/utils/format.ts`, `packages/core/src/format.ts`
+  (`formatCurrency`, `formatCompactCurrency`)
+- `ury/ury/doctype/ury_order/ury_order.js` (desk URY Order menu card)
+
+What it does: the report stat cards and the "Daily P&L" menu entry show a
+banknote icon instead of the rupee icon. The currency formatters fell back
+to "₹" when the browser had no cached `currencySymbol` (the POS caches it;
+the management app at /ury often opens without it); they now fall back to
+the site's default currency (`frappe.boot.sysdefaults.currency`, e.g. MAD),
+or nothing. Amounts no longer use Indian digit grouping (`en-IN`,
+1,00,000) but the browser's locale. The desk URY Order item cards show the
+site currency instead of "₹". No new strings.
+
+Why it can't be done in `erp_restaurant`: icons and the fallback symbol are
+hardcoded in the URY frontend sources and a URY doctype script.
+
+Acceptance criteria:
+1. /ury Reports: no rupee icon on any report card or in the reports menu;
+   a banknote icon instead.
+2. /ury in a fresh browser (no POS opened): amounts show the site currency
+   (MAD), not "₹", with normal grouping (100,000 or 100 000).
+3. /pos amounts unchanged (currency from the POS store).
+4. Desk URY Order form item cards: "MAD <rate>".
+
+Not covered: `formatCompactCurrency` still uses Indian units (L for lakh,
+Cr for crore) on chart axes; a code comment in
+`ury/ury/report_api/sales.py` mentions ₹ (not shown).
+
+Build: frontend and pos (shared format.ts). The server deploy builds pos
+only; run `yarn build` in apps/ury for frontend. The desk JS needs no build
+(restart / clear-cache).
+
+Commit: `1194e3d5c2a62c5f6c42c0f80855378f38f6da9a`
+
+Risk profile: low. Identifier swap and fallback values. On a conflict, keep
+`Banknote` and the `sysdefaults.currency` fallback.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

@@ -1,0 +1,363 @@
+diff --git a/frontend/src/pages/Reports/AverageBillValue.tsx b/frontend/src/pages/Reports/AverageBillValue.tsx
+index 10d023d9..c99df315 100644
+--- a/frontend/src/pages/Reports/AverageBillValue.tsx
++++ b/frontend/src/pages/Reports/AverageBillValue.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Gauge, IndianRupee, Receipt } from 'lucide-react';
++import { Gauge, Banknote, Receipt } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { LineChartCard } from '../../components/reports/charts/LineChartCard';
+@@ -86,7 +86,7 @@ export function AverageBillValue() {
+             <StatCard
+               label="Total Sales"
+               value={formatCurrency(data.summary.total_sales)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard
+               label="Average Bill Value"
+diff --git a/frontend/src/pages/Reports/CancelledInvoices.tsx b/frontend/src/pages/Reports/CancelledInvoices.tsx
+index e108699e..9c57691c 100644
+--- a/frontend/src/pages/Reports/CancelledInvoices.tsx
++++ b/frontend/src/pages/Reports/CancelledInvoices.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
+-import { Ban, IndianRupee, Users, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
++import { Ban, Banknote, Users, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -113,7 +113,7 @@ export function CancelledInvoices() {
+           <StatCard
+             label="Total Amount"
+             value={formatCurrency(data.summary.total_amount)}
+-            icon={<IndianRupee className="w-4 h-4" />}
++            icon={<Banknote className="w-4 h-4" />}
+           />
+           <StatCard
+             label="Unique Cancellers"
+diff --git a/frontend/src/pages/Reports/CustomerData.tsx b/frontend/src/pages/Reports/CustomerData.tsx
+index 89300f26..2bee4060 100644
+--- a/frontend/src/pages/Reports/CustomerData.tsx
++++ b/frontend/src/pages/Reports/CustomerData.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Receipt, IndianRupee, TrendingUp, Search } from 'lucide-react';
++import { Receipt, Banknote, TrendingUp, Search } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -156,7 +156,7 @@ export function CustomerData() {
+             <StatCard
+               label="Total Spend"
+               value={formatCurrency(data.summary.total_spend)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard
+               label="Avg Spend / Visit"
+diff --git a/frontend/src/pages/Reports/DailyPnl.tsx b/frontend/src/pages/Reports/DailyPnl.tsx
+index d3cf4421..fc2c0475 100644
+--- a/frontend/src/pages/Reports/DailyPnl.tsx
++++ b/frontend/src/pages/Reports/DailyPnl.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
+-import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
++import { Banknote, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { toApiDate } from '../../lib/reportDate';
+ import { DatePicker } from '../../components/setup/DatePicker';
+@@ -259,7 +259,7 @@ export function DailyPnl() {
+             <StatCard
+               label="Gross Sales"
+               value={formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard
+               label="Net Sales"
+diff --git a/frontend/src/pages/Reports/DaywiseSales.tsx b/frontend/src/pages/Reports/DaywiseSales.tsx
+index 89b6733e..6c70309a 100644
+--- a/frontend/src/pages/Reports/DaywiseSales.tsx
++++ b/frontend/src/pages/Reports/DaywiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Receipt, IndianRupee, TrendingUp, Trophy } from 'lucide-react';
++import { Receipt, Banknote, TrendingUp, Trophy } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { LineChartCard } from '../../components/reports/charts/LineChartCard';
+@@ -100,7 +100,7 @@ export function DaywiseSales() {
+             <StatCard
+               label="Period Total"
+               value={formatCurrency(data.summary.period_total)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard
+               label="Avg Daily Sales"
+diff --git a/frontend/src/pages/Reports/EmployeeItemWiseSales.tsx b/frontend/src/pages/Reports/EmployeeItemWiseSales.tsx
+index 2a041406..b9200723 100644
+--- a/frontend/src/pages/Reports/EmployeeItemWiseSales.tsx
++++ b/frontend/src/pages/Reports/EmployeeItemWiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Package, IndianRupee, Search } from 'lucide-react';
++import { Package, Banknote, Search } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -149,7 +149,7 @@ export function EmployeeItemWiseSales() {
+             <StatCard
+               label="Total Amount"
+               value={formatCurrency(data.summary.total_amount)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+           </div>
+           <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
+diff --git a/frontend/src/pages/Reports/EmployeeSales.tsx b/frontend/src/pages/Reports/EmployeeSales.tsx
+index 8050dc38..0764033f 100644
+--- a/frontend/src/pages/Reports/EmployeeSales.tsx
++++ b/frontend/src/pages/Reports/EmployeeSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Users, IndianRupee, Receipt } from 'lucide-react';
++import { Users, Banknote, Receipt } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { BarChartCard } from '../../components/reports/charts/BarChartCard';
+@@ -94,7 +94,7 @@ export function EmployeeSales() {
+             <StatCard
+               label="Total Sales"
+               value={formatCurrency(data.summary.period_total_sales)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+           </div>
+ 
+diff --git a/frontend/src/pages/Reports/ItemWisePurchaseHistory.tsx b/frontend/src/pages/Reports/ItemWisePurchaseHistory.tsx
+index c9c6f329..982ed1e3 100644
+--- a/frontend/src/pages/Reports/ItemWisePurchaseHistory.tsx
++++ b/frontend/src/pages/Reports/ItemWisePurchaseHistory.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { Package, IndianRupee } from 'lucide-react';
++import { Package, Banknote } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -86,7 +86,7 @@ export function ItemWisePurchaseHistory() {
+           <StatCard
+             label="Total Spend"
+             value={formatCurrency(data.summary.total_amount)}
+-            icon={<IndianRupee className="w-4 h-4" />}
++            icon={<Banknote className="w-4 h-4" />}
+           />
+         </div>
+       )}
+diff --git a/frontend/src/pages/Reports/ItemWiseSales.tsx b/frontend/src/pages/Reports/ItemWiseSales.tsx
+index c840d8b5..e6d0e297 100644
+--- a/frontend/src/pages/Reports/ItemWiseSales.tsx
++++ b/frontend/src/pages/Reports/ItemWiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
+-import { Package, IndianRupee, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
++import { Package, Banknote, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -111,7 +111,7 @@ export function ItemWiseSales() {
+           <StatCard
+             label="Total Amount"
+             value={formatCurrency(data.summary.total_amount)}
+-            icon={<IndianRupee className="w-4 h-4" />}
++            icon={<Banknote className="w-4 h-4" />}
+           />
+         </div>
+       )}
+diff --git a/frontend/src/pages/Reports/MonthWiseSales.tsx b/frontend/src/pages/Reports/MonthWiseSales.tsx
+index ae7e62f8..b8010679 100644
+--- a/frontend/src/pages/Reports/MonthWiseSales.tsx
++++ b/frontend/src/pages/Reports/MonthWiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { IndianRupee, TrendingUp, Trophy, TrendingDown } from 'lucide-react';
++import { Banknote, TrendingUp, Trophy, TrendingDown } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { BarChartCard } from '../../components/reports/charts/BarChartCard';
+ import { SearchableSelect } from '../../components/common/SearchableSelect';
+@@ -110,7 +110,7 @@ export function MonthWiseSales() {
+             <StatCard
+               label="Total Revenue"
+               value={formatCurrency(data.summary.total_revenue)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard
+               label="Avg Monthly"
+diff --git a/frontend/src/pages/Reports/ServiceWiseSales.tsx b/frontend/src/pages/Reports/ServiceWiseSales.tsx
+index 92cc60e9..c84b379a 100644
+--- a/frontend/src/pages/Reports/ServiceWiseSales.tsx
++++ b/frontend/src/pages/Reports/ServiceWiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { IndianRupee, Receipt, TrendingUp } from 'lucide-react';
++import { Banknote, Receipt, TrendingUp } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+ import { PieChartCard } from '../../components/reports/charts/PieChartCard';
+@@ -87,7 +87,7 @@ export function ServiceWiseSales() {
+             <StatCard
+               label="Total Revenue"
+               value={formatCurrency(data.summary.total_revenue)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard label="Total Orders" value={data.summary.total_orders} icon={<Receipt className="w-4 h-4" />} />
+             <StatCard
+diff --git a/frontend/src/pages/Reports/TimeWiseSales.tsx b/frontend/src/pages/Reports/TimeWiseSales.tsx
+index 541d40a1..7480187e 100644
+--- a/frontend/src/pages/Reports/TimeWiseSales.tsx
++++ b/frontend/src/pages/Reports/TimeWiseSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+-import { IndianRupee, Receipt, TrendingUp, Trophy } from 'lucide-react';
++import { Banknote, Receipt, TrendingUp, Trophy } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { BarChartCard } from '../../components/reports/charts/BarChartCard';
+ import { toApiDate } from '../../lib/reportDate';
+@@ -118,7 +118,7 @@ export function TimeWiseSales() {
+             <StatCard
+               label="Total Sales"
+               value={formatCurrency(data.summary.total_sales)}
+-              icon={<IndianRupee className="w-4 h-4" />}
++              icon={<Banknote className="w-4 h-4" />}
+             />
+             <StatCard label="Total Bills" value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
+             <StatCard
+diff --git a/frontend/src/pages/Reports/TodaysSales.tsx b/frontend/src/pages/Reports/TodaysSales.tsx
+index f07e805a..ea8e3175 100644
+--- a/frontend/src/pages/Reports/TodaysSales.tsx
++++ b/frontend/src/pages/Reports/TodaysSales.tsx
+@@ -1,7 +1,7 @@
+ import { useCallback, useEffect, useState } from 'react';
+ import { call, formatCurrency } from '@ury/core';
+ import { StatCard } from '@ury/ui';
+-import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
++import { Receipt, Banknote, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
+ import { useBranchContext } from '../../context/BranchContext';
+ import { toApiDate } from '../../lib/reportDate';
+ import { DatePicker } from '../../components/setup/DatePicker';
+@@ -96,7 +96,7 @@ export function TodaysSales() {
+           <StatCard
+             label="Item Total"
+             value={formatCurrency(data.item_total)}
+-            icon={<IndianRupee className="w-4 h-4" />}
++            icon={<Banknote className="w-4 h-4" />}
+           />
+           <StatCard
+             label="Total Taxes & Charges"
+diff --git a/frontend/src/pages/Reports/reportsRegistry.ts b/frontend/src/pages/Reports/reportsRegistry.ts
+index d471c636..2a204dad 100644
+--- a/frontend/src/pages/Reports/reportsRegistry.ts
++++ b/frontend/src/pages/Reports/reportsRegistry.ts
+@@ -16,7 +16,7 @@ import {
+   UserCog,
+   ClipboardList,
+   Factory,
+-  IndianRupee,
++  Banknote,
+ } from 'lucide-react';
+ 
+ export interface ReportEntry {
+@@ -47,7 +47,7 @@ export const reportsRegistry: ReportEntry[] = [
+   { id: 'employee-item-wise-sales', label: 'Employee Item Wise Sales', group: 'Employees & Operations', path: 'employee-item-wise-sales', icon: ClipboardList },
+   { id: 'completed-work-orders', label: 'Completed Work Orders', group: 'Employees & Operations', path: 'completed-work-orders', icon: Factory },
+ 
+-  { id: 'daily-pnl', label: 'Daily P&L', group: 'Financial', path: 'daily-pnl', icon: IndianRupee },
++  { id: 'daily-pnl', label: 'Daily P&L', group: 'Financial', path: 'daily-pnl', icon: Banknote },
+ ];
+ 
+ export function groupReports(reports: ReportEntry[]): Record<string, ReportEntry[]> {
+diff --git a/frontend/src/utils/format.ts b/frontend/src/utils/format.ts
+index 571e1467..2394dd79 100644
+--- a/frontend/src/utils/format.ts
++++ b/frontend/src/utils/format.ts
+@@ -1,8 +1,9 @@
+ import { storage } from '@ury/core';
+ 
+ export function formatCurrency(amount: number): string {
+-  const symbol = (storage as any)?.getItem?.('currencySymbol') || '₹';
+-  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString('en-IN') : amount;
++  // Patch 16: site currency when the POS has not cached a symbol (was ₹), no Indian grouping.
++  const symbol = (storage as any)?.getItem?.('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
++  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString() : amount;
+   return `${symbol} ${formattedVal}`;
+ }
+ 
+diff --git a/packages/core/src/format.ts b/packages/core/src/format.ts
+index fc4a0f34..788a01a3 100644
+--- a/packages/core/src/format.ts
++++ b/packages/core/src/format.ts
+@@ -1,9 +1,10 @@
+ import { storage } from './storage';
+ 
+ export function formatCurrency(amount: number): string {
+-  const symbol = storage.getItem('currencySymbol') || '₹';
++  // Patch 16: site currency when no symbol is cached (was ₹), no Indian grouping.
++  const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
+   const roundedAmount = flt(amount, 2);
+-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString('en-IN') : roundedAmount;
++  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
+   return `${symbol} ${formattedVal}`;
+ }
+ 
+@@ -27,7 +28,7 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
+  * e.g. 600000 -> "₹6L", 12500000 -> "₹1.25Cr", 8200 -> "₹8.2k".
+  */
+ export function formatCompactCurrency(amount: number): string {
+-  const symbol = storage.getItem('currencySymbol') || '₹';
++  const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || ''; // Patch 16
+   if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
+ 
+   const sign = amount < 0 ? '-' : '';
+diff --git a/ury/ury/doctype/ury_order/ury_order.js b/ury/ury/doctype/ury_order/ury_order.js
+index 221fb9bf..5689e0f0 100644
+--- a/ury/ury/doctype/ury_order/ury_order.js
++++ b/ury/ury/doctype/ury_order/ury_order.js
+@@ -330,7 +330,7 @@ frappe.ui.form.on('URY Order', {
+ 	            <div class="col-lg-2 col-md-3 col-6 mr-0">
+                     <div class="border border-light mb-4 mh-100 rounded text-center" id=${index} style="box-shadow: 0 0px 3px 0 rgba(0, 0, 0, 0.2);">
+                         <div class="mt-3" style="padding: 0 13px;text-overflow: ellipsis;overflow:hidden;white-space:nowrap;width: 160px;">${menu_item_list.item_name}</div>
+-                        <div> ₹ ${menu_item_list.rate_of_item}</div>
++                        <div>${frappe.boot.sysdefaults.currency || ''} ${menu_item_list.rate_of_item}</div>
+                         <div class="d-none">${menu_item_list.special_dish_menu}</div>
+                         <div class="d-flex " style="margin-bottom:10%;margin-top:10%;margin-left:8%;margin-right:8%;">
+                             <div class="input-group">
