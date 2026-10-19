@@ -1,0 +1,1115 @@
+diff --git a/pos/src/captain/components/CaptainActionsMenu.tsx b/pos/src/captain/components/CaptainActionsMenu.tsx
+index b33f35f3..a33fd0ce 100644
+--- a/pos/src/captain/components/CaptainActionsMenu.tsx
++++ b/pos/src/captain/components/CaptainActionsMenu.tsx
+@@ -1,6 +1,7 @@
+ import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+ import { ArrowRightLeft, Loader2, MoreVertical, Printer, Receipt, UserRound } from 'lucide-react';
+ import { Button } from '@ury/ui';
++import { t } from '../../i18n';
+ 
+ /**
+  * Captain order screen's secondary-actions overflow menu (PLAN.md §5/§6/§10:
+@@ -102,7 +103,7 @@ const CaptainActionsMenu = ({
+         size="icon"
+         className="h-9 w-9 shrink-0 text-gray-600 hover:text-gray-900"
+         onClick={handleToggle}
+-        aria-label="More actions"
++        aria-label={t('common.more_actions')}
+         aria-expanded={isOpen}
+       >
+         <MoreVertical className="h-5 w-5" />
+diff --git a/pos/src/captain/components/CaptainMenu.tsx b/pos/src/captain/components/CaptainMenu.tsx
+index fa7891f7..eaf0d9a7 100644
+--- a/pos/src/captain/components/CaptainMenu.tsx
++++ b/pos/src/captain/components/CaptainMenu.tsx
+@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
+ import { usePOSStore } from '../../store/pos-store';
+ import { cn, Spinner } from '@ury/ui';
+ import MenuCard from '../../components/MenuCard';
++import { t } from '../../i18n';
+ 
+ interface CaptainMenuProps {
+   /** From the per-table permission map (`get_table_order_context`). When
+@@ -65,7 +66,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+           <input
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+-            placeholder="Search menu"
++            placeholder={t('captain.search_menu')}
+             className="w-full ps-9 pe-3 py-3 rounded-lg border border-gray-200 bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+           />
+         </div>
+@@ -107,9 +108,9 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+ 
+       <div className="flex-1 overflow-y-auto p-3">
+         {menuLoading ? (
+-          <Spinner message="Loading menu…" />
++          <Spinner message={t('captain.loading_menu')} />
+         ) : filteredItems.length === 0 ? (
+-          <p className="text-center text-gray-500 text-sm mt-8">No items found.</p>
++          <p className="text-center text-gray-500 text-sm mt-8">{t('common.no_items_found')}</p>
+         ) : (
+           <div className="grid grid-cols-2 gap-3 pb-8">
+             {filteredItems.map((item) => (
+diff --git a/pos/src/captain/components/CaptainOrderLine.tsx b/pos/src/captain/components/CaptainOrderLine.tsx
+index 49256162..b19a981e 100644
+--- a/pos/src/captain/components/CaptainOrderLine.tsx
++++ b/pos/src/captain/components/CaptainOrderLine.tsx
+@@ -2,6 +2,7 @@ import { Minus, Plus, MessageSquare, RotateCcw, Trash2 } from 'lucide-react';
+ import { cn } from '@ury/ui';
+ import { formatCurrency } from '@ury/core';
+ import type { OrderDeltaLine } from '../hooks/useTableOrderContext';
++import { t } from '../../i18n';
+ 
+ interface CaptainOrderLineProps {
+   line: OrderDeltaLine;
+@@ -78,7 +79,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
+               onClick={onDecrement}
+               disabled={disabled}
+               className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+-              aria-label="Decrease"
++              aria-label={t('common.decrease')}
+             >
+               <Minus className="w-4 h-4" />
+             </button>
+@@ -87,7 +88,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
+               onClick={onIncrement}
+               disabled={disabled}
+               className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+-              aria-label="Increase"
++              aria-label={t('common.increase')}
+             >
+               <Plus className="w-4 h-4" />
+             </button>
+@@ -100,8 +101,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
+             onClick={onDecrement}
+             disabled={disabled}
+             className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+-            aria-label="Reduce quantity"
+-            title="Reduce quantity"
++            aria-label={t('captain.reduce_qty')}
++            title={t('captain.reduce_qty')}
+           >
+             <Minus className="w-4 h-4" />
+           </button>
+@@ -113,8 +114,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
+             onClick={onRemove}
+             disabled={disabled}
+             className="w-9 h-9 rounded-full border border-red-200 text-red-600 flex items-center justify-center disabled:opacity-40"
+-            aria-label="Remove item"
+-            title="Remove item"
++            aria-label={t('captain.remove_item')}
++            title={t('captain.remove_item')}
+           >
+             <Trash2 className="w-4 h-4" />
+           </button>
+@@ -126,8 +127,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
+             onClick={onRestore}
+             disabled={disabled}
+             className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+-            aria-label="Undo reduction"
+-            title="Undo"
++            aria-label={t('captain.undo_reduction')}
++            title={t('common.undo')}
+           >
+             <RotateCcw className="w-4 h-4" />
+           </button>
+diff --git a/pos/src/captain/components/CaptainRouteGuard.tsx b/pos/src/captain/components/CaptainRouteGuard.tsx
+index f08b3a1b..968ae107 100644
+--- a/pos/src/captain/components/CaptainRouteGuard.tsx
++++ b/pos/src/captain/components/CaptainRouteGuard.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import { Spinner } from '@ury/ui';
+ import { useCaptainContext } from '../hooks/useCaptainContext';
++import { t } from '../../i18n';
+ 
+ interface Props {
+   children: React.ReactNode;
+@@ -32,7 +33,7 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
+   if (isLoading) {
+     return (
+       <div className="min-h-screen">
+-        <Spinner message="Loading captain context..." />
++        <Spinner message={t('captain.loading_context')} />
+       </div>
+     );
+   }
+@@ -42,7 +43,7 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
+       <div className="flex items-center justify-center min-h-screen">
+         <div className="text-center">
+           <div className="text-red-600 text-xl mb-4">⚠️</div>
+-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Unable to load Captain context</h2>
++          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('captain.load_context_failed')}</h2>
+           <p className="text-gray-600">{error}</p>
+         </div>
+       </div>
+@@ -54,9 +55,9 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
+       <div className="flex items-center justify-center min-h-screen">
+         <div className="text-center">
+           <div className="text-amber-600 text-xl mb-4">🔒</div>
+-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Not permitted</h2>
++          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('common.not_permitted')}</h2>
+           <p className="text-gray-600">
+-            You do not have permission to take table orders.
++            {t('captain.no_table_orders')}
+           </p>
+         </div>
+       </div>
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index a2e121cc..d3e65691 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -25,6 +25,7 @@ import CommentDialog from '../../components/CommentDialog';
+ import TableTransferDialog from '../../components/TableTransferDialog';
+ import CaptainTransferDialog from '../../components/CaptainTransferDialog';
+ import { CustomerSelect } from '../../components/CustomerSelect';
++import { t } from '../../i18n';
+ 
+ type Mode = 'menu' | 'order';
+ 
+@@ -172,19 +173,19 @@ export default function CaptainOrder() {
+     if (!table) return;
+     try {
+       if (!posProfile) {
+-        showToast.error('POS profile not found.');
++        showToast.error(t('errors.pos_profile_not_found'));
+         return;
+       }
+       if (!user?.name) {
+-        showToast.error('You are not logged in.');
++        showToast.error(t('errors.user_not_logged_in'));
+         return;
+       }
+       if (!canModify) {
+-        showToast.error('You do not have permission to modify this order.');
++        showToast.error(t('captain.no_permission_order'));
+         return;
+       }
+       if (activeOrders.length === 0) {
+-        showToast.error('Add at least one item before sending the order.');
++        showToast.error(t('captain.add_item_first'));
+         return;
+       }
+       // sync_order requires `customer` as a hard backend parameter (found via
+@@ -192,7 +193,7 @@ export default function CaptainOrder() {
+       // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
+       // exact validate-before-submit gate rather than only omitting the field.
+       if (!selectedCustomer?.name) {
+-        showToast.error('Please select a customer before sending the order.');
++        showToast.error(t('captain.select_customer_first'));
+         return;
+       }
+ 
+@@ -227,8 +228,8 @@ export default function CaptainOrder() {
+       if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
+         showToast.error(
+           isUpdatingOrder
+-            ? 'This order was modified by someone else. Please reopen the table and try again.'
+-            : 'Failed to send the order. Please try again.'
++            ? t('captain.modified_elsewhere')
++            : t('captain.send_failed_retry')
+         );
+         return;
+       }
+@@ -246,14 +247,14 @@ export default function CaptainOrder() {
+         try {
+           const messages = JSON.parse(serverMessages);
+           const messageObj = JSON.parse(messages[0]);
+-          showToast.error(messageObj.message || 'API error');
++          showToast.error(messageObj.message || t('errors.api_error'));
+         } catch {
+-          showToast.error('API error');
++          showToast.error(t('errors.api_error'));
+         }
+       } else if (error instanceof Error) {
+         showToast.error(error.message);
+       } else {
+-        showToast.error('Failed to send the order.');
++        showToast.error(t('captain.send_failed'));
+       }
+     } finally {
+       setIsSubmitting(false);
+@@ -272,15 +273,15 @@ export default function CaptainOrder() {
+ 
+   const handleReprintKot = async () => {
+     if (!invoiceId) {
+-      showToast.error('No active order to reprint.');
++      showToast.error(t('captain.no_order_reprint'));
+       return;
+     }
+     setIsReprintingKot(true);
+     try {
+       await reprintKot(invoiceId);
+-      showToast.success('KOT reprinted.');
++      showToast.success(t('captain.kot_reprinted'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : 'Failed to reprint KOT.');
++      showToast.error(error instanceof Error ? error.message : t('captain.reprint_failed'));
+     } finally {
+       setIsReprintingKot(false);
+     }
+@@ -288,11 +289,11 @@ export default function CaptainOrder() {
+ 
+   const handlePrintBill = async () => {
+     if (!invoiceId) {
+-      showToast.error('No active order to print.');
++      showToast.error(t('captain.no_order_print'));
+       return;
+     }
+     if (!posProfile) {
+-      showToast.error('POS profile not found.');
++      showToast.error(t('errors.pos_profile_not_found'));
+       return;
+     }
+     setIsPrintingBill(true);
+@@ -302,9 +303,9 @@ export default function CaptainOrder() {
+         posProfile,
+         printFormat: resolvePrintFormat(context?.order ?? {}, posProfile.print_format),
+       });
+-      showToast.success('Printed successfully.');
++      showToast.success(t('success.printed'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : 'Failed to print bill.');
++      showToast.error(error instanceof Error ? error.message : t('captain.print_bill_failed'));
+     } finally {
+       setIsPrintingBill(false);
+     }
+@@ -312,12 +313,12 @@ export default function CaptainOrder() {
+ 
+   const handleOpenTransferTable = async () => {
+     if (!invoiceId || !table) {
+-      showToast.error('No active order to transfer.');
++      showToast.error(t('captain.no_order_transfer'));
+       return;
+     }
+     const branch = posProfile?.branch;
+     if (!branch) {
+-      showToast.error('Unable to transfer this table.');
++      showToast.error(t('captain.transfer_failed'));
+       return;
+     }
+     setTransferDestinations([]);
+@@ -328,7 +329,7 @@ export default function CaptainOrder() {
+       setTransferDestinations(destinations);
+     } catch (error) {
+       setIsTransferTableOpen(false);
+-      showToast.error(error instanceof Error ? error.message : 'Failed to load destination tables.');
++      showToast.error(error instanceof Error ? error.message : t('captain.load_destinations_failed'));
+     } finally {
+       setIsTransferDestinationsLoading(false);
+     }
+@@ -338,7 +339,7 @@ export default function CaptainOrder() {
+     if (!table || !invoiceId) return;
+     await tableTransfer(table, newTable, invoiceId);
+     clearTableOrder();
+-    showToast.success('Table transferred.');
++    showToast.success(t('tables.transfer_success'));
+     navigate('/order');
+   };
+ 
+@@ -346,7 +347,7 @@ export default function CaptainOrder() {
+ 
+   const handleOpenTransferCaptain = () => {
+     if (!invoiceId) {
+-      showToast.error('No active order to transfer.');
++      showToast.error(t('captain.no_order_transfer'));
+       return;
+     }
+     setIsTransferCaptainOpen(true);
+@@ -356,7 +357,7 @@ export default function CaptainOrder() {
+     if (!invoiceId) return;
+     await captainTransfer(currentCaptain, newCaptain, invoiceId);
+     clearTableOrder();
+-    showToast.success('Captain transferred.');
++    showToast.success(t('tables.captain_transfer_success'));
+     navigate('/order');
+   };
+ 
+@@ -375,14 +376,14 @@ export default function CaptainOrder() {
+ 
+       {!canModify && (
+         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
+-          <span className="text-sm font-medium text-gray-700">Pax</span>
++          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
+           <span className="text-sm text-gray-900">{noOfPax}</span>
+         </div>
+       )}
+ 
+       {canModify && (
+         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
+-          <span className="text-sm font-medium text-gray-700">Pax</span>
++          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
+           <div className="flex items-center gap-3">
+             <Button
+               onClick={() => setNoOfPax(Math.max(MIN_PAX, noOfPax - 1))}
+@@ -410,10 +411,10 @@ export default function CaptainOrder() {
+       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
+         <div className="flex flex-col items-center justify-center text-center py-16">
+           <ClipboardList className="w-10 h-10 text-gray-300 mb-3" />
+-          <p className="text-gray-500 text-sm">No items yet.</p>
++          <p className="text-gray-500 text-sm">{t('captain.no_items_yet')}</p>
+           {canModify && (
+             <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
+-              Browse menu
++              {t('captain.browse_menu')}
+             </Button>
+           )}
+         </div>
+@@ -487,7 +488,7 @@ export default function CaptainOrder() {
+   if (isContextLoading || !isOrderReady) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-gray-50">
+-        <Spinner message="Loading table…" />
++        <Spinner message={t('captain.loading_table')} />
+       </div>
+     );
+   }
+@@ -496,10 +497,10 @@ export default function CaptainOrder() {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+         <div className="text-center">
+-          <p className="text-lg font-semibold text-red-600 mb-2">Unable to load this table</p>
++          <p className="text-lg font-semibold text-red-600 mb-2">{t('captain.load_table_failed')}</p>
+           <p className="text-gray-600 text-sm">{contextError}</p>
+           <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
+-            Back to Tables
++            {t('captain.back_to_tables')}
+           </Button>
+         </div>
+       </div>
+@@ -510,12 +511,12 @@ export default function CaptainOrder() {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+         <div className="text-center max-w-sm">
+-          <p className="text-lg font-semibold text-gray-900 mb-2">Not permitted</p>
++          <p className="text-lg font-semibold text-gray-900 mb-2">{t('common.not_permitted')}</p>
+           <p className="text-gray-600 text-sm">
+-            You don't have access to view this table's order. It may belong to another captain.
++            {t('captain.no_access_table')}
+           </p>
+           <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
+-            Back to Tables
++            {t('captain.back_to_tables')}
+           </Button>
+         </div>
+       </div>
+@@ -527,7 +528,7 @@ export default function CaptainOrder() {
+       {/* Header */}
+       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between">
+         <div className="flex items-center gap-2">
+-          <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label="Back to Tables">
++          <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label={t('captain.back_to_tables')}>
+             <ChevronLeft className="w-5 h-5" />
+           </Button>
+           <div>
+@@ -618,7 +619,7 @@ export default function CaptainOrder() {
+         {canModify && (
+           <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg">
+             <div className="flex items-center justify-between mb-2 px-1">
+-              <span className="text-sm font-semibold text-gray-700">Total</span>
++              <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
+               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+             </div>
+             <Button
+@@ -647,7 +648,7 @@ export default function CaptainOrder() {
+       {canModify && (
+         <div className="sticky bottom-0 lg:hidden bg-white border-t border-gray-200 p-3">
+           <div className="flex items-center justify-between mb-2 px-1">
+-            <span className="text-sm font-semibold text-gray-700">Total</span>
++            <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
+             <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+           </div>
+           <Button
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index 6f47dc80..712341ae 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -13,6 +13,7 @@ import {
+ import CaptainTableCard, {
+   type CaptainTableOwnership,
+ } from '../components/CaptainTableCard';
++import { t } from '../../i18n';
+ 
+ /**
+  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
+@@ -92,7 +93,7 @@ export default function CaptainTables() {
+       setTables(sortTablesByMergeGroups(fetchedTables));
+     } catch (err) {
+       console.error(err);
+-      setTablesError('Failed to load tables');
++      setTablesError(t('errors.failed_load_tables'));
+       setTables([]);
+     } finally {
+       setTablesLoading(false);
+@@ -167,7 +168,7 @@ export default function CaptainTables() {
+   if (isLoading) {
+     return (
+       <div className="flex min-h-screen items-center justify-center">
+-        <Spinner message="Loading captain context..." />
++        <Spinner message={t('captain.loading_context')} />
+       </div>
+     );
+   }
+@@ -177,7 +178,7 @@ export default function CaptainTables() {
+       <div className="flex min-h-screen items-center justify-center p-6">
+         <div className="text-center">
+           <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-600" />
+-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Unable to load tables</h2>
++          <h2 className="mb-1 text-lg font-semibold text-gray-800">{t('errors.failed_load_tables')}</h2>
+           <p className="text-sm text-gray-600">{error}</p>
+         </div>
+       </div>
+@@ -188,9 +189,9 @@ export default function CaptainTables() {
+     <div className="flex min-h-screen flex-col bg-gray-50">
+       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
+         <div className="flex items-center justify-between gap-2">
+-          <h1 className="text-lg font-bold text-gray-900">Tables</h1>
++          <h1 className="text-lg font-bold text-gray-900">{t('footer.tables')}</h1>
+           <Button variant="ghost" size="sm" onClick={refresh}>
+-            Refresh
++            {t('captain.refresh')}
+           </Button>
+         </div>
+ 
+@@ -216,7 +217,7 @@ export default function CaptainTables() {
+         {branchRooms.length === 0 ? (
+           <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-gray-500">
+             <AlertTriangle className="h-8 w-8" />
+-            <p className="text-sm">No rooms available for your account.</p>
++            <p className="text-sm">{t('captain.no_rooms')}</p>
+           </div>
+         ) : tablesError ? (
+           <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-red-500">
+@@ -224,11 +225,11 @@ export default function CaptainTables() {
+             <p className="text-sm">{tablesError}</p>
+           </div>
+         ) : tablesLoading ? (
+-          <Spinner message="Loading tables..." />
++          <Spinner message={t('common.loading_tables')} />
+         ) : tableGroups.length === 0 ? (
+           <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-gray-500">
+             <Square className="h-8 w-8" />
+-            <p className="text-sm">No tables found in this room.</p>
++            <p className="text-sm">{t('captain.no_tables_in_room')}</p>
+           </div>
+         ) : (
+           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+diff --git a/pos/src/components/AuthGuard.tsx b/pos/src/components/AuthGuard.tsx
+index 4ff7d5e1..d38bcd71 100644
+--- a/pos/src/components/AuthGuard.tsx
++++ b/pos/src/components/AuthGuard.tsx
+@@ -52,7 +52,7 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
+       <div className="flex items-center justify-center min-h-screen">
+         <div className="text-center">
+           <div className="text-red-600 text-xl mb-4">⚠️</div>
+-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
++          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('auth.access_denied')}</h2>
+           <p className="text-gray-600">{authError || configError}</p>
+         </div>
+       </div>
+@@ -69,8 +69,8 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
+       <div className="flex items-center justify-center min-h-screen">
+         <div className="text-center">
+           <div className="text-amber-600 text-xl mb-4">⚠️</div>
+-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Configuration Error</h2>
+-          <p className="text-gray-600">POS Profile not found or not configured.</p>
++          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('auth.config_error')}</h2>
++          <p className="text-gray-600">{t('auth.pos_profile_missing')}</p>
+         </div>
+       </div>
+     );
+@@ -81,9 +81,9 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
+       <div className="flex items-center justify-center min-h-screen">
+         <div className="text-center">
+           <div className="text-amber-600 text-xl mb-4">🔒</div>
+-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Permission Required</h2>
+-          <p className="text-gray-600">You do not have permission to access this application.</p>
+-          <p className="text-sm text-gray-500 mt-2">Required roles: {allowedRoles.join(', ')}</p>
++          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('auth.permission_required')}</h2>
++          <p className="text-gray-600">{t('auth.no_app_permission')}</p>
++          <p className="text-sm text-gray-500 mt-2">{t('auth.required_roles', { roles: allowedRoles.join(', ') })}</p>
+           <Button 
+             variant="outline"
+             className="mt-4"
+diff --git a/pos/src/components/LayoutView.tsx b/pos/src/components/LayoutView.tsx
+index 84e96cd4..852ce2cd 100644
+--- a/pos/src/components/LayoutView.tsx
++++ b/pos/src/components/LayoutView.tsx
+@@ -374,7 +374,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
+             variant="outline"
+             size="icon"
+             className="shadow-lg"
+-            title="Zoom In"
++            title={t('tables.zoom_in')}
+           >
+             <ZoomIn className="w-5 h-5" />
+           </Button>
+@@ -383,7 +383,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
+             variant="outline"
+             size="icon"
+             className="shadow-lg"
+-            title="Zoom Out"
++            title={t('tables.zoom_out')}
+           >
+             <ZoomOut className="w-5 h-5" />
+           </Button>
+@@ -392,7 +392,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
+             variant="outline"
+             size="icon"
+             className="shadow-lg"
+-            title="Reset Zoom & Pan"
++            title={t('tables.reset_zoom')}
+           >
+             <RotateCcw className="w-5 h-5" />
+           </Button>
+diff --git a/pos/src/components/OrderTabs.tsx b/pos/src/components/OrderTabs.tsx
+index 78c265e8..96b3a425 100644
+--- a/pos/src/components/OrderTabs.tsx
++++ b/pos/src/components/OrderTabs.tsx
+@@ -173,7 +173,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
+                     ? 'text-primary-500 hover:text-primary-700 hover:bg-primary-100'
+                     : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+                 )}
+-                title="Close order"
++                title={t('orders.close_tab')}
+               >
+                 <X className="w-3 h-3" />
+               </button>
+@@ -187,7 +187,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
+           className="h-8 w-8 flex-shrink-0 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-gray-200/50 ml-1"
+           onClick={() => !disabled && addTab()}
+           disabled={disabled}
+-          title="Add new order"
++          title={t('cart.add_new_order')}
+         >
+           <Plus className="w-4 h-4" />
+         </Button>
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 409eee86..b8ff8caf 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -28,7 +28,12 @@
+         "cancelling": "جاري الإلغاء...",
+         "confirm_cancel": "تأكيد الإلغاء",
+         "loading_ury_pos": "جاري تحميل URY POS...",
+-        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء..."
++        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء...",
++        "not_permitted": "غير مسموح",
++        "decrease": "إنقاص",
++        "increase": "زيادة",
++        "undo": "تراجع",
++        "more_actions": "إجراءات أخرى"
+     },
+     "header": {
+         "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
+@@ -263,7 +268,15 @@
+             "previous_sessions_open": "هناك {{count}} من جلسات نقطة البيع مفتوحة منذ يوم سابق",
+             "generic": "تعذر فتح جلسة نقطة البيع. {{message}}",
+             "load_failed": "تعذر التحقق من حالة جلسة نقطة البيع. يرجى المحاولة مرة أخرى."
+-        }
++        },
++        "api_error": "خطأ في الخادم",
++        "fetch_notifications": "فشل تحميل الإشعارات",
++        "fetch_invoices": "فشل تحميل الطلبات",
++        "fetch_invoice_items": "فشل تحميل أصناف الطلب",
++        "update_invoice_status": "فشل تحديث حالة الطلب",
++        "fetch_print": "فشل تحميل الفاتورة للطباعة",
++        "branch_not_in_profile": "لا يوجد فرع في ملف نقطة البيع",
++        "create_customer_failed": "فشل إنشاء الزبون"
+     },
+     "success": {
+         "order_cancelled": "تم إلغاء الطلب بنجاح",
+@@ -283,7 +296,9 @@
+             "previous": "السابق",
+             "next": "التالي",
+             "page": "صفحة {{number}}"
+-        }
++        },
++        "close_tab": "إغلاق الطلب",
++        "edit_order": "تعديل الطلب"
+     },
+     "tables": {
+         "layout_view": "عرض المخطط",
+@@ -363,7 +378,11 @@
+         "no_destination_tables": "لا توجد طاولات شاغرة متاحة في هذا الفرع",
+         "transfer_not_for_merged": "لا يُسمح بنقل الطاولات المدمجة. افصلها أولًا.",
+         "order_already_billed": "تم إصدار فاتورة لهذا الطلب بالفعل",
+-        "no_captains_found": "لم يتم العثور على مسؤولين"
++        "no_captains_found": "لم يتم العثور على مسؤولين",
++        "zoom_in": "تكبير",
++        "zoom_out": "تصغير",
++        "loading_rooms": "جارٍ تحميل القاعات…",
++        "reset_zoom": "إعادة ضبط التكبير"
+     },
+     "bill_split": {
+         "split_bill": "تقسيم الفاتورة",
+@@ -506,6 +525,49 @@
+         "reprint": "إعادة طباعة تذكرة المطبخ",
+         "reprinted": "تمت طباعة تذكرة المطبخ ({{count}})",
+         "nothing_to_print": "لا توجد تذكرة مطبخ لهذا الطلب",
+-        "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات."
++        "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات.",
++        "qz_host_missing": "مضيف QZ غير محدد في ملف نقطة البيع",
++        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع"
++    },
++    "captain": {
++        "load_context_failed": "تعذّر تحميل شاشة النادل",
++        "reduce_qty": "تقليل الكمية",
++        "remove_item": "إزالة الصنف",
++        "undo_reduction": "التراجع عن التقليل",
++        "search_menu": "البحث في القائمة",
++        "no_rooms": "لا توجد قاعات متاحة لحسابك.",
++        "no_tables_in_room": "لا توجد طاولات في هذه القاعة.",
++        "no_permission_order": "ليس لديك صلاحية تعديل هذا الطلب.",
++        "add_item_first": "أضف صنفًا واحدًا على الأقل قبل إرسال الطلب.",
++        "select_customer_first": "اختر زبونًا قبل إرسال الطلب.",
++        "send_failed": "فشل إرسال الطلب.",
++        "no_order_reprint": "لا يوجد طلب نشط لإعادة طباعته.",
++        "kot_reprinted": "تمت إعادة طباعة تذكرة المطبخ.",
++        "no_order_print": "لا يوجد طلب نشط للطباعة.",
++        "no_order_transfer": "لا يوجد طلب نشط لنقله.",
++        "transfer_failed": "تعذّر نقل هذه الطاولة.",
++        "no_items_yet": "لا توجد أصناف بعد.",
++        "load_table_failed": "تعذّر تحميل هذه الطاولة",
++        "back_to_tables": "العودة إلى الطاولات",
++        "modified_elsewhere": "تم تعديل هذا الطلب من قبل شخص آخر. أعد فتح الطاولة وحاول مرة أخرى.",
++        "send_failed_retry": "فشل إرسال الطلب. حاول مرة أخرى.",
++        "reprint_failed": "فشلت إعادة طباعة تذكرة المطبخ.",
++        "print_bill_failed": "فشلت طباعة الفاتورة.",
++        "load_destinations_failed": "فشل تحميل طاولات الوجهة.",
++        "browse_menu": "تصفح القائمة",
++        "loading_table": "جارٍ تحميل الطاولة…",
++        "no_access_table": "ليس لديك صلاحية الوصول إلى طلب هذه الطاولة. قد يكون تابعًا لنادل آخر.",
++        "loading_context": "جارٍ التحميل…",
++        "no_table_orders": "ليس لديك صلاحية أخذ طلبات الطاولات.",
++        "refresh": "تحديث",
++        "loading_menu": "جارٍ تحميل القائمة…"
++    },
++    "auth": {
++        "access_denied": "تم رفض الوصول",
++        "config_error": "خطأ في الإعداد",
++        "permission_required": "الإذن مطلوب",
++        "no_app_permission": "ليس لديك صلاحية الوصول إلى هذا التطبيق.",
++        "pos_profile_missing": "ملف نقطة البيع غير موجود أو غير مُعدّ.",
++        "required_roles": "الأدوار المطلوبة: {{roles}}"
+     }
+ }
+\ No newline at end of file
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 39604ee9..b5f296d9 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -21,7 +21,12 @@
+     "cancelling": "Cancelling...",
+     "confirm_cancel": "Confirm Cancel",
+     "loading_ury_pos": "Loading URY POS...",
+-    "please_wait_setup": "Please wait while we set things up"
++    "please_wait_setup": "Please wait while we set things up",
++    "not_permitted": "Not permitted",
++    "decrease": "Decrease",
++    "increase": "Increase",
++    "undo": "Undo",
++    "more_actions": "More actions"
+   },
+   "header": {
+     "search_placeholder_default": "Search orders, menu items, or customers...",
+@@ -256,7 +261,15 @@
+       "previous_sessions_open": "{{count}} POS session(s) left open from a previous day",
+       "generic": "Could not open the POS session. {{message}}",
+       "load_failed": "Could not check the POS session status. Please try again."
+-    }
++    },
++    "api_error": "Server error",
++    "fetch_notifications": "Failed to load notifications",
++    "fetch_invoices": "Failed to load orders",
++    "fetch_invoice_items": "Failed to load the order items",
++    "update_invoice_status": "Failed to update the order status",
++    "fetch_print": "Failed to load the bill for printing",
++    "branch_not_in_profile": "No branch on the POS profile",
++    "create_customer_failed": "Failed to create the customer"
+   },
+   "success": {
+     "order_cancelled": "Order cancelled successfully",
+@@ -276,7 +289,9 @@
+       "previous": "Previous",
+       "next": "Next",
+       "page": "Page {{number}}"
+-    }
++    },
++    "close_tab": "Close order",
++    "edit_order": "Edit order"
+   },
+   "tables": {
+     "layout_view": "Layout View",
+@@ -356,7 +371,11 @@
+     "no_destination_tables": "No vacant tables available in this branch",
+     "transfer_not_for_merged": "Table transfer is not allowed for merged tables. Unmerge first.",
+     "order_already_billed": "This order has already been billed",
+-    "no_captains_found": "No captains found"
++    "no_captains_found": "No captains found",
++    "zoom_in": "Zoom in",
++    "zoom_out": "Zoom out",
++    "loading_rooms": "Loading rooms…",
++    "reset_zoom": "Reset zoom"
+   },
+   "bill_split": {
+     "split_bill": "Split bill",
+@@ -499,6 +518,49 @@
+     "reprint": "Reprint kitchen ticket",
+     "reprinted": "Kitchen ticket printed ({{count}})",
+     "nothing_to_print": "No kitchen ticket for this order",
+-    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders."
++    "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders.",
++    "qz_host_missing": "QZ host is not set on the POS profile",
++    "qz_disabled": "QZ printing is not enabled on the POS profile"
++  },
++  "captain": {
++    "load_context_failed": "Unable to load the waiter screen",
++    "reduce_qty": "Reduce quantity",
++    "remove_item": "Remove item",
++    "undo_reduction": "Undo reduction",
++    "search_menu": "Search menu",
++    "no_rooms": "No rooms available for your account.",
++    "no_tables_in_room": "No tables found in this room.",
++    "no_permission_order": "You do not have permission to modify this order.",
++    "add_item_first": "Add at least one item before sending the order.",
++    "select_customer_first": "Please select a customer before sending the order.",
++    "send_failed": "Failed to send the order.",
++    "no_order_reprint": "No active order to reprint.",
++    "kot_reprinted": "Kitchen ticket reprinted.",
++    "no_order_print": "No active order to print.",
++    "no_order_transfer": "No active order to transfer.",
++    "transfer_failed": "Unable to transfer this table.",
++    "no_items_yet": "No items yet.",
++    "load_table_failed": "Unable to load this table",
++    "back_to_tables": "Back to tables",
++    "modified_elsewhere": "This order was modified by someone else. Please reopen the table and try again.",
++    "send_failed_retry": "Failed to send the order. Please try again.",
++    "reprint_failed": "Failed to reprint the kitchen ticket.",
++    "print_bill_failed": "Failed to print the bill.",
++    "load_destinations_failed": "Failed to load the destination tables.",
++    "browse_menu": "Browse menu",
++    "loading_table": "Loading table…",
++    "no_access_table": "You don't have access to this table's order. It may belong to another captain.",
++    "loading_context": "Loading…",
++    "no_table_orders": "You do not have permission to take table orders.",
++    "refresh": "Refresh",
++    "loading_menu": "Loading menu…"
++  },
++  "auth": {
++    "access_denied": "Access denied",
++    "config_error": "Configuration error",
++    "permission_required": "Permission required",
++    "no_app_permission": "You do not have permission to access this application.",
++    "pos_profile_missing": "POS profile not found or not configured.",
++    "required_roles": "Required roles: {{roles}}"
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index d49e91bb..1e7e3040 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -21,7 +21,12 @@
+     "cancelling": "Annulation en cours...",
+     "confirm_cancel": "Confirmer l'annulation",
+     "loading_ury_pos": "Chargement de URY POS...",
+-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
++    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
++    "not_permitted": "Non autorisé",
++    "decrease": "Diminuer",
++    "increase": "Augmenter",
++    "undo": "Annuler",
++    "more_actions": "Plus d'actions"
+   },
+   "header": {
+     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
+@@ -256,7 +261,15 @@
+       "previous_sessions_open": "{{count}} session(s) PDV sont restées ouvertes depuis un jour précédent",
+       "generic": "Impossible d'ouvrir la session PDV. {{message}}",
+       "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
+-    }
++    },
++    "api_error": "Erreur du serveur",
++    "fetch_notifications": "Échec du chargement des notifications",
++    "fetch_invoices": "Échec du chargement des commandes",
++    "fetch_invoice_items": "Échec du chargement des articles de la commande",
++    "update_invoice_status": "Échec de la mise à jour du statut de la commande",
++    "fetch_print": "Échec du chargement de la note à imprimer",
++    "branch_not_in_profile": "Aucune succursale sur le profil PDV",
++    "create_customer_failed": "Échec de la création du client"
+   },
+   "success": {
+     "order_cancelled": "Commande annulée avec succès",
+@@ -276,7 +289,9 @@
+       "previous": "Précédent",
+       "next": "Suivant",
+       "page": "Page {{number}}"
+-    }
++    },
++    "close_tab": "Fermer la commande",
++    "edit_order": "Modifier la commande"
+   },
+   "tables": {
+     "layout_view": "Vue de mise en page",
+@@ -356,7 +371,11 @@
+     "no_destination_tables": "Aucune table libre disponible dans cet établissement",
+     "transfer_not_for_merged": "Le transfert de table n'est pas autorisé pour les tables fusionnées. Séparez d'abord les tables.",
+     "order_already_billed": "Cette commande a déjà été facturée",
+-    "no_captains_found": "Aucun capitaine trouvé"
++    "no_captains_found": "Aucun capitaine trouvé",
++    "zoom_in": "Zoom avant",
++    "zoom_out": "Zoom arrière",
++    "loading_rooms": "Chargement des salles…",
++    "reset_zoom": "Réinitialiser le zoom"
+   },
+   "bill_split": {
+     "split_bill": "Diviser l'addition",
+@@ -499,6 +518,49 @@
+     "reprint": "Réimprimer le ticket cuisine",
+     "reprinted": "Ticket cuisine imprimé ({{count}})",
+     "nothing_to_print": "Aucun ticket cuisine pour cette commande",
+-    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes."
++    "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes.",
++    "qz_host_missing": "L'hôte QZ n'est pas défini sur le profil PDV",
++    "qz_disabled": "L'impression QZ n'est pas activée sur le profil PDV"
++  },
++  "captain": {
++    "load_context_failed": "Impossible de charger l'écran capitaine",
++    "reduce_qty": "Réduire la quantité",
++    "remove_item": "Retirer l'article",
++    "undo_reduction": "Annuler la réduction",
++    "search_menu": "Rechercher dans le menu",
++    "no_rooms": "Aucune salle disponible pour votre compte.",
++    "no_tables_in_room": "Aucune table dans cette salle.",
++    "no_permission_order": "Vous n'avez pas le droit de modifier cette commande.",
++    "add_item_first": "Ajoutez au moins un article avant d'envoyer la commande.",
++    "select_customer_first": "Choisissez un client avant d'envoyer la commande.",
++    "send_failed": "Échec de l'envoi de la commande.",
++    "no_order_reprint": "Aucune commande en cours à réimprimer.",
++    "kot_reprinted": "Ticket cuisine réimprimé.",
++    "no_order_print": "Aucune commande en cours à imprimer.",
++    "no_order_transfer": "Aucune commande en cours à transférer.",
++    "transfer_failed": "Impossible de transférer cette table.",
++    "no_items_yet": "Aucun article pour l'instant.",
++    "load_table_failed": "Impossible de charger cette table",
++    "back_to_tables": "Retour aux tables",
++    "modified_elsewhere": "Cette commande a été modifiée par quelqu'un d'autre. Rouvrez la table et réessayez.",
++    "send_failed_retry": "Échec de l'envoi de la commande. Réessayez.",
++    "reprint_failed": "Échec de la réimpression du ticket cuisine.",
++    "print_bill_failed": "Échec de l'impression de l'addition.",
++    "load_destinations_failed": "Échec du chargement des tables de destination.",
++    "browse_menu": "Parcourir le menu",
++    "loading_table": "Chargement de la table…",
++    "no_access_table": "Vous n'avez pas accès à la commande de cette table. Elle appartient peut-être à un autre capitaine.",
++    "loading_context": "Chargement…",
++    "no_table_orders": "Vous n'avez pas le droit de prendre des commandes à table.",
++    "refresh": "Actualiser",
++    "loading_menu": "Chargement du menu…"
++  },
++  "auth": {
++    "access_denied": "Accès refusé",
++    "config_error": "Erreur de configuration",
++    "permission_required": "Autorisation requise",
++    "no_app_permission": "Vous n'avez pas le droit d'accéder à cette application.",
++    "pos_profile_missing": "Profil PDV introuvable ou non configuré.",
++    "required_roles": "Rôles requis : {{roles}}"
+   }
+ }
+diff --git a/pos/src/lib/customer-api.ts b/pos/src/lib/customer-api.ts
+index 11fe4fca..33747822 100644
+--- a/pos/src/lib/customer-api.ts
++++ b/pos/src/lib/customer-api.ts
+@@ -1,5 +1,6 @@
+ import { DOCTYPES } from '../data/doctypes';
+ import { db, call } from '@ury/core';
++import { t } from '../i18n';
+ 
+ export interface Customer {
+   name: string;
+@@ -75,7 +76,7 @@ export async function addCustomer(
+     const response = await call.post('ury.ury_pos.api.create_customer', customerData);
+     const msg = response.message;
+     if (!msg || msg.status !== "success") {
+-      throw new Error("Failed to create Customer,API Response error");
++      throw new Error(t('errors.create_customer_failed'));
+     }
+     return {
+       data: {
+diff --git a/pos/src/lib/invoice-api.ts b/pos/src/lib/invoice-api.ts
+index 529d7afd..5b2d02f6 100644
+--- a/pos/src/lib/invoice-api.ts
++++ b/pos/src/lib/invoice-api.ts
+@@ -2,6 +2,7 @@ import { DOCTYPES } from '../data/doctypes';
+ import { call, db } from '@ury/core';
+ import { OrderStatusType, OrderType } from '../data/order-types';
+ import type { Filter } from 'frappe-js-sdk/lib/db/types';
++import { t } from '../i18n';
+ 
+ export interface POSInvoice {
+   name: string;
+@@ -102,7 +103,7 @@ export async function getPOSInvoices({
+     };
+   } catch (error) {
+     console.error('Error fetching POS invoices:', error);
+-    throw new Error('Failed to fetch POS invoices');
++    throw new Error(t('errors.fetch_invoices'));
+   }
+ }
+ 
+@@ -121,7 +122,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
+     };
+   } catch (error) {
+     console.error('Error fetching POS invoice items:', error);
+-    throw new Error('Failed to fetch POS invoice items');
++    throw new Error(t('errors.fetch_invoice_items'));
+   }
+ }
+ 
+@@ -136,7 +137,7 @@ export async function updateInvoiceStatus(
+     });
+   } catch (error) {
+     console.error('Error updating invoice status:', error);
+-    throw new Error('Failed to update invoice status');
++    throw new Error(t('errors.update_invoice_status'));
+   }
+ }
+ 
+@@ -225,7 +226,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
+     return response.message.html;
+   } catch (error) {
+     console.error('Error fetching invoice print HTML:', error);
+-    throw new Error('Failed to fetch invoice print HTML');
++    throw new Error(t('errors.fetch_print'));
+   }
+ }
+ 
+@@ -329,11 +330,11 @@ const MERGE_CANDIDATE_FIELDS = [
+ function getBranchFromSession(): string {
+   const raw = sessionStorage.getItem('posProfile');
+   if (!raw) {
+-    throw new Error('POS profile not loaded');
++    throw new Error(t('errors.pos_profile_not_loaded'));
+   }
+   const profile = JSON.parse(raw) as { branch?: string };
+   if (!profile.branch) {
+-    throw new Error('Branch not found in POS profile');
++    throw new Error(t('errors.branch_not_in_profile'));
+   }
+   return profile.branch;
+ }
+diff --git a/pos/src/lib/print.ts b/pos/src/lib/print.ts
+index bdc023d4..58bbe1ae 100644
+--- a/pos/src/lib/print.ts
++++ b/pos/src/lib/print.ts
+@@ -6,6 +6,7 @@ import {
+   updatePrintStatus
+ } from './invoice-api';
+ import { PosProfileCombined } from './pos-profile-api';
++import { t } from '../i18n';
+ 
+ interface PrintOrderParams {
+   orderId: string;
+@@ -19,7 +20,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
+ 
+   if (print_type === 'qz') {
+     if (!qz_host) {
+-      throw new Error('QZ host is not set');
++      throw new Error(t('kitchen.qz_host_missing'));
+     }
+     const html = await getInvoicePrintHtml(orderId, format as string);
+     await printWithQz(qz_host, html, posProfile.custom_bill_printer);
+@@ -64,7 +65,7 @@ export async function printKitchenTickets({
+ }): Promise<number> {
+   const host = posProfile.qz_host;
+   if (posProfile.print_type !== 'qz' || !host) {
+-    throw new Error('QZ Print is not enabled on the POS Profile');
++    throw new Error(t('kitchen.qz_disabled'));
+   }
+   const res = await call.get<{ message: KitchenTicket[] }>(`${KITCHEN_API}.get_kitchen_tickets`, {
+     invoice,
+diff --git a/pos/src/pages/Dashboard.tsx b/pos/src/pages/Dashboard.tsx
+index 3453085e..4b596d38 100644
+--- a/pos/src/pages/Dashboard.tsx
++++ b/pos/src/pages/Dashboard.tsx
+@@ -222,7 +222,7 @@ export default function Dashboard() {
+         const notificationsRes = await fetch(
+           `/api/method/frappe.client.get_list?${params.toString()}`
+         );
+-        if (!notificationsRes.ok) throw new Error('Failed to fetch notifications');
++        if (!notificationsRes.ok) throw new Error(t('errors.fetch_notifications'));
+         const notificationsData = await notificationsRes.json();
+         const processedNotifications = (notificationsData.message || []).map((notif: any) => ({
+           id: notif.name,
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index a6b4d9ed..4a9b7e7b 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -580,7 +580,7 @@ export default function Orders() {
+                       <button
+                         type="button"
+                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+-                        aria-label="Edit order"
++                        aria-label={t('orders.edit_order')}
+                         onClick={handleEditOrder}
+                         disabled={editLoading}
+                       >
+@@ -591,7 +591,7 @@ export default function Orders() {
+                         <button
+                           type="button"
+                           className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+-                          aria-label="Cancel order"
++                          aria-label={t('order.cancel_order')}
+                           onClick={() => setCancelDialogOpen(true)}
+                         >
+                           <X className="w-4 h-4" />
+@@ -750,7 +750,7 @@ export default function Orders() {
+                   size="icon"
+                   className="flex-shrink-0"
+                   onClick={handlePrintOrder}
+-                  aria-label="Print"
++                  aria-label={t('order.print')}
+                   disabled={isPrinting}
+                 >
+                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 266a7595..7bd13fbe 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -187,7 +187,7 @@ const TableView = () => {
+     event.stopPropagation();
+ 
+     if (!posProfile) {
+-      showToast.error('POS profile not loaded yet');
++      showToast.error(t('errors.pos_profile_not_loaded'));
+       return;
+     }
+ 
+@@ -197,7 +197,7 @@ const TableView = () => {
+       const invoiceId = orderResponse.message?.name;
+ 
+       if (!invoiceId) {
+-        showToast.error('No active order found for this table');
++        showToast.error(t('errors.no_active_order'));
+         return;
+       }
+ 
+@@ -209,7 +209,7 @@ const TableView = () => {
+           posProfile.print_format
+         ),
+       });
+-      showToast.success('Printed successfully');
++      showToast.success(t('success.printed'));
+       await loadTables(table.restaurant_room, { useCache: false });
+     } catch (error) {
+       showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
+@@ -440,7 +440,7 @@ const TableView = () => {
+               <div className="flex flex-wrap gap-2">
+                 {loadingRooms && (
+                   <div className="flex-1 min-w-[160px]">
+-                    <Spinner message="Loading rooms..." />
++                    <Spinner message={t('tables.loading_rooms')} />
+                   </div>
+                 )}
+ 

@@ -782,6 +782,93 @@ Commit: `1194e3d5c2a62c5f6c42c0f80855378f38f6da9a`
 Risk profile: low. Identifier swap and fallback values. On a conflict, keep
 `Banknote` and the `sysdefaults.currency` fallback.
 
+### Patch 17 — No hardcoded English in the POS and waiter screens
+
+Bug fix (backlog B1, owner request 2026-10-19).
+
+Files touched:
+- `pos/src/captain/components/CaptainActionsMenu.tsx`, `CaptainMenu.tsx`,
+  `CaptainOrderLine.tsx`, `CaptainRouteGuard.tsx`,
+  `pos/src/captain/pages/CaptainOrder.tsx`, `CaptainTables.tsx` (waiter app)
+- `pos/src/components/AuthGuard.tsx`, `LayoutView.tsx`, `OrderTabs.tsx`,
+  `pos/src/pages/Dashboard.tsx`, `Orders.tsx`, `Table.tsx`
+- `pos/src/lib/customer-api.ts`, `invoice-api.ts`, `print.ts` (error texts
+  shown in toasts)
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (58 new keys in
+  `common`, `captain`, `errors`, `tables`, `auth`, `orders`, `kitchen`;
+  existing keys reused where the text already existed; French calls the
+  waiter "capitaine", as the existing keys do)
+
+What it does: about 85 user-facing texts were written in English in the
+source (toasts, titles, tooltips, empty states, error messages from the API
+helpers), so they stayed English in French and Arabic. They now go through
+`t()` with en/fr/ar entries (including loading spinners, empty states,
+"Refresh", "Back to tables"). Developer-only messages (socket setup) stay
+English. The audit found no missing keys in the existing locale files.
+Known remainder: English fallback error strings in `pos/src/store/pos-store.ts`
+and `store/slices/orders-slice.ts` (shown only when the server sends no
+message), left to keep this patch out of those high-risk files.
+
+Why it can't be done in `erp_restaurant`: the texts are compiled into the
+POS bundle; there is no runtime override point for them.
+
+Acceptance criteria:
+1. POS in French and in Arabic: Tables page print toasts, order tabs and zoom
+   tooltips, Orders action labels, access/permission screens show the
+   language, no English.
+2. Waiter app (/pos captain screens) in French and Arabic: titles, toasts,
+   "Pax", "Total", search placeholder, empty states translated.
+3. English unchanged.
+
+Commit: `bc2e2888d1f798acfdb0b7d125b16fbe3342ebba`
+
+Risk profile: medium. Many small edits across files that upstream edits
+(CaptainOrder, Orders); on a conflict, keep the `t('...')` calls and the
+keys. JSON files keep their indentation (2 spaces en/fr, 4 spaces ar).
+
+### Patch 18 — URY server messages translatable
+
+Bug fix (backlog B1, owner request 2026-10-19).
+
+Files touched: 20 backend files under `ury/` (`ury_pos/api.py`,
+`ury/doctype/ury_order/ury_order.py`, `ury/hooks/*`, `ury/api/*`,
+`ury/report_api/*`, `ury/doctype/sub_pos_closing`, `ury_daily_p_and_l`);
+`setup/demo.py` and tests untouched.
+
+What it does: 69 `frappe.throw` / `frappe.msgprint` messages (plus two
+`title=` values and the "Removed items / Modified quantities" details of the
+printed-invoice check) were plain or
+f-strings, so Frappe could not translate them. They are wrapped in `_()`:
+`f"Table {x} is occupied"` becomes `_("Table {0} is occupied").format(x)`,
+`"..." % x` and `"..." + x` likewise; `from frappe import _` added where
+missing. Done by an AST rewrite, every file compiled. The two wrappers
+"Error while updating order: {e}" and "Error while settling order: {e}" stay
+English on purpose: Patch 13 strips exactly that prefix in the POS toast.
+URY ships no translations; the fr/ar texts for all 179 URY server messages
+(these and the ones already wrapped) live in `erp_restaurant`
+`translations/fr.csv` and `ar.csv` (Frappe merges every app's translations),
+so this patch must be deployed with that erp_restaurant commit. Frappe's
+`_()` strips the message before the lookup, so csv keys are stored stripped.
+Side effect: generic texts there ("Not permitted", "Setup failed"...) also
+replace ERPNext's own fr/ar wording for the same English text.
+
+Why it can't be done in `erp_restaurant`: a message not passed through `_()`
+cannot be translated by any app; the translations themselves are in
+`erp_restaurant`.
+
+Acceptance criteria:
+1. Cashier user in French: a dine-in order on a table that already has an
+   unpaid order -> "La table X a déjà une facture en cours"; paying a table
+   order before printing -> "L'impression de l'addition est obligatoire...".
+2. Same in Arabic.
+3. "Error while updating order:" prefix still removed by the POS toast.
+
+Commit: `da8ff0faa344323c4d919524599c32b4348334d8`
+
+Risk profile: medium. One-line changes spread over ury_order.py and api.py,
+which upstream edits often; on a conflict, re-wrap the message in `_()`.
+Backend only: restart, no build; translations need a clear-cache.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

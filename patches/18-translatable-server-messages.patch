@@ -1,0 +1,726 @@
+diff --git a/ury/ury/api/minimal/business_setup.py b/ury/ury/api/minimal/business_setup.py
+index e538b1ca..d59489d9 100644
+--- a/ury/ury/api/minimal/business_setup.py
++++ b/ury/ury/api/minimal/business_setup.py
+@@ -4,7 +4,7 @@ from frappe import _
+ @frappe.whitelist()
+ def get_business_setup():
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     company = frappe.get_all("Company", limit=1)
+     if not company:
+@@ -28,7 +28,7 @@ def get_business_setup():
+ @frappe.whitelist()
+ def get_branches():
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
+@@ -39,7 +39,7 @@ def get_branches():
+ @frappe.whitelist()
+ def update_business_setup(branch=None, restaurant=None):
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     if branch:
+         if isinstance(branch, str):
+diff --git a/ury/ury/api/minimal/setup_organization.py b/ury/ury/api/minimal/setup_organization.py
+index d6de26f4..43c04fdf 100644
+--- a/ury/ury/api/minimal/setup_organization.py
++++ b/ury/ury/api/minimal/setup_organization.py
+@@ -6,11 +6,12 @@ import pytz
+ import json
+ from dateutil.relativedelta import relativedelta
+ from datetime import datetime
++from frappe import _
+ 
+ @frappe.whitelist()
+ def get_setup_defaults():
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+         
+     languages = load_languages()
+     country_data = load_country()
+@@ -54,7 +55,7 @@ def get_setup_defaults():
+ @frappe.whitelist()
+ def get_country_defaults(country):
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+         
+     country_info = get_country_info(country)
+     
+@@ -110,7 +111,7 @@ def get_setup_progress_steps(setup_ury_demo=0):
+     from ury.setup.setup_wizard import _wants_ury_demo
+ 
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     args = frappe._dict({"setup_ury_demo": 1 if _wants_ury_demo({"setup_ury_demo": setup_ury_demo}) else 0})
+     steps = []
+@@ -147,14 +148,14 @@ def _run_setup_complete(payload):
+             sleep(0.4 * (attempt + 1))
+     if last_error:
+         raise last_error
+-    frappe.throw("Setup failed")
++    frappe.throw(_("Setup failed"))
+ 
+ 
+ @frappe.whitelist()
+ def get_setup_progress_status():
+     """Latest setup_task payload for the current user (socket fallback)."""
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+     return frappe.cache.get_value(_progress_cache_key()) or {}
+ 
+ 
+@@ -162,10 +163,10 @@ def get_setup_progress_status():
+ def submit_setup(payload=None, **kwargs):
+     from frappe.utils import cint
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+-        frappe.throw("Setup already completed")
++        frappe.throw(_("Setup already completed"))
+ 
+     payload = _normalize_setup_payload(payload, **kwargs)
+ 
+@@ -195,7 +196,7 @@ def complete_wizard_setup(payload=None, **kwargs):
+ @frappe.whitelist()
+ def get_wizard_status():
+     if frappe.session.user == "Guest":
+-        frappe.throw("Not permitted")
++        frappe.throw(_("Not permitted"))
+ 
+     return {
+         "step1_complete": bool(frappe.db.exists("Company", {})),
+diff --git a/ury/ury/api/pos_extend.py b/ury/ury/api/pos_extend.py
+index 78684164..30f5869e 100644
+--- a/ury/ury/api/pos_extend.py
++++ b/ury/ury/api/pos_extend.py
+@@ -31,7 +31,7 @@ def overrided_past_order_list(search_term, status, limit=20):
+         branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+ 
+         if not branch_array:
+-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
++            frappe.throw(_("User is not Associated with any Branch.Please refresh Page"))
+ 
+         branch_name = branch_array[0].get("branch")
+         room_name = branch_array[0].get("room")
+diff --git a/ury/ury/api/ury_kot_display.py b/ury/ury/api/ury_kot_display.py
+index a1b61a30..e32773de 100644
+--- a/ury/ury/api/ury_kot_display.py
++++ b/ury/ury/api/ury_kot_display.py
+@@ -35,7 +35,7 @@ def confirm_cancel_kot(name):
+     manager_roles = {"URY Manager", "URY Admin", "System Manager"}
+     if not manager_roles.intersection(frappe.get_roles()) and frappe.session.user != "Administrator":
+         frappe.throw(
+-            "Only a manager can confirm a cancelled KOT.",
++            _("Only a manager can confirm a cancelled KOT."),
+             frappe.PermissionError,
+         )
+ 
+@@ -43,12 +43,12 @@ def confirm_cancel_kot(name):
+     try:
+         kot_doc = frappe.get_doc("URY KOT", name)
+     except frappe.DoesNotExistError:
+-        frappe.throw(f"URY KOT {name} not found.", frappe.DoesNotExistError)
++        frappe.throw(_("URY KOT {0} not found.").format(name), frappe.DoesNotExistError)
+ 
+     # Document-level permission check
+     if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+         frappe.throw(
+-            "You do not have permission to modify this KOT.",
++            _("You do not have permission to modify this KOT."),
+             frappe.PermissionError
+         )
+ 
+@@ -63,7 +63,7 @@ def confirm_cancel_kot(name):
+ 
+     if session_branch and kot_doc.branch != session_branch:
+         frappe.throw(
+-            "You do not have permission to modify KOTs from other branches.",
++            _("You do not have permission to modify KOTs from other branches."),
+             frappe.PermissionError
+         )
+ 
+diff --git a/ury/ury/api/ury_kot_generate.py b/ury/ury/api/ury_kot_generate.py
+index ac21263f..4b4ec5f5 100644
+--- a/ury/ury/api/ury_kot_generate.py
++++ b/ury/ury/api/ury_kot_generate.py
+@@ -2,6 +2,7 @@ import json
+ 
+ import frappe
+ from ury.ury_pos.api import getBranch
++from frappe import _
+ 
+ 
+ # Load JSON data or return as is if it's already a Python dictionary
+@@ -136,7 +137,7 @@ def process_items_for_kot(
+             item_code = item["item_code"]
+             if item_group not in all_production_item_groups:
+                 frappe.msgprint(
+-                    f"Item group '{item_group}' for item '{item_code}' is not in any production."
++                    _("Item group '{0}' for item '{1}' is not in any production.").format(item_group, item_code)
+                 )
+         for production in productions:
+             productionItemGroupslist = frappe.get_all(
+@@ -184,7 +185,7 @@ def process_items_for_kot(
+                 created_kot_names.append(kot_name)
+     else:
+         frappe.throw(
+-            "Create URY Production unit against POS Profile: %s " % pos_profile.name
++            _("Create URY Production unit against POS Profile: {0}").format(pos_profile.name)
+         )
+ 
+     return created_kot_names
+@@ -362,8 +363,9 @@ def kot_execute(
+         cancel_kot_naming_series = "CNCL-" + kot_naming_series
+     else:
+         frappe.throw(
+-            "KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: %s"
+-            % pos_profile.name
++            _("KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: {0}").format(
++                pos_profile.name
++            )
+         )
+ 
+     from ury.ury.api.ury_waiter_print import print_combined_waiter_order_slip
+diff --git a/ury/ury/api/ury_kot_reprint.py b/ury/ury/api/ury_kot_reprint.py
+index fc403aa3..f1587b17 100644
+--- a/ury/ury/api/ury_kot_reprint.py
++++ b/ury/ury/api/ury_kot_reprint.py
+@@ -33,7 +33,7 @@ def reprint_kot(invoice_number):
+         )
+ 
+     if not pos_invoice.pos_profile:
+-        frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
++        frappe.throw(_("POS Profile not found for Invoice {0}.").format(invoice_number))
+ 
+     # Captain ownership/elevated-access check, reusing Phase 2's ownership
+     # formula. Matches get_table_order_context()'s can_reprint_kot gate
+@@ -51,7 +51,7 @@ def reprint_kot(invoice_number):
+             "POS Invoice", invoice_number, ["pos_profile", "restaurant_table","order_type"]
+         )
+         if not pos_profile:
+-            frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
++            frappe.throw(_("POS Profile not found for Invoice {0}.").format(invoice_number))
+ 
+         enable_kot_reprint, kot_print_format, table_order_printer, parcel_order_printer = frappe.db.get_value(
+             "POS Profile", pos_profile,
+@@ -60,15 +60,15 @@ def reprint_kot(invoice_number):
+ 
+         
+         if not cint(enable_kot_reprint):
+-            frappe.throw("KOT Reprint is disabled in POS Profile.")
++            frappe.throw(_("KOT Reprint is disabled in POS Profile."))
+ 
+         if not kot_print_format:
+-            frappe.throw("No KOT Reprint Print Format is set in POS Profile.")
++            frappe.throw(_("No KOT Reprint Print Format is set in POS Profile."))
+         
+         printer = table_order_printer if order_type == "Dine In" else parcel_order_printer
+ 
+         if not printer:
+-            frappe.throw("No printer is assigned for reprinting KOT.")
++            frappe.throw(_("No printer is assigned for reprinting KOT."))
+ 
+        
+         print_kot(printer, invoice_number, kot_print_format)
+@@ -79,7 +79,7 @@ def reprint_kot(invoice_number):
+     except Exception as e:
+         error_message = f"KOT Reprint Error for Invoice {invoice_number}: {str(e)}"
+         frappe.log_error(error_message, "KOT Reprint Error")
+-        frappe.throw("An unexpected error occurred while reprinting KOT. Please check logs.")
++        frappe.throw(_("An unexpected error occurred while reprinting KOT. Please check logs."))
+ 
+ 
+ def print_kot(printer,docname, kot_print_format):
+diff --git a/ury/ury/api/ury_menu_course_validation.py b/ury/ury/api/ury_menu_course_validation.py
+index 22394462..0eec0593 100644
+--- a/ury/ury/api/ury_menu_course_validation.py
++++ b/ury/ury/api/ury_menu_course_validation.py
+@@ -1,4 +1,5 @@
+ import frappe
++from frappe import _
+ 
+ def validate_priority(doc,event):
+     # Check if the selected priority is already used by another course
+@@ -11,4 +12,4 @@ def validate_priority(doc,event):
+     )
+ 
+     if existing_course:
+-        frappe.throw(f"Priority {doc.custom_serving_priority} is already assigned to another course. Please choose a different priority.")
++        frappe.throw(_("Priority {0} is already assigned to another course. Please choose a different priority.").format(doc.custom_serving_priority))
+diff --git a/ury/ury/doctype/sub_pos_closing/sub_pos_closing.py b/ury/ury/doctype/sub_pos_closing/sub_pos_closing.py
+index feec3f9b..06fc56ad 100644
+--- a/ury/ury/doctype/sub_pos_closing/sub_pos_closing.py
++++ b/ury/ury/doctype/sub_pos_closing/sub_pos_closing.py
+@@ -22,7 +22,7 @@ class SubPOSClosing(Document):
+             filters={"branch": branch, "status": "Draft", "docstatus": "0","cashier":self.user},
+         )
+         if draft_invoices:
+-            frappe.throw("Submit/Delete Draft Invoices")
++            frappe.throw(_("Submit/Delete Draft Invoices"))
+ 
+         date_time = now()
+         if isinstance(date_time, str):
+@@ -63,7 +63,7 @@ class SubPOSClosing(Document):
+                 if user_details.custom_main_cashier:
+                     owner = user_details.user
+             if frappe.session.user == owner:
+-                frappe.throw("The Main Cashier cannot close a Sub POS Closing entry.")
++                frappe.throw(_("The Main Cashier cannot close a Sub POS Closing entry."))
+         else:
+             pass
+     
+diff --git a/ury/ury/doctype/ury_daily_p_and_l/ury_daily_p_and_l.py b/ury/ury/doctype/ury_daily_p_and_l/ury_daily_p_and_l.py
+index 18bc629f..11003535 100644
+--- a/ury/ury/doctype/ury_daily_p_and_l/ury_daily_p_and_l.py
++++ b/ury/ury/doctype/ury_daily_p_and_l/ury_daily_p_and_l.py
+@@ -6,6 +6,7 @@ from frappe.model.document import Document
+ import json
+ import calendar
+ from datetime import datetime
++from frappe import _
+ 
+ def inner_bom_process(buying_price_list, bom):
+     unset_bom_items = []
+@@ -64,12 +65,12 @@ class URYDailyPandL(Document):
+ 		cogs = 0
+ 		electricity_reading = self.electricity_closing - self.electricity_opening
+ 		if electricity_reading <= 0:
+-			frappe.throw("Invalid Electricity Reading")
++			frappe.throw(_("Invalid Electricity Reading"))
+ 
+ 		# Append materials consumed
+ 		for expense in self.materials_consumed:
+ 			if expense.units_consumed <= 0:
+-				frappe.throw("Invavlid Units Consumed for "+expense.material)
++				frappe.throw(_("Invavlid Units Consumed for {0}").format(expense.material))
+ 		non_pb_item_sales = frappe.db.sql('''
+ 			SELECT
+ 				c.item_group AS "Item Group",
+diff --git a/ury/ury/doctype/ury_order/ury_order.py b/ury/ury/doctype/ury_order/ury_order.py
+index 3a7870aa..bc24f992 100644
+--- a/ury/ury/doctype/ury_order/ury_order.py
++++ b/ury/ury/doctype/ury_order/ury_order.py
+@@ -1435,7 +1435,7 @@ def sync_order(
+             return {"status": "Failure"}
+ 
+     if not customer:
+-        frappe.throw("Please enter valid customer details")
++        frappe.throw(_("Please enter valid customer details"))
+     else:
+         invoice.customer = customer
+ 
+@@ -1502,7 +1502,7 @@ def sync_order(
+         price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
+         
+         if not price_list:
+-            frappe.throw(f"Price list for customer {customer} in branch {invoice.branch} not found in Aggregator Settings.")
++            frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(customer, invoice.branch))
+     else:
+         price_list = invoice.selling_price_list
+ 
+@@ -1749,7 +1749,7 @@ def table_transfer(table, newTable, invoice):
+         frappe.throw(_("Table transfer between different branches is restricted."))
+ 
+     if new_table.occupied == 1:
+-        frappe.throw(f"Table {new_table.name} is already occupied")
++        frappe.throw(_("Table {0} is already occupied").format(new_table.name))
+ 
+     frappe.db.set_value(
+         "URY Table",
+diff --git a/ury/ury/hooks/ury_item.py b/ury/ury/hooks/ury_item.py
+index 42807cf3..1dda037f 100644
+--- a/ury/ury/hooks/ury_item.py
++++ b/ury/ury/hooks/ury_item.py
+@@ -1,4 +1,5 @@
+ import frappe
++from frappe import _
+ 
+ 
+ def validate(doc,method):
+@@ -15,9 +16,9 @@ def update_variants_add_on(doc, event):
+     if doc.custom_pos_add_on_items:
+         for row in doc.custom_pos_add_on_items:
+             if not frappe.db.exists("URY Menu Item", {"item": row.item}):
+-                frappe.throw(f"Item '{row.item}' in POS Add On Items is not in URY Menu")
++                frappe.throw(_("Item '{0}' in POS Add On Items is not in URY Menu").format(row.item))
+ 
+     if doc.custom_pos_item_variants:
+         for row in doc.custom_pos_item_variants:
+             if not frappe.db.exists("URY Menu Item", {"item": row.item}):
+-                frappe.throw(f"Item '{row.item}' in POS Item Variants is not in URY Menu")
++                frappe.throw(_("Item '{0}' in POS Item Variants is not in URY Menu").format(row.item))
+diff --git a/ury/ury/hooks/ury_pos_closing_entry.py b/ury/ury/hooks/ury_pos_closing_entry.py
+index 1e588e2b..5d5d737e 100644
+--- a/ury/ury/hooks/ury_pos_closing_entry.py
++++ b/ury/ury/hooks/ury_pos_closing_entry.py
+@@ -1,4 +1,5 @@
+ import frappe
++from frappe import _
+ 
+ def before_save(doc, method):
+     sub_pos_close_check(doc, method)
+@@ -28,7 +29,7 @@ def sub_pos_close_check(doc,method):
+                 if pos_opening.status == "Open" and pos_opening.docstatus == 1:
+                     flag = 1
+             if flag == 1:
+-                frappe.throw(("Sub Cashier POS  must be closed"), title=("Sub Cashier POS Closing Required"))
++                frappe.throw((_("Sub Cashier POS  must be closed")), title=_("Sub Cashier POS Closing Required"))
+                 
+             return flag
+     else:
+@@ -54,7 +55,7 @@ def calculate_closing_amount(doc, method):
+                 closing_details.closing_amount = total_closing_amount
+                 closing_details.difference = total_closing_amount - closing_details.expected_amount
+         else:
+-            frappe.throw("No Sub POS Closing entries found between the given dates")
++            frappe.throw(_("No Sub POS Closing entries found between the given dates"))
+             return None
+     else:
+         pass
+@@ -67,7 +68,7 @@ def validate_cashier(doc, method):
+             if not user_details.custom_main_cashier:
+                 cashier = user_details.user
+         if frappe.session.user == cashier:
+-            frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
++            frappe.throw(_("Sub Cashiers are not allowed to make POS Closing Entries."))
+     else:
+         pass
+     
+\ No newline at end of file
+diff --git a/ury/ury/hooks/ury_pos_invoice.py b/ury/ury/hooks/ury_pos_invoice.py
+index d9038da2..363feab3 100644
+--- a/ury/ury/hooks/ury_pos_invoice.py
++++ b/ury/ury/hooks/ury_pos_invoice.py
+@@ -2,6 +2,7 @@ import frappe
+ from datetime import datetime
+ from frappe.utils import now_datetime, get_time, now, get_datetime
+ from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
++from frappe import _
+ 
+ 
+ def before_insert(doc, method):
+@@ -56,8 +57,9 @@ def validate_invoice(doc, method):
+             if (item_code in current_items and 
+                 current_items[item_code]["qty"] < item_data["qty"]):
+                 reduced_qty_items.append(
+-                    f"{item_data['name']} (qty reduced from {item_data['qty']} "
+-                    f"to {current_items[item_code]['qty']})"
++                    _("{0} (qty reduced from {1} to {2})").format(
++                        item_data["name"], item_data["qty"], current_items[item_code]["qty"]
++                    )
+                 )
+         
+         if removed_items or reduced_qty_items:
+@@ -67,12 +69,12 @@ def validate_invoice(doc, method):
+                     original_items[item_code]["name"] 
+                     for item_code in removed_items
+                 ]
+-                error_msg.append(f"Removed items: {', '.join(removed_item_names)}")
++                error_msg.append(_("Removed items: {0}").format(", ".join(removed_item_names)))
+             if reduced_qty_items:
+-                error_msg.append(f"Modified quantities: {', '.join(reduced_qty_items)}")
++                error_msg.append(_("Modified quantities: {0}").format(", ".join(reduced_qty_items)))
+                 
+             frappe.throw(
+-                ("Cannot modify items after invoice is printed.\n{0}")
++                (_("Cannot modify items after invoice is printed.\n{0}"))
+                 .format("\n".join(error_msg))
+             )
+ 
+@@ -80,7 +82,7 @@ def validate_invoice(doc, method):
+ def validate_customer(doc, method):
+     if doc.customer_name == None or doc.customer_name == "":
+         frappe.throw(
+-            (" Failed to load data , Please Refresh the page ").format(
++            (_(" Failed to load data , Please Refresh the page ")).format(
+                 doc.customer_name
+             )
+         )
+@@ -110,7 +112,7 @@ def validate_invoice_print(doc, method):
+     # If the invoice is associated with a restaurant table and hasn't been printed
+     if doc.restaurant_table and invoice_printed == 0:
+         frappe.throw(
+-            "Printing the invoice is mandatory before submitting. Please print the invoice."
++            _("Printing the invoice is mandatory before submitting. Please print the invoice.")
+         )
+ 
+ 
+@@ -180,7 +182,7 @@ def validate_price_list(doc, method):
+                 )
+             
+             if not price_list:
+-                frappe.throw(f"Price list for customer {doc.customer} in branch {doc.branch} not found in Aggregator Settings.")
++                frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(doc.customer, doc.branch))
+                 
+             doc.selling_price_list = price_list
+             
+@@ -223,7 +225,7 @@ def restrict_existing_order(doc, event):
+     )
+     if invoice_exist:
+         frappe.throw(
+-            ("Table {0} has an existing invoice").format(doc.restaurant_table)
++            (_("Table {0} has an existing invoice")).format(doc.restaurant_table)
+         )
+ 
+ def sync_merged_invoice(doc):
+diff --git a/ury/ury/hooks/ury_pos_opening_entry.py b/ury/ury/hooks/ury_pos_opening_entry.py
+index 4c256b1d..ae5ae34a 100644
+--- a/ury/ury/hooks/ury_pos_opening_entry.py
++++ b/ury/ury/hooks/ury_pos_opening_entry.py
+@@ -1,6 +1,7 @@
+ import frappe
+ from frappe.utils import today
+ from frappe.utils import  get_datetime,today,now
++from frappe import _
+ 
+ def validate(doc,method):
+     set_cashier_room(doc,method)
+@@ -56,7 +57,7 @@ def main_pos_open_check(doc,method):
+                 if pos_opening.status == "Open" and pos_opening.docstatus == 1:
+                     flag = 0
+             if flag == 1:
+-                frappe.throw(("Main Cashier POS must be open"), title=("Main Cashier POS Required"))
++                frappe.throw((_("Main Cashier POS must be open")), title=_("Main Cashier POS Required"))
+                 
+             return flag
+     else:
+diff --git a/ury/ury/hooks/ury_sales_invoice.py b/ury/ury/hooks/ury_sales_invoice.py
+index 9de26640..fea973ea 100644
+--- a/ury/ury/hooks/ury_sales_invoice.py
++++ b/ury/ury/hooks/ury_sales_invoice.py
+@@ -1,4 +1,5 @@
+ import frappe
++from frappe import _
+ 
+ 
+ def before_insert(doc, method):
+@@ -22,7 +23,7 @@ def sales_invoice_naming(doc, method):
+     )
+ 
+     if not pos_profile:
+-        frappe.throw(f"POS Profile '{doc.pos_profile}' does not exist. Please select a valid POS Profile.")
++        frappe.throw(_("POS Profile '{0}' does not exist. Please select a valid POS Profile.").format(doc.pos_profile))
+     
+     restaurant = pos_profile.get("restaurant")
+ 
+diff --git a/ury/ury/report_api/customers.py b/ury/ury/report_api/customers.py
+index 3efa8f5d..1881be87 100644
+--- a/ury/ury/report_api/customers.py
++++ b/ury/ury/report_api/customers.py
+@@ -9,6 +9,7 @@ from ury.ury.report_api.utils import (
+ 	require_manager,
+ 	validate_date_range,
+ )
++from frappe import _
+ 
+ 
+ @frappe.whitelist()
+@@ -49,7 +50,7 @@ def get_customer_data(customer, start_date, end_date, branch=None, page=1, page_
+ 	validate_date_range(start_date, end_date)
+ 
+ 	if not customer:
+-		frappe.throw("customer is required.")
++		frappe.throw(_("customer is required."))
+ 
+ 	page = max(1, int(page))
+ 	page_size = max(1, min(int(page_size), 200))
+diff --git a/ury/ury/report_api/employees.py b/ury/ury/report_api/employees.py
+index dec767f0..53e1720e 100644
+--- a/ury/ury/report_api/employees.py
++++ b/ury/ury/report_api/employees.py
+@@ -7,6 +7,7 @@ from ury.ury.report_api.utils import (
+ 	require_manager,
+ 	validate_date_range,
+ )
++from frappe import _
+ 
+ 
+ @frappe.whitelist()
+@@ -112,7 +113,7 @@ def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
+ 	validate_date_range(start_date, end_date)
+ 
+ 	if not employee:
+-		frappe.throw("employee is required.")
++		frappe.throw(_("employee is required."))
+ 
+ 	date_list = date_list_cte()
+ 
+diff --git a/ury/ury/report_api/sales.py b/ury/ury/report_api/sales.py
+index e73e70a0..789301eb 100644
+--- a/ury/ury/report_api/sales.py
++++ b/ury/ury/report_api/sales.py
+@@ -8,6 +8,7 @@ from ury.ury.report_api.utils import (
+ 	require_manager,
+ 	validate_date_range,
+ )
++from frappe import _
+ 
+ 
+ @frappe.whitelist()
+@@ -365,7 +366,7 @@ def get_time_wise_sales(branch=None, date=None, bucket_size_hours=2):
+ 
+ 	bucket_size_hours = int(bucket_size_hours)
+ 	if bucket_size_hours not in (1, 2, 4):
+-		frappe.throw("bucket_size_hours must be 1, 2, or 4.")
++		frappe.throw(_("bucket_size_hours must be 1, 2, or 4."))
+ 
+ 	target_date = frappe.utils.getdate(date) if date else frappe.utils.today()
+ 	num_buckets = 24 // bucket_size_hours
+diff --git a/ury/ury/report_api/utils.py b/ury/ury/report_api/utils.py
+index 65bec7a5..4d463f12 100644
+--- a/ury/ury/report_api/utils.py
++++ b/ury/ury/report_api/utils.py
+@@ -1,4 +1,5 @@
+ import frappe
++from frappe import _
+ 
+ 
+ def require_manager():
+@@ -13,7 +14,7 @@ def require_manager():
+ 		return
+ 	if not allowed_roles & user_roles:
+ 		frappe.throw(
+-			"You do not have permission to access this report.",
++			_("You do not have permission to access this report."),
+ 			frappe.PermissionError,
+ 		)
+ 
+@@ -120,8 +121,8 @@ def validate_date_range(start_date, end_date, max_days=366):
+ 	frappe.ValidationError on bad input so every report gets consistent
+ 	error messages instead of a raw SQL failure."""
+ 	if not start_date or not end_date:
+-		frappe.throw("Both start_date and end_date are required.")
++		frappe.throw(_("Both start_date and end_date are required."))
+ 	if frappe.utils.getdate(start_date) > frappe.utils.getdate(end_date):
+-		frappe.throw("start_date must not be after end_date.")
++		frappe.throw(_("start_date must not be after end_date."))
+ 	if (frappe.utils.getdate(end_date) - frappe.utils.getdate(start_date)).days > max_days:
+-		frappe.throw(f"Date range cannot exceed {max_days} days.")
++		frappe.throw(_("Date range cannot exceed {0} days.").format(max_days))
+diff --git a/ury/ury_pos/api.py b/ury/ury_pos/api.py
+index 8eea13a4..7b18a90b 100644
+--- a/ury/ury_pos/api.py
++++ b/ury/ury_pos/api.py
+@@ -135,7 +135,7 @@ def getBranch():
+     """
+     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+     if not branch_array:
+-        frappe.throw("User is not Associated with any Branch.Please refresh Page")
++        frappe.throw(_("User is not Associated with any Branch.Please refresh Page"))
+ 
+     branch_name = branch_array[0].get("branch")
+ 
+@@ -156,10 +156,10 @@ def getBranchRoom():
+     room_name = branch_array[0].get("room")
+ 
+     if not branch_name:
+-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
++        frappe.throw(_("Branch information is missing for the user. Please contact your administrator."))
+ 
+     if not room_name:
+-        frappe.throw("No room assigned to this user. Please contact your administrator.")
++        frappe.throw(_("No room assigned to this user. Please contact your administrator."))
+ 
+     return [{
+         "name":room_name ,
+@@ -178,7 +178,7 @@ def getRoom():
+     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+     
+     if not branch_array:
+-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
++        frappe.throw(_("No branch or room information found for the user. Please contact your administrator."))
+     
+     room_details = [
+         {
+@@ -926,16 +926,16 @@ def getAggregatorMOP(aggregator):
+ @frappe.whitelist()
+ def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+     if not frappe.has_permission("Customer", "create"):
+-        frappe.throw("Not permitted to create customers", frappe.PermissionError)
++        frappe.throw(_("Not permitted to create customers"), frappe.PermissionError)
+         
+     if not customer_name:
+-        frappe.throw("Customer name is required")
++        frappe.throw(_("Customer name is required"))
+     if not mobile_number:
+-        frappe.throw("Mobile Number is required")
++        frappe.throw(_("Mobile Number is required"))
+     try:
+         validate_phone_number(mobile_number, throw=True)
+     except Exception:
+-        frappe.throw("Invalid mobile number format")
++        frappe.throw(_("Invalid mobile number format"))
+ 
+     """Create a new customer"""
+     try:
+@@ -1462,7 +1462,7 @@ def merge_bills(primary_invoice, secondary_invoice):
+     try:
+ 
+         if primary_invoice == secondary_invoice:
+-            frappe.throw("Cannot merge an invoice with itself.")
++            frappe.throw(_("Cannot merge an invoice with itself."))
+ 
+         primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
+         secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
+@@ -1470,38 +1470,38 @@ def merge_bills(primary_invoice, secondary_invoice):
+         # Authorization: caller must have write permission on both invoices
+         if not frappe.has_permission("POS Invoice", "write", doc=primary_doc):
+             frappe.throw(
+-                "You do not have permission to merge this bill.",
++                _("You do not have permission to merge this bill."),
+                 frappe.PermissionError,
+             )
+ 
+         if not frappe.has_permission("POS Invoice", "write", doc=secondary_doc):
+             frappe.throw(
+-                "You do not have permission to merge the selected bill.",
++                _("You do not have permission to merge the selected bill."),
+                 frappe.PermissionError,
+             )
+ 
+           # Prevent cross-branch merging
+         if primary_doc.branch != secondary_doc.branch:
+             frappe.throw(
+-                "Cannot merge bills from different branches.",
++                _("Cannot merge bills from different branches."),
+                 frappe.PermissionError,
+             )
+ 
+         # Validation
+         if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
+-            frappe.throw("Both invoices must be in Draft state to merge.")
++            frappe.throw(_("Both invoices must be in Draft state to merge."))
+ 
+         if primary_doc.branch != secondary_doc.branch:
+-            frappe.throw("Cannot merge bills from different branches.")
++            frappe.throw(_("Cannot merge bills from different branches."))
+ 
+         if primary_doc.custom_merged_pos_invoice:
+-            frappe.throw("This bill already includes a merged bill.")
++            frappe.throw(_("This bill already includes a merged bill."))
+ 
+         if secondary_doc.custom_merged_pos_invoice:
+-            frappe.throw("The selected bill already includes another bill.")
++            frappe.throw(_("The selected bill already includes another bill."))
+ 
+         if not secondary_doc.items:
+-            frappe.throw("The selected bill has no items to merge.")
++            frappe.throw(_("The selected bill has no items to merge."))
+ 
+ 
+         def update_merge_details(target_invoice,source_invoice,):
