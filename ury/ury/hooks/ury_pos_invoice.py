@@ -2,6 +2,7 @@ import frappe
 from datetime import datetime
 from frappe.utils import now_datetime, get_time, now, get_datetime
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+from frappe import _
 
 
 def before_insert(doc, method):
@@ -56,8 +57,9 @@ def validate_invoice(doc, method):
             if (item_code in current_items and 
                 current_items[item_code]["qty"] < item_data["qty"]):
                 reduced_qty_items.append(
-                    f"{item_data['name']} (qty reduced from {item_data['qty']} "
-                    f"to {current_items[item_code]['qty']})"
+                    _("{0} (qty reduced from {1} to {2})").format(
+                        item_data["name"], item_data["qty"], current_items[item_code]["qty"]
+                    )
                 )
         
         if removed_items or reduced_qty_items:
@@ -67,12 +69,12 @@ def validate_invoice(doc, method):
                     original_items[item_code]["name"] 
                     for item_code in removed_items
                 ]
-                error_msg.append(f"Removed items: {', '.join(removed_item_names)}")
+                error_msg.append(_("Removed items: {0}").format(", ".join(removed_item_names)))
             if reduced_qty_items:
-                error_msg.append(f"Modified quantities: {', '.join(reduced_qty_items)}")
+                error_msg.append(_("Modified quantities: {0}").format(", ".join(reduced_qty_items)))
                 
             frappe.throw(
-                ("Cannot modify items after invoice is printed.\n{0}")
+                (_("Cannot modify items after invoice is printed.\n{0}"))
                 .format("\n".join(error_msg))
             )
 
@@ -80,7 +82,7 @@ def validate_invoice(doc, method):
 def validate_customer(doc, method):
     if doc.customer_name == None or doc.customer_name == "":
         frappe.throw(
-            (" Failed to load data , Please Refresh the page ").format(
+            (_(" Failed to load data , Please Refresh the page ")).format(
                 doc.customer_name
             )
         )
@@ -110,7 +112,7 @@ def validate_invoice_print(doc, method):
     # If the invoice is associated with a restaurant table and hasn't been printed
     if doc.restaurant_table and invoice_printed == 0:
         frappe.throw(
-            "Printing the invoice is mandatory before submitting. Please print the invoice."
+            _("Printing the invoice is mandatory before submitting. Please print the invoice.")
         )
 
 
@@ -180,7 +182,7 @@ def validate_price_list(doc, method):
                 )
             
             if not price_list:
-                frappe.throw(f"Price list for customer {doc.customer} in branch {doc.branch} not found in Aggregator Settings.")
+                frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(doc.customer, doc.branch))
                 
             doc.selling_price_list = price_list
             
@@ -223,7 +225,7 @@ def restrict_existing_order(doc, event):
     )
     if invoice_exist:
         frappe.throw(
-            ("Table {0} has an existing invoice").format(doc.restaurant_table)
+            (_("Table {0} has an existing invoice")).format(doc.restaurant_table)
         )
 
 def sync_merged_invoice(doc):

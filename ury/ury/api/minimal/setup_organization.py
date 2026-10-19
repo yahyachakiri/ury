@@ -6,11 +6,12 @@ import pytz
 import json
 from dateutil.relativedelta import relativedelta
 from datetime import datetime
+from frappe import _
 
 @frappe.whitelist()
 def get_setup_defaults():
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
         
     languages = load_languages()
     country_data = load_country()
@@ -54,7 +55,7 @@ def get_setup_defaults():
 @frappe.whitelist()
 def get_country_defaults(country):
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
         
     country_info = get_country_info(country)
     
@@ -110,7 +111,7 @@ def get_setup_progress_steps(setup_ury_demo=0):
     from ury.setup.setup_wizard import _wants_ury_demo
 
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     args = frappe._dict({"setup_ury_demo": 1 if _wants_ury_demo({"setup_ury_demo": setup_ury_demo}) else 0})
     steps = []
@@ -147,14 +148,14 @@ def _run_setup_complete(payload):
             sleep(0.4 * (attempt + 1))
     if last_error:
         raise last_error
-    frappe.throw("Setup failed")
+    frappe.throw(_("Setup failed"))
 
 
 @frappe.whitelist()
 def get_setup_progress_status():
     """Latest setup_task payload for the current user (socket fallback)."""
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
     return frappe.cache.get_value(_progress_cache_key()) or {}
 
 
@@ -162,10 +163,10 @@ def get_setup_progress_status():
 def submit_setup(payload=None, **kwargs):
     from frappe.utils import cint
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
-        frappe.throw("Setup already completed")
+        frappe.throw(_("Setup already completed"))
 
     payload = _normalize_setup_payload(payload, **kwargs)
 
@@ -195,7 +196,7 @@ def complete_wizard_setup(payload=None, **kwargs):
 @frappe.whitelist()
 def get_wizard_status():
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     return {
         "step1_complete": bool(frappe.db.exists("Company", {})),

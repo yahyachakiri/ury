@@ -33,7 +33,7 @@ def reprint_kot(invoice_number):
         )
 
     if not pos_invoice.pos_profile:
-        frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
+        frappe.throw(_("POS Profile not found for Invoice {0}.").format(invoice_number))
 
     # Captain ownership/elevated-access check, reusing Phase 2's ownership
     # formula. Matches get_table_order_context()'s can_reprint_kot gate
@@ -51,7 +51,7 @@ def reprint_kot(invoice_number):
             "POS Invoice", invoice_number, ["pos_profile", "restaurant_table","order_type"]
         )
         if not pos_profile:
-            frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
+            frappe.throw(_("POS Profile not found for Invoice {0}.").format(invoice_number))
 
         enable_kot_reprint, kot_print_format, table_order_printer, parcel_order_printer = frappe.db.get_value(
             "POS Profile", pos_profile,
@@ -60,15 +60,15 @@ def reprint_kot(invoice_number):
 
         
         if not cint(enable_kot_reprint):
-            frappe.throw("KOT Reprint is disabled in POS Profile.")
+            frappe.throw(_("KOT Reprint is disabled in POS Profile."))
 
         if not kot_print_format:
-            frappe.throw("No KOT Reprint Print Format is set in POS Profile.")
+            frappe.throw(_("No KOT Reprint Print Format is set in POS Profile."))
         
         printer = table_order_printer if order_type == "Dine In" else parcel_order_printer
 
         if not printer:
-            frappe.throw("No printer is assigned for reprinting KOT.")
+            frappe.throw(_("No printer is assigned for reprinting KOT."))
 
        
         print_kot(printer, invoice_number, kot_print_format)
@@ -79,7 +79,7 @@ def reprint_kot(invoice_number):
     except Exception as e:
         error_message = f"KOT Reprint Error for Invoice {invoice_number}: {str(e)}"
         frappe.log_error(error_message, "KOT Reprint Error")
-        frappe.throw("An unexpected error occurred while reprinting KOT. Please check logs.")
+        frappe.throw(_("An unexpected error occurred while reprinting KOT. Please check logs."))
 
 
 def print_kot(printer,docname, kot_print_format):

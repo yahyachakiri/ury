@@ -135,7 +135,7 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
-        frappe.throw("User is not Associated with any Branch.Please refresh Page")
+        frappe.throw(_("User is not Associated with any Branch.Please refresh Page"))
 
     branch_name = branch_array[0].get("branch")
 
@@ -156,10 +156,10 @@ def getBranchRoom():
     room_name = branch_array[0].get("room")
 
     if not branch_name:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+        frappe.throw(_("Branch information is missing for the user. Please contact your administrator."))
 
     if not room_name:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
+        frappe.throw(_("No room assigned to this user. Please contact your administrator."))
 
     return [{
         "name":room_name ,
@@ -178,7 +178,7 @@ def getRoom():
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     
     if not branch_array:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+        frappe.throw(_("No branch or room information found for the user. Please contact your administrator."))
     
     room_details = [
         {
@@ -926,16 +926,16 @@ def getAggregatorMOP(aggregator):
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
     if not frappe.has_permission("Customer", "create"):
-        frappe.throw("Not permitted to create customers", frappe.PermissionError)
+        frappe.throw(_("Not permitted to create customers"), frappe.PermissionError)
         
     if not customer_name:
-        frappe.throw("Customer name is required")
+        frappe.throw(_("Customer name is required"))
     if not mobile_number:
-        frappe.throw("Mobile Number is required")
+        frappe.throw(_("Mobile Number is required"))
     try:
         validate_phone_number(mobile_number, throw=True)
     except Exception:
-        frappe.throw("Invalid mobile number format")
+        frappe.throw(_("Invalid mobile number format"))
 
     """Create a new customer"""
     try:
@@ -1462,7 +1462,7 @@ def merge_bills(primary_invoice, secondary_invoice):
     try:
 
         if primary_invoice == secondary_invoice:
-            frappe.throw("Cannot merge an invoice with itself.")
+            frappe.throw(_("Cannot merge an invoice with itself."))
 
         primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
         secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
@@ -1470,38 +1470,38 @@ def merge_bills(primary_invoice, secondary_invoice):
         # Authorization: caller must have write permission on both invoices
         if not frappe.has_permission("POS Invoice", "write", doc=primary_doc):
             frappe.throw(
-                "You do not have permission to merge this bill.",
+                _("You do not have permission to merge this bill."),
                 frappe.PermissionError,
             )
 
         if not frappe.has_permission("POS Invoice", "write", doc=secondary_doc):
             frappe.throw(
-                "You do not have permission to merge the selected bill.",
+                _("You do not have permission to merge the selected bill."),
                 frappe.PermissionError,
             )
 
           # Prevent cross-branch merging
         if primary_doc.branch != secondary_doc.branch:
             frappe.throw(
-                "Cannot merge bills from different branches.",
+                _("Cannot merge bills from different branches."),
                 frappe.PermissionError,
             )
 
         # Validation
         if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
-            frappe.throw("Both invoices must be in Draft state to merge.")
+            frappe.throw(_("Both invoices must be in Draft state to merge."))
 
         if primary_doc.branch != secondary_doc.branch:
-            frappe.throw("Cannot merge bills from different branches.")
+            frappe.throw(_("Cannot merge bills from different branches."))
 
         if primary_doc.custom_merged_pos_invoice:
-            frappe.throw("This bill already includes a merged bill.")
+            frappe.throw(_("This bill already includes a merged bill."))
 
         if secondary_doc.custom_merged_pos_invoice:
-            frappe.throw("The selected bill already includes another bill.")
+            frappe.throw(_("The selected bill already includes another bill."))
 
         if not secondary_doc.items:
-            frappe.throw("The selected bill has no items to merge.")
+            frappe.throw(_("The selected bill has no items to merge."))
 
 
         def update_merge_details(target_invoice,source_invoice,):

@@ -7,6 +7,7 @@ from ury.ury.report_api.utils import (
 	require_manager,
 	validate_date_range,
 )
+from frappe import _
 
 
 @frappe.whitelist()
@@ -112,7 +113,7 @@ def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
 	validate_date_range(start_date, end_date)
 
 	if not employee:
-		frappe.throw("employee is required.")
+		frappe.throw(_("employee is required."))
 
 	date_list = date_list_cte()
 

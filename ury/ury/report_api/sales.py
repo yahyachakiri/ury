@@ -8,6 +8,7 @@ from ury.ury.report_api.utils import (
 	require_manager,
 	validate_date_range,
 )
+from frappe import _
 
 
 @frappe.whitelist()
@@ -365,7 +366,7 @@ def get_time_wise_sales(branch=None, date=None, bucket_size_hours=2):
 
 	bucket_size_hours = int(bucket_size_hours)
 	if bucket_size_hours not in (1, 2, 4):
-		frappe.throw("bucket_size_hours must be 1, 2, or 4.")
+		frappe.throw(_("bucket_size_hours must be 1, 2, or 4."))
 
 	target_date = frappe.utils.getdate(date) if date else frappe.utils.today()
 	num_buckets = 24 // bucket_size_hours

@@ -6,6 +6,7 @@ from frappe.model.document import Document
 import json
 import calendar
 from datetime import datetime
+from frappe import _
 
 def inner_bom_process(buying_price_list, bom):
     unset_bom_items = []
@@ -64,12 +65,12 @@ class URYDailyPandL(Document):
 		cogs = 0
 		electricity_reading = self.electricity_closing - self.electricity_opening
 		if electricity_reading <= 0:
-			frappe.throw("Invalid Electricity Reading")
+			frappe.throw(_("Invalid Electricity Reading"))
 
 		# Append materials consumed
 		for expense in self.materials_consumed:
 			if expense.units_consumed <= 0:
-				frappe.throw("Invavlid Units Consumed for "+expense.material)
+				frappe.throw(_("Invavlid Units Consumed for {0}").format(expense.material))
 		non_pb_item_sales = frappe.db.sql('''
 			SELECT
 				c.item_group AS "Item Group",

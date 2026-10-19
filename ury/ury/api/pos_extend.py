@@ -31,7 +31,7 @@ def overrided_past_order_list(search_term, status, limit=20):
         branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
         if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+            frappe.throw(_("User is not Associated with any Branch.Please refresh Page"))
 
         branch_name = branch_array[0].get("branch")
         room_name = branch_array[0].get("room")

@@ -22,7 +22,7 @@ class SubPOSClosing(Document):
             filters={"branch": branch, "status": "Draft", "docstatus": "0","cashier":self.user},
         )
         if draft_invoices:
-            frappe.throw("Submit/Delete Draft Invoices")
+            frappe.throw(_("Submit/Delete Draft Invoices"))
 
         date_time = now()
         if isinstance(date_time, str):
@@ -63,7 +63,7 @@ class SubPOSClosing(Document):
                 if user_details.custom_main_cashier:
                     owner = user_details.user
             if frappe.session.user == owner:
-                frappe.throw("The Main Cashier cannot close a Sub POS Closing entry.")
+                frappe.throw(_("The Main Cashier cannot close a Sub POS Closing entry."))
         else:
             pass
     

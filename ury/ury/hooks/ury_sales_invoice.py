@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def before_insert(doc, method):
@@ -22,7 +23,7 @@ def sales_invoice_naming(doc, method):
     )
 
     if not pos_profile:
-        frappe.throw(f"POS Profile '{doc.pos_profile}' does not exist. Please select a valid POS Profile.")
+        frappe.throw(_("POS Profile '{0}' does not exist. Please select a valid POS Profile.").format(doc.pos_profile))
     
     restaurant = pos_profile.get("restaurant")
 

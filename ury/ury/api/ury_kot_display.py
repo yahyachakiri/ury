@@ -35,7 +35,7 @@ def confirm_cancel_kot(name):
     manager_roles = {"URY Manager", "URY Admin", "System Manager"}
     if not manager_roles.intersection(frappe.get_roles()) and frappe.session.user != "Administrator":
         frappe.throw(
-            "Only a manager can confirm a cancelled KOT.",
+            _("Only a manager can confirm a cancelled KOT."),
             frappe.PermissionError,
         )
 
@@ -43,12 +43,12 @@ def confirm_cancel_kot(name):
     try:
         kot_doc = frappe.get_doc("URY KOT", name)
     except frappe.DoesNotExistError:
-        frappe.throw(f"URY KOT {name} not found.", frappe.DoesNotExistError)
+        frappe.throw(_("URY KOT {0} not found.").format(name), frappe.DoesNotExistError)
 
     # Document-level permission check
     if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
         frappe.throw(
-            "You do not have permission to modify this KOT.",
+            _("You do not have permission to modify this KOT."),
             frappe.PermissionError
         )
 
@@ -63,7 +63,7 @@ def confirm_cancel_kot(name):
 
     if session_branch and kot_doc.branch != session_branch:
         frappe.throw(
-            "You do not have permission to modify KOTs from other branches.",
+            _("You do not have permission to modify KOTs from other branches."),
             frappe.PermissionError
         )
 

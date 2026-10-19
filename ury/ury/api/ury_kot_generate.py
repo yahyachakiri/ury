@@ -2,6 +2,7 @@ import json
 
 import frappe
 from ury.ury_pos.api import getBranch
+from frappe import _
 
 
 # Load JSON data or return as is if it's already a Python dictionary
@@ -136,7 +137,7 @@ def process_items_for_kot(
             item_code = item["item_code"]
             if item_group not in all_production_item_groups:
                 frappe.msgprint(
-                    f"Item group '{item_group}' for item '{item_code}' is not in any production."
+                    _("Item group '{0}' for item '{1}' is not in any production.").format(item_group, item_code)
                 )
         for production in productions:
             productionItemGroupslist = frappe.get_all(
@@ -184,7 +185,7 @@ def process_items_for_kot(
                 created_kot_names.append(kot_name)
     else:
         frappe.throw(
-            "Create URY Production unit against POS Profile: %s " % pos_profile.name
+            _("Create URY Production unit against POS Profile: {0}").format(pos_profile.name)
         )
 
     return created_kot_names
@@ -362,8 +363,9 @@ def kot_execute(
         cancel_kot_naming_series = "CNCL-" + kot_naming_series
     else:
         frappe.throw(
-            "KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: %s"
-            % pos_profile.name
+            _("KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: {0}").format(
+                pos_profile.name
+            )
         )
 
     from ury.ury.api.ury_waiter_print import print_combined_waiter_order_slip

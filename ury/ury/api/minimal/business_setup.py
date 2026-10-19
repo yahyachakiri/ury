@@ -4,7 +4,7 @@ from frappe import _
 @frappe.whitelist()
 def get_business_setup():
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     company = frappe.get_all("Company", limit=1)
     if not company:
@@ -28,7 +28,7 @@ def get_business_setup():
 @frappe.whitelist()
 def get_branches():
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
@@ -39,7 +39,7 @@ def get_branches():
 @frappe.whitelist()
 def update_business_setup(branch=None, restaurant=None):
     if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+        frappe.throw(_("Not permitted"))
 
     if branch:
         if isinstance(branch, str):

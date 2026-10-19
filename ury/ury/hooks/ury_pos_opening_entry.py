@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import today
 from frappe.utils import  get_datetime,today,now
+from frappe import _
 
 def validate(doc,method):
     set_cashier_room(doc,method)
@@ -56,7 +57,7 @@ def main_pos_open_check(doc,method):
                 if pos_opening.status == "Open" and pos_opening.docstatus == 1:
                     flag = 0
             if flag == 1:
-                frappe.throw(("Main Cashier POS must be open"), title=("Main Cashier POS Required"))
+                frappe.throw((_("Main Cashier POS must be open")), title=_("Main Cashier POS Required"))
                 
             return flag
     else:

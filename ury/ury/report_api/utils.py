@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def require_manager():
@@ -13,7 +14,7 @@ def require_manager():
 		return
 	if not allowed_roles & user_roles:
 		frappe.throw(
-			"You do not have permission to access this report.",
+			_("You do not have permission to access this report."),
 			frappe.PermissionError,
 		)
 
@@ -120,8 +121,8 @@ def validate_date_range(start_date, end_date, max_days=366):
 	frappe.ValidationError on bad input so every report gets consistent
 	error messages instead of a raw SQL failure."""
 	if not start_date or not end_date:
-		frappe.throw("Both start_date and end_date are required.")
+		frappe.throw(_("Both start_date and end_date are required."))
 	if frappe.utils.getdate(start_date) > frappe.utils.getdate(end_date):
-		frappe.throw("start_date must not be after end_date.")
+		frappe.throw(_("start_date must not be after end_date."))
 	if (frappe.utils.getdate(end_date) - frappe.utils.getdate(start_date)).days > max_days:
-		frappe.throw(f"Date range cannot exceed {max_days} days.")
+		frappe.throw(_("Date range cannot exceed {0} days.").format(max_days))
