@@ -1,9 +1,10 @@
 import { storage } from './storage';
 
 export function formatCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
+  // Patch 16: site currency when no symbol is cached (was ₹), no Indian grouping.
+  const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
   const roundedAmount = flt(amount, 2);
-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString('en-IN') : roundedAmount;
+  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
   return `${symbol} ${formattedVal}`;
 }
 
@@ -27,7 +28,7 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
  * e.g. 600000 -> "₹6L", 12500000 -> "₹1.25Cr", 8200 -> "₹8.2k".
  */
 export function formatCompactCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
+  const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || ''; // Patch 16
   if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
 
   const sign = amount < 0 ? '-' : '';
