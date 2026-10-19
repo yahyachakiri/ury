@@ -5,6 +5,8 @@ frappe.ui.form.on('POS Invoice', {
         if (fieldValue.message.remove_items === 0) {
 
             const items_details_section = document.querySelector(".item-details-container");
+            // Patch 14: the container exists only on the legacy POS page, not on the desk form.
+            if (!items_details_section) return;
             const item_observer = new MutationObserver(() => {
                 const computedStyle = window.getComputedStyle(items_details_section);
                 if (computedStyle.display === "flex") {
