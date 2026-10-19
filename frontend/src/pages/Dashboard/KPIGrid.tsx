@@ -2,8 +2,9 @@ import React from 'react';
 import { formatCurrency } from '@ury/core';
 import { Card, Spinner } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
-import uryPosLogo from '../../../../pos/public/ury_pos.png';
-import uryMosaicLogo from '../../../../mosaic/src/assets/logos/mosaic.jpg';
+// Patch 15: desk logo on both link cards (set by the page, erp_restaurant branding.py).
+const uryPosLogo: string = (window as any).app_logo_url || '';
+const uryMosaicLogo = uryPosLogo;
 
 interface LinkCardProps {
   logoSrc: string;

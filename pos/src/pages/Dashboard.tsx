@@ -3,7 +3,6 @@ import { Card, CardContent } from '@ury/ui';
 import { call, formatCurrency } from '@ury/core';
 import { useEffect, useState } from 'react';
 
-import HufLogo from '../components/HufLogo';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 
@@ -522,9 +521,10 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between gap-2 mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">{t('dashboard.shift_brief')}</h3>
-                <span className="inline-flex items-center justify-center px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
-                  <HufLogo className="h-3.5 w-auto" />
-                </span>
+                {/* Patch 15: desk logo instead of the HUF mark */}
+                {(window as any).app_logo_url && (
+                  <img src={(window as any).app_logo_url} alt="" className="h-6 w-auto" />
+                )}
               </div>
               <p className="text-sm text-gray-600">
                 {t('dashboard.shift_brief_description')}

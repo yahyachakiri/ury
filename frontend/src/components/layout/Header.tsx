@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
-import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
+// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
+const uryLogo: string = (window as any).app_logo_url || '';
 import {
   Bell,
   User,
@@ -133,7 +134,7 @@ export const Header: React.FC = () => {
         {/* Left Section: Logo & Brand */}
         <div className="flex items-center space-x-3">
           <Link to="/dashboard" className="flex items-center space-x-3 group">
-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
+            <img src={uryLogo} alt="Logo" className="h-7 w-auto" />
           </Link>
         </div>
 

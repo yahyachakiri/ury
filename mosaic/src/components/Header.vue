@@ -68,7 +68,8 @@
 </template>
 
 <script>
-import urimosaicImage from "@/assets/logos/mosaic.jpg";
+// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
+const urimosaicImage = window.app_logo_url || "";
 
 export default {
   name: "Header",

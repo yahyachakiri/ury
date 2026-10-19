@@ -3,7 +3,9 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="/ury.ico" />
+  <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
+  <link rel="icon" href="{{ favicon }}" />
+  <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mosaic</title>
 </head>

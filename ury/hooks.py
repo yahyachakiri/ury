@@ -14,7 +14,8 @@ required_apps = ["erpnext"]
 add_to_apps_screen = [
   {
     "name": "ury",
-    "logo": "/assets/ury/Images/ury.png",
+    # Patch 15: desk logo through erp_restaurant (redirect).
+    "logo": "/api/method/erp_restaurant.erp_restaurant.branding.desk_logo",
     "title": "URY",
     "route": "/ury",
     "has_permission": "ury.permission.check_app_permission"

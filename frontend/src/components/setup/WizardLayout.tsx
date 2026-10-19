@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { Button } from '@ury/ui';
 import { Check } from 'lucide-react';
-import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
+// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
+const uryLogo: string = (window as any).app_logo_url || '';
 
 interface WizardLayoutProps {
   step: 1 | 2;
@@ -35,7 +36,7 @@ export function WizardLayout({
       <header className="w-full border-b border-border bg-card">
         <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
           <div className="flex items-center gap-3">
-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
+            <img src={uryLogo} alt="Logo" className="h-7 w-auto" />
             <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
           </div>
 

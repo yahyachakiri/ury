@@ -115,12 +115,12 @@ const Header = () => {
         {/* Logo */}
         <div className="flex items-center">
         <Link to="/dashboard" className="flex items-center gap-3">
-            {/* <img
-              src="/assets/ury/pos/ury_pos.png"
-              alt="URY POS" 
-              className="h-10 w-auto"
-            /> */}
-            <p>POS</p>
+            {/* Patch 15: desk logo, text when none */}
+            {(window as any).app_logo_url ? (
+              <img src={(window as any).app_logo_url} alt="POS" className="h-10 w-auto" />
+            ) : (
+              <p>POS</p>
+            )}
           </Link>
         </div>
 
