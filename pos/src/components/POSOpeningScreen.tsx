@@ -156,10 +156,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
   const handleSubmit = async () => {
     if (!canSubmit || !context?.selected_profile) return;
 
-    if (totalOpeningBalance <= 0 && !zeroBalanceConfirmed) {
-      setZeroBalanceConfirmed(true);
-      return;
-    }
+    // Patch 12: opening with 0 is normal (no cash float), no second confirmation.
 
     setIsSubmitting(true);
     setError(null);
