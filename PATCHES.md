@@ -499,6 +499,52 @@ change is backward compatible. On a conflict, keep the Patch 10 block after
 the Patch 08 `savedName` line, `printKitchenTickets` and the `printerName`
 argument.
 
+### Patch 11 — Close Shift accepts an all-zero shift with no activity
+
+Bug fix (ticket 15, bug 3).
+
+Files touched:
+- `pos/src/components/POSClosingDialog.tsx`
+
+What it does: upstream, the Close Shift dialog refuses any close whose
+counted total is 0 ("Total closing amount can't be zero"), so a shift with
+no opening cash and no sales can never be closed from the POS. The open
+shift then blocks stock counts on its warehouse (`erp_restaurant`
+stock_adjustments rule). After this patch the all-zero block applies only
+when a row has an opening amount or expected sales; with every opening and
+expected amount at 0, counting 0 everywhere is accepted. Every row must
+still be entered (unchanged), and the confirmation step is unchanged.
+No new strings.
+
+Why it can't be done in `erp_restaurant`: the check exists only in the
+browser dialog; the server already accepts an all-zero POS Closing Entry
+(closing from the desk works). No server hook can lift a browser check.
+
+Acceptance criteria:
+1. Open a shift with 0 opening cash, make no sale, Close Shift, enter 0 in
+   every row: the closing is created and submitted, no error.
+2. Shift opened with 20 MAD and no sales, all rows 0: still refused with
+   "Total closing amount can't be zero". Same for a shift with sales.
+3. Normal close with amounts: unchanged.
+4. A row left untouched: still refused (missing rows message).
+5. French and Arabic: dialog unchanged, no new text.
+
+Known limit: the dialog's expected amounts can show 0 when the device clock
+is not on Casablanca time (see docs/feature-status.md); such a shift with
+no opening cash could then be closed at 0. The server recomputes expected
+amounts on save (`erp_restaurant` pos_closing_hooks), so the difference
+still shows in the closing and the Daily Closing when there were sales.
+Second case: the dialog reads opening amounts from the POS Opening Entry
+(`balance_details`); a closing was once seen with opening 0 although the
+opening had 20 (docs/feature-status.md). If the dialog ever reads 0 opening
+cash for a shift with no sales, it now accepts a 0 close with no warning,
+and the server does not recompute anything when there are no invoices.
+
+Commit: `85f565f130f2a7932249274da98af7e199230164`
+
+Risk profile: low. Two lines in the dialog validation memo. On a conflict,
+keep the `hasActivity` condition on the all-zero block.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

@@ -1,0 +1,33 @@
+diff --git a/pos/src/components/POSClosingDialog.tsx b/pos/src/components/POSClosingDialog.tsx
+index 23911296..740692dc 100644
+--- a/pos/src/components/POSClosingDialog.tsx
++++ b/pos/src/components/POSClosingDialog.tsx
+@@ -304,7 +304,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
+   // Fix 2: submission-blocking validation. Every row must be explicitly
+   // touched (not just numerically non-zero, since a blank input silently
+   // becomes 0), and the total closing amount across all rows must be
+-  // non-zero so an all-zero close can't slip through unnoticed.
++  // non-zero so an all-zero close can't slip through unnoticed, unless
++  // there was no opening cash and no sales (Patch 11).
+   const validation = useMemo(() => {
+     if (rows.length === 0) {
+       return { isValid: false, blockingMessage: null as string | null, warningMessage: null as string | null };
+@@ -312,6 +313,9 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
+ 
+     const untouchedCount = rows.filter((row) => !touchedModes.has(row.mode_of_payment)).length;
+     const totalClosing = rows.reduce((sum, row) => sum + row.closing_amount, 0);
++    // Patch 11: a shift with no opening cash and no sales has nothing to
++    // count, so an all-zero close is valid there.
++    const hasActivity = rows.some((row) => row.opening_amount !== 0 || row.expected_amount !== 0);
+ 
+     const zeroRowsWithActivity = rows.filter(
+       (row) =>
+@@ -323,7 +327,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
+     let blockingMessage: string | null = null;
+     if (untouchedCount > 0) {
+       blockingMessage = t('pos_closing.validation_missing_rows');
+-    } else if (totalClosing === 0) {
++    } else if (totalClosing === 0 && hasActivity) {
+       blockingMessage = t('pos_closing.validation_all_zero');
+     }
+ 
