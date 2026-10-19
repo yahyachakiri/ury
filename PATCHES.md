@@ -627,6 +627,36 @@ their text without the title (localized titles such as "رسالة" are not
 filtered). On a conflict, keep the alert
 skip, the prefix strip and the duplicate check.
 
+### Patch 14 — Null check before the legacy POS quantity observer
+
+Bug fix (ticket 15, bug 2; PRD known bug 2).
+
+Files touched:
+- `ury/public/js/restrict_qty_edit_pos.js`
+
+What it does: URY loads this script on every desk page
+(`app_include_js`). On POS Invoice onload, with POS Profile "Remove Items"
+off, it attaches a MutationObserver to `.item-details-container`, which
+exists only on the legacy point-of-sale page. On the desk POS Invoice form
+the element is missing and `observe(null)` throws a TypeError in the
+console. After this patch the script stops when the element is missing; the
+legacy POS page behaves as before. Cosmetic, unrelated to save errors.
+
+Why it can't be done in `erp_restaurant`: the script is URY's own desk
+include; another app cannot remove or wrap it.
+
+Acceptance criteria:
+1. POS Profile "Remove Items" off: open a POS Invoice in the desk; no
+   "parameter 1 is not of type 'Node'" error in the browser console.
+2. Legacy point-of-sale page, if used: qty, UOM and warehouse locks on a
+   printed table order behave as before.
+
+Commit: `83acdddeeb5ed4db1aee8891b50054f07d16ae39`
+
+Risk profile: low. Static desk JS served from the app's public folder; no
+build step, clear-cache and a hard refresh. On a conflict, keep the null
+check.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
