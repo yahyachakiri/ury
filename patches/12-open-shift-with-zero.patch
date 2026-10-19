@@ -1,0 +1,16 @@
+diff --git a/pos/src/components/POSOpeningScreen.tsx b/pos/src/components/POSOpeningScreen.tsx
+index a1b78c86..e6070846 100644
+--- a/pos/src/components/POSOpeningScreen.tsx
++++ b/pos/src/components/POSOpeningScreen.tsx
+@@ -156,10 +156,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
+   const handleSubmit = async () => {
+     if (!canSubmit || !context?.selected_profile) return;
+ 
+-    if (totalOpeningBalance <= 0 && !zeroBalanceConfirmed) {
+-      setZeroBalanceConfirmed(true);
+-      return;
+-    }
++    // Patch 12: opening with 0 is normal (no cash float), no second confirmation.
+ 
+     setIsSubmitting(true);
+     setError(null);

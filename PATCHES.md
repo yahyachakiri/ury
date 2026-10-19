@@ -105,6 +105,10 @@ Files touched:
 - `frontend/src/i18n.ts`
 - `frontend/src/main.tsx`
 
+2026-10-19 (ticket 15 test): `pos_opening.zero_balance_warning` shows
+"0" instead of the rupee sign (en, fr, ar). Text only.
+Since Patch 12 the warning is no longer shown.
+
 ### Patch 03 — Management frontend translation, dashboard loop fix
 
 Files touched:
@@ -544,6 +548,35 @@ Commit: `85f565f130f2a7932249274da98af7e199230164`
 
 Risk profile: low. Two lines in the dialog validation memo. On a conflict,
 keep the `hasActivity` condition on the all-zero block.
+
+### Patch 12 — Open Shift with 0 opening cash on the first click
+
+Change (ticket 15, owner request 2026-10-19).
+
+Files touched:
+- `pos/src/components/POSOpeningScreen.tsx`
+
+What it does: upstream, opening a shift with 0 on every payment mode shows
+a warning ("You're opening with 0 across all payment modes") and needs a
+second tap on "Confirm & Open". Small fast-food shifts often start with no
+cash float, so the warning is removed: the shift opens on the first tap.
+The warning text and the alternative button label stay in the locales and
+in the component (now never shown), so the diff stays small.
+No new strings.
+
+Why it can't be done in `erp_restaurant`: the warning is a browser-only
+step in the opening screen; the server accepts a 0 opening.
+
+Acceptance criteria:
+1. Open Shift with 0 on every mode: the shift opens on the first tap, no
+   warning.
+2. Open Shift with an amount: unchanged.
+3. French and Arabic: screen unchanged.
+
+Commit: `c87750920be2ed13b4fb1b3d29519fdce21a8515`
+
+Risk profile: low. One removed early return in `handleSubmit`. On a
+conflict, drop upstream's zero-balance early return again.
 
 ## Build and deploy
 
