@@ -188,7 +188,12 @@
         "confirm_submit": "نعم، إغلاق نقطة البيع",
         "confirm_back": "رجوع",
         "checklist_skip": "تخطي الآن",
-        "checklist_skip_hint": "تم إرسال إغلاق نقطة البيع بالفعل. يمكنك إكمال قائمة التحقق لاحقًا."
+        "checklist_skip_hint": "تم إرسال إغلاق نقطة البيع بالفعل. يمكنك إكمال قائمة التحقق لاحقًا.",
+        "col_payment_mode": "طريقة الدفع",
+        "col_opening": "الافتتاح",
+        "col_expected": "المتوقع",
+        "col_closing": "المعدود",
+        "col_difference": "الفرق"
     },
     "checklist": {
         "title_opening": "قائمة تحقق الفتح",
@@ -298,7 +303,8 @@
             "page": "صفحة {{number}}"
         },
         "close_tab": "إغلاق الطلب",
-        "edit_order": "تعديل الطلب"
+        "edit_order": "تعديل الطلب",
+        "qty": "الكمية: {{qty}}"
     },
     "tables": {
         "layout_view": "عرض المخطط",
@@ -382,7 +388,9 @@
         "zoom_in": "تكبير",
         "zoom_out": "تصغير",
         "loading_rooms": "جارٍ تحميل القاعات…",
-        "reset_zoom": "إعادة ضبط التكبير"
+        "reset_zoom": "إعادة ضبط التكبير",
+        "preview": "معاينة",
+        "printing": "جارٍ الطباعة…"
     },
     "bill_split": {
         "split_bill": "تقسيم الفاتورة",
@@ -560,7 +568,26 @@
         "loading_context": "جارٍ التحميل…",
         "no_table_orders": "ليس لديك صلاحية أخذ طلبات الطاولات.",
         "refresh": "تحديث",
-        "loading_menu": "جارٍ تحميل القائمة…"
+        "loading_menu": "جارٍ تحميل القائمة…",
+        "order_updated": "تم تحديث الطلب.",
+        "order_sent": "أُرسل الطلب إلى المطبخ.",
+        "updating_order": "تعديل الطلب",
+        "new_order": "طلب جديد",
+        "already_ordered": "طُلب سابقا",
+        "new_or_changed": "جديد / معدّل",
+        "reduction_pending": "تخفيض قيد الانتظار",
+        "tab_menu": "القائمة",
+        "tab_order": "الطلب",
+        "updating": "جارٍ التحديث…",
+        "sending": "جارٍ الإرسال…",
+        "update_order": "تحديث الطلب",
+        "send_order": "إرسال الطلب",
+        "reprint_kot": "إعادة طباعة تذكرة المطبخ",
+        "transfer_captain": "نقل إلى نادل آخر",
+        "print_bill": "طباعة الفاتورة",
+        "status_billed": "الفاتورة مطبوعة",
+        "status_mine": "لي",
+        "status_free": "فارغة"
     },
     "auth": {
         "access_denied": "تم رفض الوصول",

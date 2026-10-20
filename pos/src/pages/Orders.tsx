@@ -711,7 +711,7 @@ export default function Orders() {
                     <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                        <p className="text-xs text-gray-500">{t('orders.qty', { qty: item.qty })}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-gray-900">

@@ -81,7 +81,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 : 'bg-white text-gray-700 border-gray-200'
             )}
           >
-            All
+            {t('common.all')}
           </button>
           {categories.map((category) => (
             <button

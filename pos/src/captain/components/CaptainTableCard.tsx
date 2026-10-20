@@ -4,6 +4,7 @@ import { Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import type { Table } from '../../lib/table-api';
 import type { ActiveTableOrder } from '../lib/captain-table-api';
+import { t } from '../../i18n';
 
 export type CaptainTableOwnership = 'free' | 'mine' | 'other' | 'occupied-unknown';
 
@@ -63,14 +64,14 @@ const CaptainTableCard = ({
         : 'border-amber-400 bg-amber-50 text-amber-900';
 
   const statusLabel = isBilled
-    ? 'Billed'
+    ? t('captain.status_billed')
     : ownership === 'mine'
-      ? 'Mine'
+      ? t('captain.status_mine')
       : ownership === 'free'
-        ? 'Free'
+        ? t('captain.status_free')
         : ownerName
           ? ownerName
-          : 'Occupied';
+          : t('tables.occupied');
 
   const statusBadgeVariant = isBilled
     ? 'secondary'

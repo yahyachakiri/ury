@@ -123,7 +123,7 @@ const CaptainActionsMenu = ({
               ) : (
                 <Printer className="h-4 w-4 shrink-0" />
               )}
-              Reprint KOT
+              {t('captain.reprint_kot')}
             </Button>
           )}
           {showTransferTable && (
@@ -133,7 +133,7 @@ const CaptainActionsMenu = ({
               onClick={handleTransferTable}
             >
               <ArrowRightLeft className="h-4 w-4 shrink-0" />
-              Transfer table
+              {t('tables.transfer_table')}
             </Button>
           )}
           {showTransferCaptain && (
@@ -143,7 +143,7 @@ const CaptainActionsMenu = ({
               onClick={handleTransferCaptain}
             >
               <UserRound className="h-4 w-4 shrink-0" />
-              Transfer captain
+              {t('captain.transfer_captain')}
             </Button>
           )}
           {showPrintBill && (
@@ -158,7 +158,7 @@ const CaptainActionsMenu = ({
               ) : (
                 <Receipt className="h-4 w-4 shrink-0" />
               )}
-              Print bill
+              {t('captain.print_bill')}
             </Button>
           )}
         </div>

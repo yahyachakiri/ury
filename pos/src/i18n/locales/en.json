@@ -181,7 +181,12 @@
     "confirm_submit": "Yes, Close POS",
     "confirm_back": "Go Back",
     "checklist_skip": "Skip for now",
-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
+    "col_payment_mode": "Payment Mode",
+    "col_opening": "Opening",
+    "col_expected": "Expected",
+    "col_closing": "Closing",
+    "col_difference": "Difference"
   },
   "checklist": {
     "title_opening": "Opening Checklist",
@@ -291,7 +296,8 @@
       "page": "Page {{number}}"
     },
     "close_tab": "Close order",
-    "edit_order": "Edit order"
+    "edit_order": "Edit order",
+    "qty": "Qty: {{qty}}"
   },
   "tables": {
     "layout_view": "Layout View",
@@ -375,7 +381,9 @@
     "zoom_in": "Zoom in",
     "zoom_out": "Zoom out",
     "loading_rooms": "Loading rooms…",
-    "reset_zoom": "Reset zoom"
+    "reset_zoom": "Reset zoom",
+    "preview": "Preview",
+    "printing": "Printing..."
   },
   "bill_split": {
     "split_bill": "Split bill",
@@ -553,7 +561,26 @@
     "loading_context": "Loading…",
     "no_table_orders": "You do not have permission to take table orders.",
     "refresh": "Refresh",
-    "loading_menu": "Loading menu…"
+    "loading_menu": "Loading menu…",
+    "order_updated": "Order updated.",
+    "order_sent": "Order sent to kitchen.",
+    "updating_order": "Updating order",
+    "new_order": "New order",
+    "already_ordered": "Already Ordered",
+    "new_or_changed": "New / Changed",
+    "reduction_pending": "Reduction Pending",
+    "tab_menu": "Menu",
+    "tab_order": "Order",
+    "updating": "Updating…",
+    "sending": "Sending…",
+    "update_order": "Update Order",
+    "send_order": "Send Order",
+    "reprint_kot": "Reprint kitchen ticket",
+    "transfer_captain": "Transfer waiter",
+    "print_bill": "Print bill",
+    "status_billed": "Billed",
+    "status_mine": "Mine",
+    "status_free": "Free"
   },
   "auth": {
     "access_denied": "Access denied",

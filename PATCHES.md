@@ -950,6 +950,41 @@ Acceptance criteria:
 
 Risk profile: low. On a conflict keep the `URLSearchParams` block.
 
+### Patch 22 — Fresh POS Profile on load, waiter app and closing texts translated
+
+Bug fix (browser retest 2026-10-20, findings R3 and R5).
+
+Files touched:
+- `pos/src/components/AuthGuard.tsx`
+- `pos/src/captain/pages/CaptainOrder.tsx`, `captain/components/CaptainActionsMenu.tsx`,
+  `CaptainMenu.tsx`, `CaptainTableCard.tsx`
+- `pos/src/components/ClosingPaymentTable.tsx`, `TableCard.tsx`, `pos/src/pages/Orders.tsx`
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (27 new keys in `captain`,
+  `pos_closing`, `tables`, `orders`; existing keys reused: `common.all`,
+  `tables.transfer_table`, `tables.occupied`, `order.print`, `order_types.take_away`)
+
+What it does: the POS kept the POS Profile in the tab's sessionStorage and read
+it from there even after a reload, so an open till printed with an old print
+format (no format = ERPNext's generic form). The profile is now fetched from the
+server on every page load (the copy still serves the rest of the session). The
+waiter app texts Patch 17 missed (toasts "Order sent to kitchen.", "New order",
+"Send Order", "Already Ordered", "New / Changed", table status "Mine / Free /
+Billed", actions menu, "All") and the POS texts "Qty:", closing table headers
+and table card "Take away / Preview / Print" go through `t()`.
+
+Why it can't be done in `erp_restaurant`: POS bundle code and texts.
+
+Acceptance criteria:
+1. Change the POS Profile print format, reload the open POS tab: Print uses the new format.
+2. Waiter app in French and Arabic: no English in the order screen, table cards
+   and toasts.
+3. Close Shift table headers and table cards in French and Arabic.
+
+Not covered: dates in the POS use the browser's English format ("Oct 20, 1:04 PM").
+
+Risk profile: low to medium (CaptainOrder.tsx is edited upstream). On a conflict
+keep the `t('...')` calls and `fetchPosProfile(true)`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

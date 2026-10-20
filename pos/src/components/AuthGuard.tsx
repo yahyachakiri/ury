@@ -31,10 +31,11 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
-  // Once we have a user, fetch POS profile
+  // Once we have a user, fetch POS profile. Patch 22: always from the server on page load
+  // (the tab's sessionStorage copy kept an old print format even after a reload).
   useEffect(() => {
     if (user) {
-      fetchPosProfile();
+      fetchPosProfile(true);
     }
   }, [user, fetchPosProfile]);
 

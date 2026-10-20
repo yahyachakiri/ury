@@ -132,7 +132,7 @@ const TableCard = ({
           )}
           {table.is_take_away === 1 && (
             <Badge variant="pending" className="mt-2">
-              Take away
+              {t('order_types.take_away')}
             </Badge>
           )}
         </div>
@@ -155,7 +155,7 @@ const TableCard = ({
               )}
             >
               <Eye className="h-3 w-3" />
-              Preview
+              {t('tables.preview')}
             </button>
             <button
               onClick={onPrint}
@@ -165,12 +165,12 @@ const TableCard = ({
               {isPrinting ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Printing...
+                  {t('tables.printing')}
                 </>
               ) : (
                 <>
                   <Printer className="h-3 w-3" />
-                  Print
+                  {t('order.print')}
                 </>
               )}
             </button>

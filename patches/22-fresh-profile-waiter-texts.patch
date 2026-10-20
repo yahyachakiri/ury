@@ -1,0 +1,495 @@
+diff --git a/pos/src/captain/components/CaptainActionsMenu.tsx b/pos/src/captain/components/CaptainActionsMenu.tsx
+index a33fd0ce..3297f2fc 100644
+--- a/pos/src/captain/components/CaptainActionsMenu.tsx
++++ b/pos/src/captain/components/CaptainActionsMenu.tsx
+@@ -123,7 +123,7 @@ const CaptainActionsMenu = ({
+               ) : (
+                 <Printer className="h-4 w-4 shrink-0" />
+               )}
+-              Reprint KOT
++              {t('captain.reprint_kot')}
+             </Button>
+           )}
+           {showTransferTable && (
+@@ -133,7 +133,7 @@ const CaptainActionsMenu = ({
+               onClick={handleTransferTable}
+             >
+               <ArrowRightLeft className="h-4 w-4 shrink-0" />
+-              Transfer table
++              {t('tables.transfer_table')}
+             </Button>
+           )}
+           {showTransferCaptain && (
+@@ -143,7 +143,7 @@ const CaptainActionsMenu = ({
+               onClick={handleTransferCaptain}
+             >
+               <UserRound className="h-4 w-4 shrink-0" />
+-              Transfer captain
++              {t('captain.transfer_captain')}
+             </Button>
+           )}
+           {showPrintBill && (
+@@ -158,7 +158,7 @@ const CaptainActionsMenu = ({
+               ) : (
+                 <Receipt className="h-4 w-4 shrink-0" />
+               )}
+-              Print bill
++              {t('captain.print_bill')}
+             </Button>
+           )}
+         </div>
+diff --git a/pos/src/captain/components/CaptainMenu.tsx b/pos/src/captain/components/CaptainMenu.tsx
+index eaf0d9a7..ef112e57 100644
+--- a/pos/src/captain/components/CaptainMenu.tsx
++++ b/pos/src/captain/components/CaptainMenu.tsx
+@@ -81,7 +81,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+                 : 'bg-white text-gray-700 border-gray-200'
+             )}
+           >
+-            All
++            {t('common.all')}
+           </button>
+           {categories.map((category) => (
+             <button
+diff --git a/pos/src/captain/components/CaptainTableCard.tsx b/pos/src/captain/components/CaptainTableCard.tsx
+index 27a0de88..c0899946 100644
+--- a/pos/src/captain/components/CaptainTableCard.tsx
++++ b/pos/src/captain/components/CaptainTableCard.tsx
+@@ -4,6 +4,7 @@ import { Badge } from '@ury/ui';
+ import { formatCurrency } from '@ury/core';
+ import type { Table } from '../../lib/table-api';
+ import type { ActiveTableOrder } from '../lib/captain-table-api';
++import { t } from '../../i18n';
+ 
+ export type CaptainTableOwnership = 'free' | 'mine' | 'other' | 'occupied-unknown';
+ 
+@@ -63,14 +64,14 @@ const CaptainTableCard = ({
+         : 'border-amber-400 bg-amber-50 text-amber-900';
+ 
+   const statusLabel = isBilled
+-    ? 'Billed'
++    ? t('captain.status_billed')
+     : ownership === 'mine'
+-      ? 'Mine'
++      ? t('captain.status_mine')
+       : ownership === 'free'
+-        ? 'Free'
++        ? t('captain.status_free')
+         : ownerName
+           ? ownerName
+-          : 'Occupied';
++          : t('tables.occupied');
+ 
+   const statusBadgeVariant = isBilled
+     ? 'secondary'
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index d3e65691..c67ad13d 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -235,7 +235,7 @@ export default function CaptainOrder() {
+       }
+ 
+       clearTableOrder();
+-      showToast.success(isUpdatingOrder ? 'Order updated.' : 'Order sent to kitchen.');
++      showToast.success(isUpdatingOrder ? t('captain.order_updated') : t('captain.order_sent'));
+       navigate('/order');
+     } catch (error) {
+       console.error('Failed to sync order:', error);
+@@ -423,7 +423,7 @@ export default function CaptainOrder() {
+           {alreadyOrderedLines.length > 0 && (
+             <section>
+               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
+-                Already Ordered
++                {t('captain.already_ordered')}
+               </h2>
+               <div className="space-y-2">
+                 {alreadyOrderedLines.map((line) => (
+@@ -444,7 +444,7 @@ export default function CaptainOrder() {
+           {newOrChangedLines.length > 0 && (
+             <section>
+               <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 px-1">
+-                New / Changed
++                {t('captain.new_or_changed')}
+               </h2>
+               <div className="space-y-2">
+                 {newOrChangedLines.map((line) => (
+@@ -465,7 +465,7 @@ export default function CaptainOrder() {
+           {reductionPendingLines.length > 0 && (
+             <section>
+               <h2 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 px-1">
+-                Reduction Pending
++                {t('captain.reduction_pending')}
+               </h2>
+               <div className="space-y-2">
+                 {reductionPendingLines.map((line) => (
+@@ -533,7 +533,7 @@ export default function CaptainOrder() {
+           </Button>
+           <div>
+             <h1 className="font-semibold text-gray-900 leading-tight">Table {table}</h1>
+-            <p className="text-xs text-gray-500">{isUpdatingOrder ? 'Updating order' : 'New order'}</p>
++            <p className="text-xs text-gray-500">{isUpdatingOrder ? t('captain.updating_order') : t('captain.new_order')}</p>
+           </div>
+         </div>
+ 
+@@ -548,7 +548,7 @@ export default function CaptainOrder() {
+                 )}
+               >
+                 <UtensilsCrossed className="w-4 h-4" />
+-                Menu
++                {t('captain.tab_menu')}
+               </button>
+               <button
+                 onClick={() => setMode('order')}
+@@ -558,7 +558,7 @@ export default function CaptainOrder() {
+                 )}
+               >
+                 <ClipboardList className="w-4 h-4" />
+-                Order
++                {t('captain.tab_order')}
+                 {activeOrders.length > 0 && (
+                   <span className="ms-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-blue-600 text-white text-xs">
+                     {activeOrders.length}
+@@ -632,12 +632,12 @@ export default function CaptainOrder() {
+               {isSubmitting ? (
+                 <div className="flex items-center gap-2">
+                   <Loader2 className="w-4 h-4 animate-spin" />
+-                  {isUpdatingOrder ? 'Updating…' : 'Sending…'}
++                  {isUpdatingOrder ? t('captain.updating') : t('captain.sending')}
+                 </div>
+               ) : isUpdatingOrder ? (
+-                'Update Order'
++                t('captain.update_order')
+               ) : (
+-                'Send Order'
++                t('captain.send_order')
+               )}
+             </Button>
+           </div>
+@@ -661,12 +661,12 @@ export default function CaptainOrder() {
+             {isSubmitting ? (
+               <div className="flex items-center gap-2">
+                 <Loader2 className="w-4 h-4 animate-spin" />
+-                {isUpdatingOrder ? 'Updating…' : 'Sending…'}
++                {isUpdatingOrder ? t('captain.updating') : t('captain.sending')}
+               </div>
+             ) : isUpdatingOrder ? (
+-              'Update Order'
++              t('captain.update_order')
+             ) : (
+-              'Send Order'
++              t('captain.send_order')
+             )}
+           </Button>
+         </div>
+diff --git a/pos/src/components/AuthGuard.tsx b/pos/src/components/AuthGuard.tsx
+index d38bcd71..901135be 100644
+--- a/pos/src/components/AuthGuard.tsx
++++ b/pos/src/components/AuthGuard.tsx
+@@ -31,10 +31,11 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
+     checkAuth();
+   }, [checkAuth]);
+ 
+-  // Once we have a user, fetch POS profile
++  // Once we have a user, fetch POS profile. Patch 22: always from the server on page load
++  // (the tab's sessionStorage copy kept an old print format even after a reload).
+   useEffect(() => {
+     if (user) {
+-      fetchPosProfile();
++      fetchPosProfile(true);
+     }
+   }, [user, fetchPosProfile]);
+ 
+diff --git a/pos/src/components/ClosingPaymentTable.tsx b/pos/src/components/ClosingPaymentTable.tsx
+index d73986e0..13497098 100644
+--- a/pos/src/components/ClosingPaymentTable.tsx
++++ b/pos/src/components/ClosingPaymentTable.tsx
+@@ -31,17 +31,17 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
+         <thead>
+           <tr className="border-b border-gray-300 bg-gray-50">
+             <th className="text-left py-3 px-4 font-semibold text-gray-900">
+-              Payment Mode
++              {t('pos_closing.col_payment_mode')}
+             </th>
+             <th className="text-right py-3 px-4 font-semibold text-gray-900">
+-              Opening
++              {t('pos_closing.col_opening')}
+             </th>
+             <th className="text-right py-3 px-4 font-semibold text-gray-900">
+               <span
+                 title={t('pos_closing.help_expected')}
+                 className="inline-flex items-center gap-1 cursor-help"
+               >
+-                Expected
++                {t('pos_closing.col_expected')}
+                 <span
+                   aria-hidden="true"
+                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+@@ -55,7 +55,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
+                 title={t('pos_closing.help_closing')}
+                 className="inline-flex items-center gap-1 cursor-help"
+               >
+-                Closing
++                {t('pos_closing.col_closing')}
+                 <span
+                   aria-hidden="true"
+                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+@@ -69,7 +69,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
+                 title={t('pos_closing.help_difference')}
+                 className="inline-flex items-center gap-1 cursor-help"
+               >
+-                Difference
++                {t('pos_closing.col_difference')}
+                 <span
+                   aria-hidden="true"
+                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+diff --git a/pos/src/components/TableCard.tsx b/pos/src/components/TableCard.tsx
+index d043c6bf..1e26837d 100644
+--- a/pos/src/components/TableCard.tsx
++++ b/pos/src/components/TableCard.tsx
+@@ -132,7 +132,7 @@ const TableCard = ({
+           )}
+           {table.is_take_away === 1 && (
+             <Badge variant="pending" className="mt-2">
+-              Take away
++              {t('order_types.take_away')}
+             </Badge>
+           )}
+         </div>
+@@ -155,7 +155,7 @@ const TableCard = ({
+               )}
+             >
+               <Eye className="h-3 w-3" />
+-              Preview
++              {t('tables.preview')}
+             </button>
+             <button
+               onClick={onPrint}
+@@ -165,12 +165,12 @@ const TableCard = ({
+               {isPrinting ? (
+                 <>
+                   <Loader2 className="h-3 w-3 animate-spin" />
+-                  Printing...
++                  {t('tables.printing')}
+                 </>
+               ) : (
+                 <>
+                   <Printer className="h-3 w-3" />
+-                  Print
++                  {t('order.print')}
+                 </>
+               )}
+             </button>
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index b8ff8caf..94377a4c 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -188,7 +188,12 @@
+         "confirm_submit": "نعم، إغلاق نقطة البيع",
+         "confirm_back": "رجوع",
+         "checklist_skip": "تخطي الآن",
+-        "checklist_skip_hint": "تم إرسال إغلاق نقطة البيع بالفعل. يمكنك إكمال قائمة التحقق لاحقًا."
++        "checklist_skip_hint": "تم إرسال إغلاق نقطة البيع بالفعل. يمكنك إكمال قائمة التحقق لاحقًا.",
++        "col_payment_mode": "طريقة الدفع",
++        "col_opening": "الافتتاح",
++        "col_expected": "المتوقع",
++        "col_closing": "المعدود",
++        "col_difference": "الفرق"
+     },
+     "checklist": {
+         "title_opening": "قائمة تحقق الفتح",
+@@ -298,7 +303,8 @@
+             "page": "صفحة {{number}}"
+         },
+         "close_tab": "إغلاق الطلب",
+-        "edit_order": "تعديل الطلب"
++        "edit_order": "تعديل الطلب",
++        "qty": "الكمية: {{qty}}"
+     },
+     "tables": {
+         "layout_view": "عرض المخطط",
+@@ -382,7 +388,9 @@
+         "zoom_in": "تكبير",
+         "zoom_out": "تصغير",
+         "loading_rooms": "جارٍ تحميل القاعات…",
+-        "reset_zoom": "إعادة ضبط التكبير"
++        "reset_zoom": "إعادة ضبط التكبير",
++        "preview": "معاينة",
++        "printing": "جارٍ الطباعة…"
+     },
+     "bill_split": {
+         "split_bill": "تقسيم الفاتورة",
+@@ -560,7 +568,26 @@
+         "loading_context": "جارٍ التحميل…",
+         "no_table_orders": "ليس لديك صلاحية أخذ طلبات الطاولات.",
+         "refresh": "تحديث",
+-        "loading_menu": "جارٍ تحميل القائمة…"
++        "loading_menu": "جارٍ تحميل القائمة…",
++        "order_updated": "تم تحديث الطلب.",
++        "order_sent": "أُرسل الطلب إلى المطبخ.",
++        "updating_order": "تعديل الطلب",
++        "new_order": "طلب جديد",
++        "already_ordered": "طُلب سابقا",
++        "new_or_changed": "جديد / معدّل",
++        "reduction_pending": "تخفيض قيد الانتظار",
++        "tab_menu": "القائمة",
++        "tab_order": "الطلب",
++        "updating": "جارٍ التحديث…",
++        "sending": "جارٍ الإرسال…",
++        "update_order": "تحديث الطلب",
++        "send_order": "إرسال الطلب",
++        "reprint_kot": "إعادة طباعة تذكرة المطبخ",
++        "transfer_captain": "نقل إلى نادل آخر",
++        "print_bill": "طباعة الفاتورة",
++        "status_billed": "الفاتورة مطبوعة",
++        "status_mine": "لي",
++        "status_free": "فارغة"
+     },
+     "auth": {
+         "access_denied": "تم رفض الوصول",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index b5f296d9..e7ed1bbb 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -181,7 +181,12 @@
+     "confirm_submit": "Yes, Close POS",
+     "confirm_back": "Go Back",
+     "checklist_skip": "Skip for now",
+-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
++    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
++    "col_payment_mode": "Payment Mode",
++    "col_opening": "Opening",
++    "col_expected": "Expected",
++    "col_closing": "Closing",
++    "col_difference": "Difference"
+   },
+   "checklist": {
+     "title_opening": "Opening Checklist",
+@@ -291,7 +296,8 @@
+       "page": "Page {{number}}"
+     },
+     "close_tab": "Close order",
+-    "edit_order": "Edit order"
++    "edit_order": "Edit order",
++    "qty": "Qty: {{qty}}"
+   },
+   "tables": {
+     "layout_view": "Layout View",
+@@ -375,7 +381,9 @@
+     "zoom_in": "Zoom in",
+     "zoom_out": "Zoom out",
+     "loading_rooms": "Loading rooms…",
+-    "reset_zoom": "Reset zoom"
++    "reset_zoom": "Reset zoom",
++    "preview": "Preview",
++    "printing": "Printing..."
+   },
+   "bill_split": {
+     "split_bill": "Split bill",
+@@ -553,7 +561,26 @@
+     "loading_context": "Loading…",
+     "no_table_orders": "You do not have permission to take table orders.",
+     "refresh": "Refresh",
+-    "loading_menu": "Loading menu…"
++    "loading_menu": "Loading menu…",
++    "order_updated": "Order updated.",
++    "order_sent": "Order sent to kitchen.",
++    "updating_order": "Updating order",
++    "new_order": "New order",
++    "already_ordered": "Already Ordered",
++    "new_or_changed": "New / Changed",
++    "reduction_pending": "Reduction Pending",
++    "tab_menu": "Menu",
++    "tab_order": "Order",
++    "updating": "Updating…",
++    "sending": "Sending…",
++    "update_order": "Update Order",
++    "send_order": "Send Order",
++    "reprint_kot": "Reprint kitchen ticket",
++    "transfer_captain": "Transfer waiter",
++    "print_bill": "Print bill",
++    "status_billed": "Billed",
++    "status_mine": "Mine",
++    "status_free": "Free"
+   },
+   "auth": {
+     "access_denied": "Access denied",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 1e7e3040..4f7c1e53 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -181,7 +181,12 @@
+     "confirm_submit": "Oui, cloturer le PDV",
+     "confirm_back": "Retour",
+     "checklist_skip": "Ignorer pour l'instant",
+-    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
++    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard.",
++    "col_payment_mode": "Mode de paiement",
++    "col_opening": "Ouverture",
++    "col_expected": "Attendu",
++    "col_closing": "Compté",
++    "col_difference": "Écart"
+   },
+   "checklist": {
+     "title_opening": "Liste de contrôle d'ouverture",
+@@ -291,7 +296,8 @@
+       "page": "Page {{number}}"
+     },
+     "close_tab": "Fermer la commande",
+-    "edit_order": "Modifier la commande"
++    "edit_order": "Modifier la commande",
++    "qty": "Qté : {{qty}}"
+   },
+   "tables": {
+     "layout_view": "Vue de mise en page",
+@@ -375,7 +381,9 @@
+     "zoom_in": "Zoom avant",
+     "zoom_out": "Zoom arrière",
+     "loading_rooms": "Chargement des salles…",
+-    "reset_zoom": "Réinitialiser le zoom"
++    "reset_zoom": "Réinitialiser le zoom",
++    "preview": "Aperçu",
++    "printing": "Impression…"
+   },
+   "bill_split": {
+     "split_bill": "Diviser l'addition",
+@@ -553,7 +561,26 @@
+     "loading_context": "Chargement…",
+     "no_table_orders": "Vous n'avez pas le droit de prendre des commandes à table.",
+     "refresh": "Actualiser",
+-    "loading_menu": "Chargement du menu…"
++    "loading_menu": "Chargement du menu…",
++    "order_updated": "Commande mise à jour.",
++    "order_sent": "Commande envoyée en cuisine.",
++    "updating_order": "Modification de la commande",
++    "new_order": "Nouvelle commande",
++    "already_ordered": "Déjà commandé",
++    "new_or_changed": "Nouveau / modifié",
++    "reduction_pending": "Réduction en attente",
++    "tab_menu": "Menu",
++    "tab_order": "Commande",
++    "updating": "Mise à jour…",
++    "sending": "Envoi…",
++    "update_order": "Mettre à jour la commande",
++    "send_order": "Envoyer la commande",
++    "reprint_kot": "Réimprimer le ticket cuisine",
++    "transfer_captain": "Changer de serveur",
++    "print_bill": "Imprimer l'addition",
++    "status_billed": "Addition imprimée",
++    "status_mine": "À moi",
++    "status_free": "Libre"
+   },
+   "auth": {
+     "access_denied": "Accès refusé",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 4a9b7e7b..2f000089 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -711,7 +711,7 @@ export default function Orders() {
+                     <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
+                       <div className="flex-1">
+                         <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
++                        <p className="text-xs text-gray-500">{t('orders.qty', { qty: item.qty })}</p>
+                       </div>
+                       <div className="text-right">
+                         <p className="text-sm font-semibold text-gray-900">

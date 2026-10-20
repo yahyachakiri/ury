@@ -235,7 +235,7 @@ export default function CaptainOrder() {
       }
 
       clearTableOrder();
-      showToast.success(isUpdatingOrder ? 'Order updated.' : 'Order sent to kitchen.');
+      showToast.success(isUpdatingOrder ? t('captain.order_updated') : t('captain.order_sent'));
       navigate('/order');
     } catch (error) {
       console.error('Failed to sync order:', error);
@@ -423,7 +423,7 @@ export default function CaptainOrder() {
           {alreadyOrderedLines.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
-                Already Ordered
+                {t('captain.already_ordered')}
               </h2>
               <div className="space-y-2">
                 {alreadyOrderedLines.map((line) => (
@@ -444,7 +444,7 @@ export default function CaptainOrder() {
           {newOrChangedLines.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 px-1">
-                New / Changed
+                {t('captain.new_or_changed')}
               </h2>
               <div className="space-y-2">
                 {newOrChangedLines.map((line) => (
@@ -465,7 +465,7 @@ export default function CaptainOrder() {
           {reductionPendingLines.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 px-1">
-                Reduction Pending
+                {t('captain.reduction_pending')}
               </h2>
               <div className="space-y-2">
                 {reductionPendingLines.map((line) => (
@@ -533,7 +533,7 @@ export default function CaptainOrder() {
           </Button>
           <div>
             <h1 className="font-semibold text-gray-900 leading-tight">Table {table}</h1>
-            <p className="text-xs text-gray-500">{isUpdatingOrder ? 'Updating order' : 'New order'}</p>
+            <p className="text-xs text-gray-500">{isUpdatingOrder ? t('captain.updating_order') : t('captain.new_order')}</p>
           </div>
         </div>
 
@@ -548,7 +548,7 @@ export default function CaptainOrder() {
                 )}
               >
                 <UtensilsCrossed className="w-4 h-4" />
-                Menu
+                {t('captain.tab_menu')}
               </button>
               <button
                 onClick={() => setMode('order')}
@@ -558,7 +558,7 @@ export default function CaptainOrder() {
                 )}
               >
                 <ClipboardList className="w-4 h-4" />
-                Order
+                {t('captain.tab_order')}
                 {activeOrders.length > 0 && (
                   <span className="ms-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-blue-600 text-white text-xs">
                     {activeOrders.length}
@@ -632,12 +632,12 @@ export default function CaptainOrder() {
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isUpdatingOrder ? 'Updating…' : 'Sending…'}
+                  {isUpdatingOrder ? t('captain.updating') : t('captain.sending')}
                 </div>
               ) : isUpdatingOrder ? (
-                'Update Order'
+                t('captain.update_order')
               ) : (
-                'Send Order'
+                t('captain.send_order')
               )}
             </Button>
           </div>
@@ -661,12 +661,12 @@ export default function CaptainOrder() {
             {isSubmitting ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {isUpdatingOrder ? 'Updating…' : 'Sending…'}
+                {isUpdatingOrder ? t('captain.updating') : t('captain.sending')}
               </div>
             ) : isUpdatingOrder ? (
-              'Update Order'
+              t('captain.update_order')
             ) : (
-              'Send Order'
+              t('captain.send_order')
             )}
           </Button>
         </div>

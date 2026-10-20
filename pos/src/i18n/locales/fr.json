@@ -181,7 +181,12 @@
     "confirm_submit": "Oui, cloturer le PDV",
     "confirm_back": "Retour",
     "checklist_skip": "Ignorer pour l'instant",
-    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
+    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard.",
+    "col_payment_mode": "Mode de paiement",
+    "col_opening": "Ouverture",
+    "col_expected": "Attendu",
+    "col_closing": "Compté",
+    "col_difference": "Écart"
   },
   "checklist": {
     "title_opening": "Liste de contrôle d'ouverture",
@@ -291,7 +296,8 @@
       "page": "Page {{number}}"
     },
     "close_tab": "Fermer la commande",
-    "edit_order": "Modifier la commande"
+    "edit_order": "Modifier la commande",
+    "qty": "Qté : {{qty}}"
   },
   "tables": {
     "layout_view": "Vue de mise en page",
@@ -375,7 +381,9 @@
     "zoom_in": "Zoom avant",
     "zoom_out": "Zoom arrière",
     "loading_rooms": "Chargement des salles…",
-    "reset_zoom": "Réinitialiser le zoom"
+    "reset_zoom": "Réinitialiser le zoom",
+    "preview": "Aperçu",
+    "printing": "Impression…"
   },
   "bill_split": {
     "split_bill": "Diviser l'addition",
@@ -553,7 +561,26 @@
     "loading_context": "Chargement…",
     "no_table_orders": "Vous n'avez pas le droit de prendre des commandes à table.",
     "refresh": "Actualiser",
-    "loading_menu": "Chargement du menu…"
+    "loading_menu": "Chargement du menu…",
+    "order_updated": "Commande mise à jour.",
+    "order_sent": "Commande envoyée en cuisine.",
+    "updating_order": "Modification de la commande",
+    "new_order": "Nouvelle commande",
+    "already_ordered": "Déjà commandé",
+    "new_or_changed": "Nouveau / modifié",
+    "reduction_pending": "Réduction en attente",
+    "tab_menu": "Menu",
+    "tab_order": "Commande",
+    "updating": "Mise à jour…",
+    "sending": "Envoi…",
+    "update_order": "Mettre à jour la commande",
+    "send_order": "Envoyer la commande",
+    "reprint_kot": "Réimprimer le ticket cuisine",
+    "transfer_captain": "Changer de serveur",
+    "print_bill": "Imprimer l'addition",
+    "status_billed": "Addition imprimée",
+    "status_mine": "À moi",
+    "status_free": "Libre"
   },
   "auth": {
     "access_denied": "Accès refusé",
