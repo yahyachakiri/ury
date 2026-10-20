@@ -928,6 +928,28 @@ Build: frontend only. The server deploy does not build it: run
 Risk profile: low. On a conflict keep `phrasePattern` and the whole-word
 replace; new upstream keys go in the same maps.
 
+### Patch 21 — Bill printed in the cashier's language
+
+Bug fix (browser retest 2026-10-20, finding F9).
+
+Files touched: `pos/src/lib/print.ts`
+
+What it does: the browser print of a bill (no QZ, no network printer) opened
+`/printview?...&format=${format}&_lang=en`: always English, and `format=null`
+(ERPNext's generic POS Invoice form) when the POS Profile had no print format.
+The URL is now built with `URLSearchParams`, `_lang` is the POS language
+(`getActiveLanguage()`), and `format` is sent only when the profile has one.
+
+Why it can't be done in `erp_restaurant`: the URL is built in the POS bundle.
+
+Acceptance criteria:
+1. Cashier in French: Print bill opens the profile's format ("Restaurant
+   Receipt") in French; in Arabic, in Arabic.
+2. A profile without print format opens ERPNext's default format, without
+   "format=null" in the URL.
+
+Risk profile: low. On a conflict keep the `URLSearchParams` block.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

@@ -6,7 +6,7 @@ import {
   updatePrintStatus
 } from './invoice-api';
 import { PosProfileCombined } from './pos-profile-api';
-import { t } from '../i18n';
+import { getActiveLanguage, t } from '../i18n';
 
 interface PrintOrderParams {
   orderId: string;
@@ -36,7 +36,19 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
     return 'network';
   } else {
     // Redirect to printview page
-    const url = `/printview?doctype=POS Invoice&name=${orderId}&format=${format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+    // Patch 21: the bill in the cashier's language (was always _lang=en), and no "format=null"
+    // when the POS Profile has no print format.
+    const params = new URLSearchParams({
+      doctype: 'POS Invoice',
+      name: orderId,
+      no_letterhead: '1',
+      settings: '{}',
+      letterhead: 'No Letterhead',
+      trigger_print: '1',
+      _lang: getActiveLanguage(),
+    });
+    if (format) params.set('format', format);
+    const url = `/printview?${params.toString()}`;
     window.open(url, '_blank', 'noopener,noreferrer');
     await updatePrintStatus(orderId);
     return 'socket';
