@@ -38,7 +38,9 @@
     "logout": "Déconnexion"
   },
   "menu": {
-    "special_items": "Plats spéciaux"
+    "special_items": "Plats spéciaux",
+    "sold_out": "Épuisé",
+    "portions_left": "Plus que {{count}}"
   },
   "pos_sidebar": {
     "categories": "Catégories",
@@ -580,7 +582,8 @@
     "print_bill": "Imprimer l'addition",
     "status_billed": "Addition imprimée",
     "status_mine": "À moi",
-    "status_free": "Libre"
+    "status_free": "Libre",
+    "browse_only": "Vous pouvez consulter le menu, mais vous n'avez pas le droit d'ajouter des plats à cette commande."
   },
   "auth": {
     "access_denied": "Accès refusé",

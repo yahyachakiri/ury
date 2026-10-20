@@ -1,6 +1,10 @@
 import { FC } from 'react';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
+import { t } from '../i18n';
+
+// Patch 25: below this many portions the card shows "only N left".
+const LOW_PORTIONS = 3;
 
 interface MenuCardProps {
   id: string;
@@ -11,6 +15,9 @@ interface MenuCardProps {
   item: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** Patch 25: portions the stock allows (null = not limited). */
+  portionsLeft?: number | null;
+  soldOut?: boolean;
 }
 
 const MenuCard: FC<MenuCardProps> = ({ 
@@ -19,16 +26,31 @@ const MenuCard: FC<MenuCardProps> = ({
   item_image, 
   course, 
   onClick,
-  disabled 
+  disabled,
+  portionsLeft,
+  soldOut
 }) => {
+  const blocked = disabled || soldOut;
+  const low = !soldOut && portionsLeft != null && portionsLeft <= LOW_PORTIONS;
   return (
     <div
       className={cn(
-        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
-        disabled && "opacity-50 cursor-not-allowed pointer-events-none"
+        "relative bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+        blocked && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
-      onClick={disabled ? undefined : onClick}
+      onClick={blocked ? undefined : onClick}
+      aria-disabled={blocked || undefined}
     >
+      {(soldOut || low) && (
+        <span
+          className={cn(
+            "absolute top-2 start-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm",
+            soldOut ? "bg-red-600 text-white" : "bg-amber-100 text-amber-800"
+          )}
+        >
+          {soldOut ? t('menu.sold_out') : t('menu.portions_left', { count: portionsLeft ?? 0 })}
+        </span>
+      )}
       {/* Image section - fixed height */}
       <div className="h-24">
         {item_image ? (

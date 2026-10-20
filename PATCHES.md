@@ -1055,6 +1055,39 @@ on the server; `www/order.py` needs the normal restart.
 Risk profile: medium on update (texts spread over the layouts upstream edits).
 On a conflict keep the `t('...')` calls; new upstream texts need keys in `i18n.tsx`.
 
+### Patch 25 — Sold-out meals greyed in the POS and the waiter app
+
+Feature (owner request 2026-10-20).
+
+Files touched:
+- `pos/src/store/pos-store.ts` (menu rows keep `portions_left` / `sold_out`; `fetchMenuItems(silent)`)
+- `pos/src/hooks/useMenuStockRefresh.ts` (new: background menu refresh every 45 s and on focus)
+- `pos/src/components/MenuCard.tsx`, `MenuList.tsx`, `captain/components/CaptainMenu.tsx`
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`menu.sold_out`, `menu.portions_left`,
+  `captain.browse_only`)
+
+What it does: erp_restaurant adds `custom_portions_left` and `custom_sold_out` to
+every row of URY's `getRestaurantMenu` (stock of the recipe ingredients minus the
+shift's unclosed sales, `menu_availability.py`). The POS and the waiter app grey
+out a sold-out meal (not tappable, red "Épuisé" badge) and show "Plus que N" at 3
+portions or fewer. The menu reloads silently every 45 s and when the window gets
+focus, so a meal that runs out during the shift greys out without a reload. The
+payment check stays as the last guard. Also translated the waiter app's "browse
+only" notice (English left by Patch 17).
+
+Why it can't be done in `erp_restaurant`: the menu cards and the refresh are in
+the POS bundle; the availability itself is computed in `erp_restaurant`.
+
+Acceptance criteria:
+1. A meal whose ingredient is at 0 (after the shift's sales) is greyed with "Épuisé"
+   in the POS and the waiter app and cannot be added.
+2. With 2 portions left: "Plus que 2"; after selling them the card greys out within
+   about 45 s without reloading.
+3. A delivery recorded in /admin makes the meal available again on the next refresh.
+
+Risk profile: medium (pos-store.ts is high-risk). On a conflict keep the two
+mapped fields, the `silent` parameter and the MenuCard props.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

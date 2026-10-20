@@ -4,6 +4,7 @@ import MenuCard from './MenuCard';
 import { Spinner } from '@ury/ui';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
+import { useMenuStockRefresh } from '../hooks/useMenuStockRefresh';
 
 interface MenuListProps {
   onItemClick: (item: any) => void;
@@ -25,6 +26,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
   useEffect(() => {
     fetchMenuItems();
   }, [fetchMenuItems]);
+  useMenuStockRefresh();
 
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
@@ -79,6 +81,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
                 item={item.item}
                 onClick={() => onItemClick(item)}
                 disabled={isInteractionDisabled}
+                portionsLeft={item.portions_left}
+                soldOut={item.sold_out}
               />
             ))}
           </div>

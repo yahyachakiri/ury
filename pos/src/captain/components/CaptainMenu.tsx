@@ -4,6 +4,7 @@ import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner } from '@ury/ui';
 import MenuCard from '../../components/MenuCard';
 import { t } from '../../i18n';
+import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
 
 interface CaptainMenuProps {
   /** From the per-table permission map (`get_table_order_context`). When
@@ -38,6 +39,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     fetchMenuItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useMenuStockRefresh();
 
   const filteredItems = useMemo(() => {
     const term = searchQuery.toLowerCase();
@@ -54,7 +56,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
   const disabled = !canAddItems || isOrderInteractionDisabled();
 
   const handleTap = (item: (typeof menuItems)[number]) => {
-    if (disabled) return;
+    if (disabled || item.sold_out) return;
     addToOrder({ ...item, quantity: 1 });
   };
 
@@ -101,7 +103,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
         {!canAddItems && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-            You can browse the menu, but you don't have permission to add items to this order.
+            {t('captain.browse_only')}
           </p>
         )}
       </div>
@@ -124,6 +126,8 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 item={item.item}
                 onClick={() => handleTap(item)}
                 disabled={disabled}
+                portionsLeft={item.portions_left}
+                soldOut={item.sold_out}
               />
             ))}
           </div>

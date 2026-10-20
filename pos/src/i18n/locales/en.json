@@ -38,7 +38,9 @@
     "logout": "Logout"
   },
   "menu": {
-    "special_items": "Special Items"
+    "special_items": "Special Items",
+    "sold_out": "Sold out",
+    "portions_left": "Only {{count}} left"
   },
   "pos_sidebar": {
     "categories": "Categories",
@@ -580,7 +582,8 @@
     "print_bill": "Print bill",
     "status_billed": "Billed",
     "status_mine": "Mine",
-    "status_free": "Free"
+    "status_free": "Free",
+    "browse_only": "You can browse the menu, but you don't have permission to add items to this order."
   },
   "auth": {
     "access_denied": "Access denied",

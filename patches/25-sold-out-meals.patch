@@ -1,0 +1,297 @@
+diff --git a/pos/src/captain/components/CaptainMenu.tsx b/pos/src/captain/components/CaptainMenu.tsx
+index ef112e57..f589bada 100644
+--- a/pos/src/captain/components/CaptainMenu.tsx
++++ b/pos/src/captain/components/CaptainMenu.tsx
+@@ -4,6 +4,7 @@ import { usePOSStore } from '../../store/pos-store';
+ import { cn, Spinner } from '@ury/ui';
+ import MenuCard from '../../components/MenuCard';
+ import { t } from '../../i18n';
++import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
+ 
+ interface CaptainMenuProps {
+   /** From the per-table permission map (`get_table_order_context`). When
+@@ -38,6 +39,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+     fetchMenuItems();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
++  useMenuStockRefresh();
+ 
+   const filteredItems = useMemo(() => {
+     const term = searchQuery.toLowerCase();
+@@ -54,7 +56,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+   const disabled = !canAddItems || isOrderInteractionDisabled();
+ 
+   const handleTap = (item: (typeof menuItems)[number]) => {
+-    if (disabled) return;
++    if (disabled || item.sold_out) return;
+     addToOrder({ ...item, quantity: 1 });
+   };
+ 
+@@ -101,7 +103,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+ 
+         {!canAddItems && (
+           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+-            You can browse the menu, but you don't have permission to add items to this order.
++            {t('captain.browse_only')}
+           </p>
+         )}
+       </div>
+@@ -124,6 +126,8 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+                 item={item.item}
+                 onClick={() => handleTap(item)}
+                 disabled={disabled}
++                portionsLeft={item.portions_left}
++                soldOut={item.sold_out}
+               />
+             ))}
+           </div>
+diff --git a/pos/src/components/MenuCard.tsx b/pos/src/components/MenuCard.tsx
+index d323698b..3e14b590 100644
+--- a/pos/src/components/MenuCard.tsx
++++ b/pos/src/components/MenuCard.tsx
+@@ -1,6 +1,10 @@
+ import { FC } from 'react';
+ import { cn } from '@ury/ui';
+ import { formatCurrency } from '@ury/core';
++import { t } from '../i18n';
++
++// Patch 25: below this many portions the card shows "only N left".
++const LOW_PORTIONS = 3;
+ 
+ interface MenuCardProps {
+   id: string;
+@@ -11,6 +15,9 @@ interface MenuCardProps {
+   item: string;
+   onClick?: () => void;
+   disabled?: boolean;
++  /** Patch 25: portions the stock allows (null = not limited). */
++  portionsLeft?: number | null;
++  soldOut?: boolean;
+ }
+ 
+ const MenuCard: FC<MenuCardProps> = ({ 
+@@ -19,16 +26,31 @@ const MenuCard: FC<MenuCardProps> = ({
+   item_image, 
+   course, 
+   onClick,
+-  disabled 
++  disabled,
++  portionsLeft,
++  soldOut
+ }) => {
++  const blocked = disabled || soldOut;
++  const low = !soldOut && portionsLeft != null && portionsLeft <= LOW_PORTIONS;
+   return (
+     <div
+       className={cn(
+-        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+-        disabled && "opacity-50 cursor-not-allowed pointer-events-none"
++        "relative bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
++        blocked && "opacity-50 cursor-not-allowed pointer-events-none"
+       )}
+-      onClick={disabled ? undefined : onClick}
++      onClick={blocked ? undefined : onClick}
++      aria-disabled={blocked || undefined}
+     >
++      {(soldOut || low) && (
++        <span
++          className={cn(
++            "absolute top-2 start-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm",
++            soldOut ? "bg-red-600 text-white" : "bg-amber-100 text-amber-800"
++          )}
++        >
++          {soldOut ? t('menu.sold_out') : t('menu.portions_left', { count: portionsLeft ?? 0 })}
++        </span>
++      )}
+       {/* Image section - fixed height */}
+       <div className="h-24">
+         {item_image ? (
+diff --git a/pos/src/components/MenuList.tsx b/pos/src/components/MenuList.tsx
+index 1e7dee26..7fb05827 100644
+--- a/pos/src/components/MenuList.tsx
++++ b/pos/src/components/MenuList.tsx
+@@ -4,6 +4,7 @@ import MenuCard from './MenuCard';
+ import { Spinner } from '@ury/ui';
+ import { cn } from '@ury/ui';
+ import { t } from '../i18n';
++import { useMenuStockRefresh } from '../hooks/useMenuStockRefresh';
+ 
+ interface MenuListProps {
+   onItemClick: (item: any) => void;
+@@ -25,6 +26,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
+   useEffect(() => {
+     fetchMenuItems();
+   }, [fetchMenuItems]);
++  useMenuStockRefresh();
+ 
+   const filteredItems = useMemo(() => {
+     return menuItems.filter(item => {
+@@ -79,6 +81,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
+                 item={item.item}
+                 onClick={() => onItemClick(item)}
+                 disabled={isInteractionDisabled}
++                portionsLeft={item.portions_left}
++                soldOut={item.sold_out}
+               />
+             ))}
+           </div>
+diff --git a/pos/src/hooks/useMenuStockRefresh.ts b/pos/src/hooks/useMenuStockRefresh.ts
+new file mode 100644
+index 00000000..679804e4
+--- /dev/null
++++ b/pos/src/hooks/useMenuStockRefresh.ts
+@@ -0,0 +1,21 @@
++import { useEffect } from 'react';
++import { usePOSStore } from '../store/pos-store';
++
++// Patch 25: reload the menu in the background so meals that run out during the shift
++// are greyed out (stock figures come from erp_restaurant with each menu load).
++const REFRESH_MS = 45000;
++
++export function useMenuStockRefresh() {
++  const fetchMenuItems = usePOSStore((state) => state.fetchMenuItems);
++  useEffect(() => {
++    const refresh = () => {
++      if (document.visibilityState === 'visible') void fetchMenuItems(true);
++    };
++    const timer = window.setInterval(refresh, REFRESH_MS);
++    window.addEventListener('focus', refresh);
++    return () => {
++      window.clearInterval(timer);
++      window.removeEventListener('focus', refresh);
++    };
++  }, [fetchMenuItems]);
++}
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 70fdb60c..15da048b 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -45,7 +45,9 @@
+         "logout": "تسجيل الخروج"
+     },
+     "menu": {
+-        "special_items": "أصناف مميزة"
++        "special_items": "أصناف مميزة",
++        "sold_out": "نفد",
++        "portions_left": "بقي {{count}} فقط"
+     },
+     "pos_sidebar": {
+         "categories": "فئات",
+@@ -587,7 +589,8 @@
+         "print_bill": "طباعة الفاتورة",
+         "status_billed": "الفاتورة مطبوعة",
+         "status_mine": "لي",
+-        "status_free": "فارغة"
++        "status_free": "فارغة",
++        "browse_only": "يمكنك تصفح القائمة، لكن لا يحق لك إضافة أصناف إلى هذا الطلب."
+     },
+     "auth": {
+         "access_denied": "تم رفض الوصول",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 3621d504..01c864b1 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -38,7 +38,9 @@
+     "logout": "Logout"
+   },
+   "menu": {
+-    "special_items": "Special Items"
++    "special_items": "Special Items",
++    "sold_out": "Sold out",
++    "portions_left": "Only {{count}} left"
+   },
+   "pos_sidebar": {
+     "categories": "Categories",
+@@ -580,7 +582,8 @@
+     "print_bill": "Print bill",
+     "status_billed": "Billed",
+     "status_mine": "Mine",
+-    "status_free": "Free"
++    "status_free": "Free",
++    "browse_only": "You can browse the menu, but you don't have permission to add items to this order."
+   },
+   "auth": {
+     "access_denied": "Access denied",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index b3f96839..8ba7f93b 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -38,7 +38,9 @@
+     "logout": "Déconnexion"
+   },
+   "menu": {
+-    "special_items": "Plats spéciaux"
++    "special_items": "Plats spéciaux",
++    "sold_out": "Épuisé",
++    "portions_left": "Plus que {{count}}"
+   },
+   "pos_sidebar": {
+     "categories": "Catégories",
+@@ -580,7 +582,8 @@
+     "print_bill": "Imprimer l'addition",
+     "status_billed": "Addition imprimée",
+     "status_mine": "À moi",
+-    "status_free": "Libre"
++    "status_free": "Libre",
++    "browse_only": "Vous pouvez consulter le menu, mais vous n'avez pas le droit d'ajouter des plats à cette commande."
+   },
+   "auth": {
+     "access_denied": "Accès refusé",
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index cbe54e49..82f4117b 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -38,6 +38,9 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
+   selectedAddons?: Array<{ id: string; name: string; price: number }>;
+   uniqueId?: string;
+   tax_rate?: number;
++  /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
++  portions_left?: number | null;
++  sold_out?: boolean;
+ }
+ 
+ export interface Customer {
+@@ -154,7 +157,7 @@ interface POSState {
+ }
+ 
+ interface POSStore extends POSState {
+-  fetchMenuItems: () => Promise<void>;
++  fetchMenuItems: (silent?: boolean) => Promise<void>;
+   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
+   fetchCategories: () => Promise<void>;
+   fetchPaymentModes: () => Promise<void>;
+@@ -426,12 +429,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+     }
+   },
+ 
+-  fetchMenuItems: async () => {
++  // Patch 25: silent = background refresh of sold-out meals (no spinner, errors ignored).
++  fetchMenuItems: async (silent = false) => {
+     const { posProfile, selectedRoom, selectedOrderType } = get();
+     if (!posProfile?.restaurant) return;
+ 
+     try {
+-      set({ menuLoading: true, error: null });
++      if (!silent) set({ menuLoading: true, error: null });
+       const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
+       
+       const menuItems: MenuItem[] = items.map((item: any) => ({
+@@ -447,14 +451,16 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         description: item.description || '',
+         special_dish: item.special_dish || 0,
+         tax_rate: 0,
++        portions_left: item.custom_portions_left ?? null,
++        sold_out: Boolean(item.custom_sold_out),
+       }));
+ 
+       set({ menuItems });
+     } catch (error) {
+-      set({ error: 'Failed to load menu items' });
++      if (!silent) set({ error: 'Failed to load menu items' });
+       console.error('Error loading menu items:', error);
+     } finally {
+-      set({ menuLoading: false });
++      if (!silent) set({ menuLoading: false });
+     }
+   },
+ 

@@ -38,6 +38,9 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   selectedAddons?: Array<{ id: string; name: string; price: number }>;
   uniqueId?: string;
   tax_rate?: number;
+  /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
+  portions_left?: number | null;
+  sold_out?: boolean;
 }
 
 export interface Customer {
@@ -154,7 +157,7 @@ interface POSState {
 }
 
 interface POSStore extends POSState {
-  fetchMenuItems: () => Promise<void>;
+  fetchMenuItems: (silent?: boolean) => Promise<void>;
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
   fetchCategories: () => Promise<void>;
   fetchPaymentModes: () => Promise<void>;
@@ -426,12 +429,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
-  fetchMenuItems: async () => {
+  // Patch 25: silent = background refresh of sold-out meals (no spinner, errors ignored).
+  fetchMenuItems: async (silent = false) => {
     const { posProfile, selectedRoom, selectedOrderType } = get();
     if (!posProfile?.restaurant) return;
 
     try {
-      set({ menuLoading: true, error: null });
+      if (!silent) set({ menuLoading: true, error: null });
       const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
       
       const menuItems: MenuItem[] = items.map((item: any) => ({
@@ -447,14 +451,16 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         description: item.description || '',
         special_dish: item.special_dish || 0,
         tax_rate: 0,
+        portions_left: item.custom_portions_left ?? null,
+        sold_out: Boolean(item.custom_sold_out),
       }));
 
       set({ menuItems });
     } catch (error) {
-      set({ error: 'Failed to load menu items' });
+      if (!silent) set({ error: 'Failed to load menu items' });
       console.error('Error loading menu items:', error);
     } finally {
-      set({ menuLoading: false });
+      if (!silent) set({ menuLoading: false });
     }
   },
 

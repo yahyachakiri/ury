@@ -45,7 +45,9 @@
         "logout": "تسجيل الخروج"
     },
     "menu": {
-        "special_items": "أصناف مميزة"
+        "special_items": "أصناف مميزة",
+        "sold_out": "نفد",
+        "portions_left": "بقي {{count}} فقط"
     },
     "pos_sidebar": {
         "categories": "فئات",
@@ -587,7 +589,8 @@
         "print_bill": "طباعة الفاتورة",
         "status_billed": "الفاتورة مطبوعة",
         "status_mine": "لي",
-        "status_free": "فارغة"
+        "status_free": "فارغة",
+        "browse_only": "يمكنك تصفح القائمة، لكن لا يحق لك إضافة أصناف إلى هذا الطلب."
     },
     "auth": {
         "access_denied": "تم رفض الوصول",
