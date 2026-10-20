@@ -1,5 +1,6 @@
 import { formatCurrency } from '@ury/core'
 import type { CustomerOrder, MenuItem, OrderingContext } from '../../lib/api'
+import { useI18n } from '../../i18n'
 
 type CartEntry = { item: MenuItem; qty: number }
 
@@ -41,33 +42,34 @@ function CartPanel({
   onPayOnline,
   className,
 }: CartPanelProps) {
+  const { t, items } = useI18n()
   return (
     <aside className={className}>
       <div className="flex-1 overflow-y-auto">
         {order && order.items.length > 0 && (
           <section className="mb-4 rounded-lg border p-3">
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
+            <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order_so_far')}</h2>
             <ul className="space-y-1 text-sm">
               {order.items.map((row, idx) => (
                 <li key={`${row.item_code}-${idx}`} className="flex justify-between">
                   <span>
                     {row.item_name} × {row.qty}
                   </span>
-                  <span>{row.amount}</span>
+                  <span className="tabular-nums">{formatCurrency(row.amount)}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-2 flex justify-between border-t pt-2 text-sm font-semibold">
-              <span>Total</span>
-              <span>{order.grand_total}</span>
+              <span>{t('total')}</span>
+              <span className="tabular-nums">{formatCurrency(order.grand_total)}</span>
             </div>
           </section>
         )}
 
         <section>
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Cart</h2>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('cart')}</h2>
           {cartItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Tap a menu item to add it to your cart.</p>
+            <p className="text-sm text-muted-foreground">{t('cart_empty')}</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {cartItems.map((entry) => (
@@ -77,7 +79,7 @@ function CartPanel({
                     <button
                       onClick={() => onDecrement(entry.item.item)}
                       className="h-7 w-7 rounded-full border text-sm leading-none"
-                      aria-label={`Remove one ${entry.item.item_name}`}
+                      aria-label={t('remove_one', { name: entry.item.item_name })}
                     >
                       −
                     </button>
@@ -85,7 +87,7 @@ function CartPanel({
                     <button
                       onClick={() => onIncrement(entry.item)}
                       className="h-7 w-7 rounded-full border text-sm leading-none"
-                      aria-label={`Add one more ${entry.item.item_name}`}
+                      aria-label={t('add_one', { name: entry.item.item_name })}
                     >
                       +
                     </button>
@@ -100,7 +102,7 @@ function CartPanel({
       <div className="border-t pt-3">
         <div className="mb-3 flex items-center justify-between text-sm font-semibold">
           <span>
-            {cartCount} item{cartCount !== 1 ? 's' : ''}
+            {items(cartCount)}
           </span>
           <span className="tabular-nums">{formatCurrency(cartTotal)}</span>
         </div>
@@ -109,7 +111,7 @@ function CartPanel({
           disabled={submitting || cartCount === 0}
           className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
         >
-          {submitting ? 'Placing order…' : 'Place Order'}
+          {submitting ? t('placing_order') : t('place_order')}
         </button>
         {context?.capabilities.customer_payment_enabled && order && !order.billed && (
           <button
@@ -117,7 +119,7 @@ function CartPanel({
             disabled={payingOnline}
             onClick={onPayOnline}
           >
-            {payingOnline ? 'Starting payment…' : 'Pay Online'}
+            {payingOnline ? t('starting_payment') : t('pay_online')}
           </button>
         )}
         {context?.capabilities.request_bill_enabled && order && !order.billed && (
@@ -126,7 +128,7 @@ function CartPanel({
             disabled={billRequested}
             onClick={onRequestBill}
           >
-            {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
+            {billRequested ? t('bill_requested') : t('request_bill')}
           </button>
         )}
       </div>

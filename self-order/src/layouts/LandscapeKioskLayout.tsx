@@ -5,6 +5,7 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+import { LanguageSwitch, useI18n } from '../i18n'
 
 const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
@@ -42,12 +43,13 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+  const { t } = useI18n()
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(t('new_order_confirm'))) {
       resetSession()
     }
   }
@@ -75,7 +77,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-xl text-muted-foreground">
-        Loading menu…
+        {t('loading_menu')}
       </div>
     )
   }
@@ -92,14 +94,17 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     <div className="flex h-screen flex-col overflow-hidden text-lg">
       <header className="flex items-center justify-between border-b bg-background/95 px-10 py-6">
         <h1 className="text-3xl font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {context?.table ? t('table', { table: context.table }) : t('order_for_pickup')}
         </h1>
-        <button
-          onClick={handleReset}
-          className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
-        >
-          New Order
-        </button>
+        <div className="flex items-center gap-3">
+          <LanguageSwitch />
+          <button
+            onClick={handleReset}
+            className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
+          >
+            {t('new_order')}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -114,7 +119,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
             capabilities={context?.capabilities}
             onAdd={addToCart}
             gridClassName="grid grid-cols-4 gap-6 xl:grid-cols-5"
-            cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-left text-lg transition active:scale-[0.97]"
+            cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-start text-lg transition active:scale-[0.97]"
             imageClassName="h-40 w-full object-cover"
           />
         </main>
@@ -133,21 +138,21 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
-          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-l bg-background p-6 text-base"
+          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-s bg-background p-6 text-base"
         />
       </div>
 
       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
         <DialogContent onClose={handleStillHere}>
           <DialogHeader>
-            <DialogTitle>Still there?</DialogTitle>
+            <DialogTitle>{t('still_there')}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={handleStillHere}
               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
             >
-              I'm still here
+              {t('still_here')}
             </button>
           </DialogFooter>
         </DialogContent>

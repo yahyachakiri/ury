@@ -1,3 +1,4 @@
+import { activeLang } from '../i18n'
 import { call } from '@ury/core'
 
 const M = 'ury.ury.api.self_ordering'
@@ -114,13 +115,13 @@ interface FrappeResponse<T> {
 }
 
 export async function bootstrap(token: string): Promise<OrderingContext> {
-  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { token })
+  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(), token })
   storeContext(response.message)
   return response.message
 }
 
 export async function bootstrapDevice(deviceId: string, deviceCredential: string): Promise<OrderingContext> {
-  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, {
+  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(),
     device_id: deviceId,
     device_credential: deviceCredential,
   })
@@ -134,7 +135,7 @@ export async function assignDeviceTable(
   staffPin: string,
   table: string,
 ): Promise<OrderingContext> {
-  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, {
+  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, { _lang: activeLang(),
     device_id: deviceId,
     device_credential: deviceCredential,
     staff_pin: staffPin,
@@ -145,12 +146,12 @@ export async function assignDeviceTable(
 }
 
 export async function getMenu(session: string): Promise<MenuResponse> {
-  const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { session })
+  const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { _lang: activeLang(), session })
   return response.message
 }
 
 export async function getCurrentOrder(session: string): Promise<CustomerOrder> {
-  const response = await call.get<FrappeResponse<CustomerOrder>>(`${M}.get_customer_order`, { session })
+  const response = await call.get<FrappeResponse<CustomerOrder>>(`${M}.get_customer_order`, { _lang: activeLang(), session })
   return response.message
 }
 
@@ -158,7 +159,7 @@ export async function addItems(
   session: string,
   items: { item: string; qty: number; comment?: string }[],
 ): Promise<CustomerOrder> {
-  const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, {
+  const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, { _lang: activeLang(),
     session,
     items: JSON.stringify(items),
   })
@@ -166,12 +167,12 @@ export async function addItems(
 }
 
 export async function requestBill(session: string): Promise<{ status: string; request: string }> {
-  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { session })
+  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { _lang: activeLang(), session })
   return response.message
 }
 
 export async function getStatus(session: string): Promise<OrderStatus> {
-  const response = await call.get<FrappeResponse<OrderStatus>>(`${M}.get_order_status`, { session })
+  const response = await call.get<FrappeResponse<OrderStatus>>(`${M}.get_order_status`, { _lang: activeLang(), session })
   return response.message
 }
 
@@ -190,12 +191,12 @@ export interface PaymentStatusResult {
 }
 
 export async function createPaymentRequest(session: string): Promise<PaymentRequestResult> {
-  const response = await call.post<FrappeResponse<PaymentRequestResult>>(`${M}.create_payment_request`, { session })
+  const response = await call.post<FrappeResponse<PaymentRequestResult>>(`${M}.create_payment_request`, { _lang: activeLang(), session })
   return response.message
 }
 
 export async function getPaymentStatus(session: string): Promise<PaymentStatusResult> {
-  const response = await call.get<FrappeResponse<PaymentStatusResult>>(`${M}.get_payment_status`, { session })
+  const response = await call.get<FrappeResponse<PaymentStatusResult>>(`${M}.get_payment_status`, { _lang: activeLang(), session })
   return response.message
 }
 
@@ -205,7 +206,7 @@ export async function sharePaymentLink(
 ): Promise<{ status: string; payment_request: string }> {
   const response = await call.post<FrappeResponse<{ status: string; payment_request: string }>>(
     `${M}.share_payment_link`,
-    { session, recipient },
+    { _lang: activeLang(), session, recipient },
   )
   return response.message
 }

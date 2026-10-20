@@ -1,0 +1,1327 @@
+diff --git a/self-order/src/App.tsx b/self-order/src/App.tsx
+index acbeb61c..44507893 100644
+--- a/self-order/src/App.tsx
++++ b/self-order/src/App.tsx
+@@ -4,6 +4,7 @@ import TabletLayout from './layouts/TabletLayout'
+ import LandscapeKioskLayout from './layouts/LandscapeKioskLayout'
+ import PortraitKioskLayout from './layouts/PortraitKioskLayout'
+ import type { OrderingLayout } from './lib/api'
++import { useI18n } from './i18n'
+ 
+ const LAYOUTS: Record<OrderingLayout, typeof MobileQRLayout> = {
+   Mobile: MobileQRLayout,
+@@ -23,19 +24,20 @@ const LAYOUTS: Record<OrderingLayout, typeof MobileQRLayout> = {
+  */
+ function App() {
+   const { isDevice, deviceContext, deviceLoading, deviceError } = useDeviceBootstrap()
++  const { t } = useI18n()
+ 
+   if (isDevice) {
+     if (deviceLoading) {
+       return (
+         <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+-          Starting up…
++          {t('starting')}
+         </div>
+       )
+     }
+     if (deviceError || !deviceContext) {
+       return (
+         <div className="flex min-h-screen items-center justify-center p-6 text-center text-destructive">
+-          {deviceError ?? 'This device could not be started. Please contact staff.'}
++          {deviceError ?? t('device_failed')}
+         </div>
+       )
+     }
+diff --git a/self-order/src/hooks/useDeviceBootstrap.ts b/self-order/src/hooks/useDeviceBootstrap.ts
+index cbe9a087..e6fe0d19 100644
+--- a/self-order/src/hooks/useDeviceBootstrap.ts
++++ b/self-order/src/hooks/useDeviceBootstrap.ts
+@@ -1,3 +1,4 @@
++import { tr } from '../i18n'
+ import { useEffect, useState } from 'react'
+ import { bootstrapDevice, type OrderingContext } from '../lib/api'
+ 
+@@ -40,7 +41,7 @@ export function useDeviceBootstrap() {
+         const context = await bootstrapDevice(deviceId, deviceCredential)
+         setDeviceContext(context)
+       } catch (err) {
+-        setDeviceError(err instanceof Error ? err.message : 'Unable to bootstrap this device.')
++        setDeviceError(err instanceof Error ? err.message : tr('device_bootstrap_failed'))
+       } finally {
+         setDeviceLoading(false)
+       }
+diff --git a/self-order/src/hooks/useOrderingSession.ts b/self-order/src/hooks/useOrderingSession.ts
+index 01008dc2..032453d1 100644
+--- a/self-order/src/hooks/useOrderingSession.ts
++++ b/self-order/src/hooks/useOrderingSession.ts
+@@ -12,6 +12,7 @@ import {
+   type OrderingContext,
+   type PaymentRequestResult,
+ } from '../lib/api'
++import { tr } from '../i18n'
+ 
+ // Same keys api.ts uses internally for sessionStorage persistence. api.ts
+ // doesn't expose a clear function (only get/store), so resetSession clears
+@@ -74,7 +75,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+           // actually expires.
+           ctx = storedContext
+         } else {
+-          setError('This link is missing an ordering code. Please rescan the QR code on your table.')
++          setError(tr('missing_code'))
+           setLoading(false)
+           return
+         }
+@@ -84,7 +85,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+       setMenu(menuResponse.items.filter((item) => !item.disabled))
+       await loadOrder(ctx.session)
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : 'Unable to load the menu. Please rescan the QR code.')
++      setError(err instanceof Error ? err.message : tr('menu_failed'))
+     } finally {
+       setLoading(false)
+     }
+@@ -164,7 +165,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+       setOrder(updated)
+       setCart({})
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : 'Could not place the order. Please try again.')
++      setError(err instanceof Error ? err.message : tr('order_failed'))
+     } finally {
+       setSubmitting(false)
+     }
+@@ -176,7 +177,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+       await requestBill(context.session)
+       setBillRequested(true)
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : 'Could not request the bill. Please ask staff for help.')
++      setError(err instanceof Error ? err.message : tr('bill_failed'))
+     }
+   }
+ 
+@@ -193,7 +194,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+     } catch (err) {
+       // Includes the graceful "online payment isn't set up yet" case from
+       // the backend — surfaced as a normal error message, not a crash.
+-      setError(err instanceof Error ? err.message : 'Could not start online payment. Please pay at the counter.')
++      setError(err instanceof Error ? err.message : tr('payment_failed'))
+     } finally {
+       setPayingOnline(false)
+     }
+diff --git a/self-order/src/i18n.tsx b/self-order/src/i18n.tsx
+new file mode 100644
+index 00000000..c731752f
+--- /dev/null
++++ b/self-order/src/i18n.tsx
+@@ -0,0 +1,273 @@
++// Patch 24: customer self-ordering app in English, French and Arabic.
++// Language: the customer's choice (kept on this device), else the restaurant's default
++// language (System Settings, sent by www/order.py), else English.
++import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
++
++export type Lang = 'en' | 'fr' | 'ar'
++export const LANGS: { code: Lang; label: string }[] = [
++  { code: 'fr', label: 'FR' },
++  { code: 'ar', label: 'ع' },
++  { code: 'en', label: 'EN' },
++]
++const STORAGE_KEY = 'ury_order_lang'
++
++const en = {
++  loading_menu: 'Loading menu…',
++  starting: 'Starting up…',
++  device_failed: 'This device could not be started. Please contact staff.',
++  device_bootstrap_failed: 'Unable to bootstrap this device.',
++  missing_code: 'This link is missing an ordering code. Please rescan the QR code on your table.',
++  menu_failed: 'Unable to load the menu. Please rescan the QR code.',
++  order_failed: 'Could not place the order. Please try again.',
++  bill_failed: 'Could not request the bill. Please ask staff for help.',
++  payment_failed: 'Could not start online payment. Please pay at the counter.',
++  order_for_pickup: 'Order for Pickup',
++  order: 'Order',
++  table: 'Table {table}',
++  start_over: 'Start Over',
++  start_over_confirm: 'Start over? Your current cart will be cleared.',
++  new_order: 'New Order',
++  new_order_confirm: 'Start a new order? Current cart will be cleared.',
++  order_so_far: 'Your order so far',
++  pickup_code: 'Pickup code: {code}',
++  total: 'Total',
++  pay_online: 'Pay Online',
++  starting_payment: 'Starting payment…',
++  payment_request_created: 'Payment request created ({amount}): a staff member will help you pay.',
++  request_bill: 'Request Bill',
++  bill_requested: 'Bill requested: staff notified',
++  in_cart: 'In cart: {qty}',
++  remove_one: 'Remove one {name}',
++  add_one: 'Add one more {name}',
++  items_one: '{count} item',
++  items_other: '{count} items',
++  place_order: 'Place Order',
++  placing_order: 'Placing order…',
++  placing: 'Placing…',
++  cart: 'Cart',
++  cart_empty: 'Tap a menu item to add it to your cart.',
++  menu_categories: 'Menu categories',
++  all_items: 'All Items',
++  other: 'Other',
++  still_there: 'Still there?',
++  still_here: "I'm still here",
++  assign_tablet: 'Assign This Tablet',
++  enter_pin: 'Enter staff PIN',
++  pin_entry: 'PIN entry',
++  continue: 'Continue',
++  enter_table: 'Enter table name or code',
++  table_placeholder: 'e.g. T12',
++  assign_table: 'Assign Table',
++  assigning: 'Assigning…',
++  back: 'Back',
++  not_provisioned: 'This tablet is not provisioned. Please contact staff.',
++  assign_failed: 'Could not assign this table. Please check the PIN and try again.',
++  language: 'Language',
++}
++type Key = keyof typeof en
++
++const fr: Record<Key, string> = {
++  loading_menu: 'Chargement du menu…',
++  starting: 'Démarrage…',
++  device_failed: "Cet appareil n'a pas pu démarrer. Merci de prévenir le personnel.",
++  device_bootstrap_failed: "Impossible de démarrer cet appareil.",
++  missing_code: 'Ce lien ne contient pas de code de commande. Scannez à nouveau le QR code de votre table.',
++  menu_failed: 'Impossible de charger le menu. Scannez à nouveau le QR code.',
++  order_failed: "La commande n'a pas pu être envoyée. Réessayez.",
++  bill_failed: "L'addition n'a pas pu être demandée. Demandez au personnel.",
++  payment_failed: 'Le paiement en ligne est indisponible. Merci de payer au comptoir.',
++  order_for_pickup: 'Commande à emporter',
++  order: 'Commande',
++  table: 'Table {table}',
++  start_over: 'Recommencer',
++  start_over_confirm: 'Recommencer ? Votre panier sera vidé.',
++  new_order: 'Nouvelle commande',
++  new_order_confirm: 'Nouvelle commande ? Le panier actuel sera vidé.',
++  order_so_far: 'Votre commande',
++  pickup_code: 'Code de retrait : {code}',
++  total: 'Total',
++  pay_online: 'Payer en ligne',
++  starting_payment: 'Ouverture du paiement…',
++  payment_request_created: 'Demande de paiement créée ({amount}) : un membre du personnel va vous aider à payer.',
++  request_bill: "Demander l'addition",
++  bill_requested: 'Addition demandée : le personnel est prévenu',
++  in_cart: 'Dans le panier : {qty}',
++  remove_one: 'Retirer un {name}',
++  add_one: 'Ajouter un {name}',
++  items_one: '{count} article',
++  items_other: '{count} articles',
++  place_order: 'Commander',
++  placing_order: 'Envoi de la commande…',
++  placing: 'Envoi…',
++  cart: 'Panier',
++  cart_empty: 'Touchez un plat du menu pour l’ajouter au panier.',
++  menu_categories: 'Catégories du menu',
++  all_items: 'Tout le menu',
++  other: 'Autres',
++  still_there: 'Vous êtes toujours là ?',
++  still_here: 'Je suis là',
++  assign_tablet: 'Attribuer cette tablette',
++  enter_pin: 'Code du personnel',
++  pin_entry: 'Saisie du code',
++  continue: 'Continuer',
++  enter_table: 'Nom ou code de la table',
++  table_placeholder: 'ex. T12',
++  assign_table: 'Attribuer la table',
++  assigning: 'Attribution…',
++  back: 'Retour',
++  not_provisioned: "Cette tablette n'est pas configurée. Merci de prévenir le personnel.",
++  assign_failed: "La table n'a pas pu être attribuée. Vérifiez le code et réessayez.",
++  language: 'Langue',
++}
++
++const ar: Record<Key, string> = {
++  loading_menu: 'جارٍ تحميل القائمة…',
++  starting: 'جارٍ التشغيل…',
++  device_failed: 'تعذّر تشغيل هذا الجهاز. يرجى إبلاغ الموظفين.',
++  device_bootstrap_failed: 'تعذّر تشغيل هذا الجهاز.',
++  missing_code: 'هذا الرابط لا يحتوي على رمز الطلب. امسح رمز QR الموجود على طاولتك مرة أخرى.',
++  menu_failed: 'تعذّر تحميل القائمة. امسح رمز QR مرة أخرى.',
++  order_failed: 'تعذّر إرسال الطلب. أعد المحاولة.',
++  bill_failed: 'تعذّر طلب الفاتورة. اطلبها من الموظفين.',
++  payment_failed: 'الدفع عبر الإنترنت غير متاح. يرجى الدفع عند الصندوق.',
++  order_for_pickup: 'طلب سفري',
++  order: 'الطلب',
++  table: 'الطاولة {table}',
++  start_over: 'البدء من جديد',
++  start_over_confirm: 'البدء من جديد؟ ستُفرَّغ سلتك.',
++  new_order: 'طلب جديد',
++  new_order_confirm: 'طلب جديد؟ ستُفرَّغ السلة الحالية.',
++  order_so_far: 'طلبك',
++  pickup_code: 'رمز الاستلام: {code}',
++  total: 'المجموع',
++  pay_online: 'الدفع عبر الإنترنت',
++  starting_payment: 'جارٍ فتح الدفع…',
++  payment_request_created: 'تم إنشاء طلب الدفع ({amount}): سيساعدك أحد الموظفين على الدفع.',
++  request_bill: 'طلب الفاتورة',
++  bill_requested: 'تم طلب الفاتورة: أُبلغ الموظفون',
++  in_cart: 'في السلة: {qty}',
++  remove_one: 'إزالة واحد {name}',
++  add_one: 'إضافة واحد {name}',
++  items_one: '{count} صنف',
++  items_other: '{count} أصناف',
++  place_order: 'اطلب',
++  placing_order: 'جارٍ إرسال الطلب…',
++  placing: 'جارٍ الإرسال…',
++  cart: 'السلة',
++  cart_empty: 'اضغط على طبق من القائمة لإضافته إلى السلة.',
++  menu_categories: 'أقسام القائمة',
++  all_items: 'كل القائمة',
++  other: 'أخرى',
++  still_there: 'هل ما زلت هنا؟',
++  still_here: 'نعم، أنا هنا',
++  assign_tablet: 'تعيين هذا الجهاز اللوحي',
++  enter_pin: 'رمز الموظف',
++  pin_entry: 'إدخال الرمز',
++  continue: 'متابعة',
++  enter_table: 'اسم الطاولة أو رمزها',
++  table_placeholder: 'مثال: T12',
++  assign_table: 'تعيين الطاولة',
++  assigning: 'جارٍ التعيين…',
++  back: 'رجوع',
++  not_provisioned: 'هذا الجهاز اللوحي غير مُعدّ. يرجى إبلاغ الموظفين.',
++  assign_failed: 'تعذّر تعيين الطاولة. تحقق من الرمز وأعد المحاولة.',
++  language: 'اللغة',
++}
++
++const MESSAGES: Record<Lang, Record<Key, string>> = { en, fr, ar }
++
++const isLang = (value: unknown): value is Lang => value === 'en' || value === 'fr' || value === 'ar'
++
++function initialLang(): Lang {
++  try {
++    const saved = localStorage.getItem(STORAGE_KEY)
++    if (isLang(saved)) return saved
++  } catch {
++    /* storage blocked: use the restaurant language */
++  }
++  const restaurant = (window as unknown as { frappe?: { boot?: { restaurant_lang?: string } } }).frappe?.boot?.restaurant_lang
++  const base = (restaurant || '').slice(0, 2)
++  return isLang(base) ? base : 'en'
++}
++
++let currentLang: Lang = initialLang()
++
++/** Language for server calls (`_lang`), so server messages match the page. */
++export const activeLang = () => currentLang
++
++function translate(lang: Lang, key: Key, params?: Record<string, string | number>) {
++  let text = MESSAGES[lang][key] ?? en[key] ?? key
++  for (const [name, value] of Object.entries(params ?? {})) text = text.split(`{${name}}`).join(String(value))
++  return text
++}
++
++type I18n = {
++  lang: Lang
++  setLang: (lang: Lang) => void
++  t: (key: Key, params?: Record<string, string | number>) => string
++  /** "{count} item(s)" in the active language. */
++  items: (count: number) => string
++}
++
++const I18nContext = createContext<I18n | null>(null)
++
++export function I18nProvider({ children }: { children: ReactNode }) {
++  const [lang, setLangState] = useState<Lang>(currentLang)
++
++  useEffect(() => {
++    currentLang = lang
++    document.documentElement.lang = lang
++    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
++  }, [lang])
++
++  const setLang = useCallback((next: Lang) => {
++    currentLang = next
++    try {
++      localStorage.setItem(STORAGE_KEY, next)
++    } catch {
++      /* storage blocked: the choice lasts for this page only */
++    }
++    setLangState(next)
++  }, [])
++
++  const value = useMemo<I18n>(
++    () => ({
++      lang,
++      setLang,
++      t: (key, params) => translate(lang, key, params),
++      items: (count) => translate(lang, count === 1 ? 'items_one' : 'items_other', { count }),
++    }),
++    [lang, setLang],
++  )
++  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
++}
++
++export function useI18n(): I18n {
++  const value = useContext(I18nContext)
++  if (!value) throw new Error('useI18n outside I18nProvider')
++  return value
++}
++
++/** Plain-text translation outside React components (hooks' error fallbacks). */
++export const tr = (key: Key, params?: Record<string, string | number>) => translate(currentLang, key, params)
++
++export function LanguageSwitch({ className = '' }: { className?: string }) {
++  const { lang, setLang, t } = useI18n()
++  return (
++    <div role="group" aria-label={t('language')} className={`flex gap-1 ${className}`}>
++      {LANGS.map((option) => (
++        <button
++          key={option.code}
++          type="button"
++          onClick={() => setLang(option.code)}
++          aria-pressed={lang === option.code}
++          className={`rounded-md border px-2 py-1 text-xs font-medium ${
++            lang === option.code ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
++          }`}
++        >
++          {option.label}
++        </button>
++      ))}
++    </div>
++  )
++}
+diff --git a/self-order/src/layouts/LandscapeKioskLayout.tsx b/self-order/src/layouts/LandscapeKioskLayout.tsx
+index 15a42b84..05c21397 100644
+--- a/self-order/src/layouts/LandscapeKioskLayout.tsx
++++ b/self-order/src/layouts/LandscapeKioskLayout.tsx
+@@ -5,6 +5,7 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
+ import type { OrderingContext } from '../lib/api'
+ import CartPanel from './shared/CartPanel'
+ import MenuGrid from './shared/MenuGrid'
++import { LanguageSwitch, useI18n } from '../i18n'
+ 
+ const IDLE_WARN_MS = 60000
+ const IDLE_RESET_GRACE_MS = 15000
+@@ -42,12 +43,13 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
+     cartCount,
+     cartTotal,
+   } = useOrderingSession(initialContext)
++  const { t } = useI18n()
+ 
+   const [showIdleWarning, setShowIdleWarning] = useState(false)
+   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+ 
+   function handleReset() {
+-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
++    if (window.confirm(t('new_order_confirm'))) {
+       resetSession()
+     }
+   }
+@@ -75,7 +77,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
+   if (loading) {
+     return (
+       <div className="flex min-h-screen items-center justify-center text-xl text-muted-foreground">
+-        Loading menu…
++        {t('loading_menu')}
+       </div>
+     )
+   }
+@@ -92,14 +94,17 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
+     <div className="flex h-screen flex-col overflow-hidden text-lg">
+       <header className="flex items-center justify-between border-b bg-background/95 px-10 py-6">
+         <h1 className="text-3xl font-semibold">
+-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
++          {context?.table ? t('table', { table: context.table }) : t('order_for_pickup')}
+         </h1>
+-        <button
+-          onClick={handleReset}
+-          className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
+-        >
+-          New Order
+-        </button>
++        <div className="flex items-center gap-3">
++          <LanguageSwitch />
++          <button
++            onClick={handleReset}
++            className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
++          >
++            {t('new_order')}
++          </button>
++        </div>
+       </header>
+ 
+       {error && (
+@@ -114,7 +119,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
+             capabilities={context?.capabilities}
+             onAdd={addToCart}
+             gridClassName="grid grid-cols-4 gap-6 xl:grid-cols-5"
+-            cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-left text-lg transition active:scale-[0.97]"
++            cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-start text-lg transition active:scale-[0.97]"
+             imageClassName="h-40 w-full object-cover"
+           />
+         </main>
+@@ -133,21 +138,21 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
+           onSubmit={submitCart}
+           onRequestBill={handleRequestBill}
+           onPayOnline={payOnline}
+-          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-l bg-background p-6 text-base"
++          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-s bg-background p-6 text-base"
+         />
+       </div>
+ 
+       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+         <DialogContent onClose={handleStillHere}>
+           <DialogHeader>
+-            <DialogTitle>Still there?</DialogTitle>
++            <DialogTitle>{t('still_there')}</DialogTitle>
+           </DialogHeader>
+           <DialogFooter>
+             <button
+               onClick={handleStillHere}
+               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+             >
+-              I'm still here
++              {t('still_here')}
+             </button>
+           </DialogFooter>
+         </DialogContent>
+diff --git a/self-order/src/layouts/MobileQRLayout.tsx b/self-order/src/layouts/MobileQRLayout.tsx
+index 764a567a..4d689882 100644
+--- a/self-order/src/layouts/MobileQRLayout.tsx
++++ b/self-order/src/layouts/MobileQRLayout.tsx
+@@ -1,6 +1,7 @@
+ import { formatCurrency } from '@ury/core'
+ import { useOrderingSession } from '../hooks/useOrderingSession'
+ import type { OrderingContext } from '../lib/api'
++import { LanguageSwitch, useI18n } from '../i18n'
+ 
+ interface LayoutProps {
+   initialContext?: OrderingContext
+@@ -28,9 +29,10 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+     cartCount,
+     cartTotal,
+   } = useOrderingSession(initialContext)
++  const { t, items } = useI18n()
+ 
+   function handleStartOver() {
+-    if (window.confirm('Start over? Your current cart will be cleared.')) {
++    if (window.confirm(t('start_over_confirm'))) {
+       resetSession()
+     }
+   }
+@@ -38,7 +40,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+   if (loading) {
+     return (
+       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+-        Loading menu…
++        {t('loading_menu')}
+       </div>
+     )
+   }
+@@ -60,14 +62,17 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+     <div className="min-h-screen pb-28">
+       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur">
+         <h1 className="text-lg font-semibold">
+-          {isPickup ? 'Order for Pickup' : context?.table ? `Table ${context.table}` : 'Order'}
++          {isPickup ? t('order_for_pickup') : context?.table ? t('table', { table: context.table }) : t('order')}
+         </h1>
+-        <button
+-          onClick={handleStartOver}
+-          className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground"
+-        >
+-          Start Over
+-        </button>
++        <div className="flex items-center gap-2">
++          <LanguageSwitch />
++          <button
++            onClick={handleStartOver}
++            className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground"
++          >
++            {t('start_over')}
++          </button>
++        </div>
+       </header>
+ 
+       {error && (
+@@ -76,23 +81,23 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+ 
+       {order && order.items.length > 0 && (
+         <section className="mx-4 mt-4 rounded-lg border p-3">
+-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
++          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order_so_far')}</h2>
+           {isPickup && order.pickup_code && (
+             <p className="mb-2 rounded-md bg-muted p-2 text-center text-sm font-semibold">
+-              Pickup code: {order.pickup_code}
++              {t('pickup_code', { code: order.pickup_code })}
+             </p>
+           )}
+           <ul className="space-y-1 text-sm">
+             {order.items.map((row, idx) => (
+               <li key={`${row.item_code}-${idx}`} className="flex justify-between">
+                 <span>{row.item_name} × {row.qty}</span>
+-                <span>{row.amount}</span>
++                <span className="tabular-nums">{formatCurrency(row.amount)}</span>
+               </li>
+             ))}
+           </ul>
+           <div className="mt-2 flex justify-between border-t pt-2 text-sm font-semibold">
+-            <span>Total</span>
+-            <span>{order.grand_total}</span>
++            <span>{t('total')}</span>
++            <span className="tabular-nums">{formatCurrency(order.grand_total)}</span>
+           </div>
+           {context?.capabilities.customer_payment_enabled && !order.billed && (
+             <button
+@@ -100,13 +105,12 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+               disabled={payingOnline}
+               onClick={payOnline}
+             >
+-              {payingOnline ? 'Starting payment…' : 'Pay Online'}
++              {payingOnline ? t('starting_payment') : t('pay_online')}
+             </button>
+           )}
+           {paymentRequest && !paymentRequest.payment_url && (
+             <p className="mt-2 text-xs text-muted-foreground">
+-              Payment request created ({paymentRequest.amount} {paymentRequest.currency}) — a staff
+-              member will assist with payment.
++              {t('payment_request_created', { amount: `${paymentRequest.amount} ${paymentRequest.currency}` })}
+             </p>
+           )}
+           {!isPickup && context?.capabilities.request_bill_enabled && !order.billed && (
+@@ -115,7 +119,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+               disabled={billRequested}
+               onClick={handleRequestBill}
+             >
+-              {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
++              {billRequested ? t('bill_requested') : t('request_bill')}
+             </button>
+           )}
+         </section>
+@@ -126,7 +130,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+           <button
+             key={item.item}
+             onClick={() => addToCart(item)}
+-            className="flex flex-col overflow-hidden rounded-lg border text-left transition active:scale-[0.98]"
++            className="flex flex-col overflow-hidden rounded-lg border text-start transition active:scale-[0.98]"
+           >
+             {context?.capabilities.show_item_images && item.item_image && (
+               <img src={item.item_image} alt={item.item_name} className="h-24 w-full object-cover" />
+@@ -135,7 +139,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+               <div className="text-sm font-medium">{item.item_name}</div>
+               <div className="text-sm text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
+               {cart[item.item] && (
+-                <div className="mt-1 text-xs font-semibold text-primary">In cart: {cart[item.item].qty}</div>
++                <div className="mt-1 text-xs font-semibold text-primary">{t('in_cart', { qty: cart[item.item].qty })}</div>
+               )}
+             </div>
+           </button>
+@@ -152,7 +156,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+                   <button
+                     onClick={() => decrementCart(entry.item.item)}
+                     className="h-6 w-6 rounded-full border text-xs leading-none"
+-                    aria-label={`Remove one ${entry.item.item_name}`}
++                    aria-label={t('remove_one', { name: entry.item.item_name })}
+                   >
+                     −
+                   </button>
+@@ -160,7 +164,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+                   <button
+                     onClick={() => addToCart(entry.item)}
+                     className="h-6 w-6 rounded-full border text-xs leading-none"
+-                    aria-label={`Add one more ${entry.item.item_name}`}
++                    aria-label={t('add_one', { name: entry.item.item_name })}
+                   >
+                     +
+                   </button>
+@@ -169,7 +173,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+             ))}
+           </ul>
+           <div className="mb-2 flex items-center justify-between text-sm font-semibold">
+-            <span>{cartCount} item{cartCount > 1 ? 's' : ''}</span>
++            <span>{items(cartCount)}</span>
+             <span className="tabular-nums">{formatCurrency(cartTotal)}</span>
+           </div>
+           <button
+@@ -177,7 +181,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
+             disabled={submitting}
+             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
+           >
+-            {submitting ? 'Placing order…' : 'Place Order'}
++            {submitting ? t('placing_order') : t('place_order')}
+           </button>
+         </div>
+       )}
+diff --git a/self-order/src/layouts/PortableTabletAssignment.tsx b/self-order/src/layouts/PortableTabletAssignment.tsx
+index ecd80509..05be411b 100644
+--- a/self-order/src/layouts/PortableTabletAssignment.tsx
++++ b/self-order/src/layouts/PortableTabletAssignment.tsx
+@@ -1,6 +1,7 @@
+ import { useState } from 'react'
+ import { assignDeviceTable, type OrderingContext } from '../lib/api'
+ import TabletLayout from './TabletLayout'
++import { LanguageSwitch, useI18n } from '../i18n'
+ 
+ type Step = 'pin' | 'table'
+ 
+@@ -39,6 +40,7 @@ function PortableTabletAssignment() {
+   const [submitting, setSubmitting] = useState(false)
+   const [error, setError] = useState<string | null>(null)
+   const [context, setContext] = useState<OrderingContext | null>(null)
++  const { t } = useI18n()
+ 
+   function handlePinDigit(digit: string) {
+     if (pin.length >= MAX_PIN_LENGTH) return
+@@ -63,7 +65,7 @@ function PortableTabletAssignment() {
+     const deviceId = localStorage.getItem(DEVICE_ID_KEY)
+     const deviceCredential = localStorage.getItem(DEVICE_CREDENTIAL_KEY)
+     if (!deviceId || !deviceCredential) {
+-      setError('This tablet is not provisioned. Please contact staff.')
++      setError(t('not_provisioned'))
+       return
+     }
+ 
+@@ -73,7 +75,7 @@ function PortableTabletAssignment() {
+       const assigned = await assignDeviceTable(deviceId, deviceCredential, pin, table.trim())
+       setContext(assigned)
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : 'Could not assign this table. Please check the PIN and try again.')
++      setError(err instanceof Error ? err.message : t('assign_failed'))
+       setPin('')
+       setStep('pin')
+     } finally {
+@@ -87,7 +89,8 @@ function PortableTabletAssignment() {
+ 
+   return (
+     <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+-      <h1 className="text-xl font-semibold">Assign This Tablet</h1>
++      <h1 className="text-xl font-semibold">{t('assign_tablet')}</h1>
++      <LanguageSwitch />
+ 
+       {error && (
+         <div className="w-full max-w-xs rounded-md bg-destructive/10 p-3 text-center text-sm text-destructive">
+@@ -97,8 +100,8 @@ function PortableTabletAssignment() {
+ 
+       {step === 'pin' && (
+         <div className="flex w-full max-w-xs flex-col items-center gap-4">
+-          <p className="text-sm text-muted-foreground">Enter staff PIN</p>
+-          <div className="flex gap-2" aria-label="PIN entry">
++          <p className="text-sm text-muted-foreground">{t('enter_pin')}</p>
++          <div className="flex gap-2" aria-label={t('pin_entry')}>
+             {Array.from({ length: MAX_PIN_LENGTH }).map((_, idx) => (
+               <div
+                 key={idx}
+@@ -130,18 +133,18 @@ function PortableTabletAssignment() {
+             disabled={pin.length < MIN_PIN_LENGTH}
+             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
+           >
+-            Continue
++            {t('continue')}
+           </button>
+         </div>
+       )}
+ 
+       {step === 'table' && (
+         <div className="flex w-full max-w-xs flex-col gap-4">
+-          <p className="text-sm text-muted-foreground">Enter table name or code</p>
++          <p className="text-sm text-muted-foreground">{t('enter_table')}</p>
+           <input
+             value={table}
+             onChange={(event) => setTable(event.target.value)}
+-            placeholder="e.g. T12"
++            placeholder={t('table_placeholder')}
+             className="rounded-md border px-4 py-3 text-base"
+           />
+           <button
+@@ -149,14 +152,14 @@ function PortableTabletAssignment() {
+             disabled={!table.trim() || submitting}
+             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
+           >
+-            {submitting ? 'Assigning…' : 'Assign Table'}
++            {submitting ? t('assigning') : t('assign_table')}
+           </button>
+           <button
+             onClick={() => setStep('pin')}
+             disabled={submitting}
+             className="w-full rounded-md border py-3 text-sm font-medium"
+           >
+-            Back
++            {t('back')}
+           </button>
+         </div>
+       )}
+diff --git a/self-order/src/layouts/PortraitKioskLayout.tsx b/self-order/src/layouts/PortraitKioskLayout.tsx
+index 29ff2ef1..ad84cf13 100644
+--- a/self-order/src/layouts/PortraitKioskLayout.tsx
++++ b/self-order/src/layouts/PortraitKioskLayout.tsx
+@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
+ import { useIdleReset } from '../hooks/useIdleReset'
+ import { useOrderingSession } from '../hooks/useOrderingSession'
+ import type { MenuItem, OrderingContext } from '../lib/api'
++import { LanguageSwitch, tr, useI18n } from '../i18n'
+ 
+ const IDLE_WARN_MS = 60000
+ const IDLE_RESET_GRACE_MS = 15000
+@@ -51,6 +52,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+     cartCount,
+     cartTotal,
+   } = useOrderingSession(initialContext)
++  const { t, items } = useI18n()
+ 
+   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
+   const [cartExpanded, setCartExpanded] = useState(false)
+@@ -58,7 +60,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+ 
+   function handleReset() {
+-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
++    if (window.confirm(t('new_order_confirm'))) {
+       resetSession()
+     }
+   }
+@@ -89,7 +91,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+       const key = item.course ?? ALL_CATEGORY
+       if (key === ALL_CATEGORY) continue
+       if (!seen.has(key)) {
+-        seen.set(key, item.course_label ?? item.course ?? 'Other')
++        seen.set(key, item.course_label ?? item.course ?? tr('other'))
+       }
+     }
+     return Array.from(seen.entries()).map(([course, label]) => ({ course, label }))
+@@ -103,7 +105,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+   if (loading) {
+     return (
+       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+-        Loading menu…
++        {t('loading_menu')}
+       </div>
+     )
+   }
+@@ -120,14 +122,17 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+     <div className="flex min-h-screen flex-col pb-24">
+       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
+         <h1 className="text-2xl font-semibold">
+-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
++          {context?.table ? t('table', { table: context.table }) : t('order_for_pickup')}
+         </h1>
+-        <button
+-          onClick={handleReset}
+-          className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
+-        >
+-          New Order
+-        </button>
++        <div className="flex items-center gap-3">
++          <LanguageSwitch />
++          <button
++            onClick={handleReset}
++            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
++          >
++            {t('new_order')}
++          </button>
++        </div>
+       </header>
+ 
+       {error && (
+@@ -136,18 +141,18 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+ 
+       {order && order.items.length > 0 && (
+         <section className="mx-6 mt-4 rounded-lg border p-4">
+-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
++          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order_so_far')}</h2>
+           <ul className="space-y-1 text-base">
+             {order.items.map((row, idx) => (
+               <li key={`${row.item_code}-${idx}`} className="flex justify-between">
+                 <span>{row.item_name} × {row.qty}</span>
+-                <span>{row.amount}</span>
++                <span className="tabular-nums">{formatCurrency(row.amount)}</span>
+               </li>
+             ))}
+           </ul>
+           <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold">
+-            <span>Total</span>
+-            <span>{order.grand_total}</span>
++            <span>{t('total')}</span>
++            <span className="tabular-nums">{formatCurrency(order.grand_total)}</span>
+           </div>
+           {context?.capabilities.customer_payment_enabled && !order.billed && (
+             <button
+@@ -155,7 +160,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+               disabled={payingOnline}
+               onClick={payOnline}
+             >
+-              {payingOnline ? 'Starting payment…' : 'Pay Online'}
++              {payingOnline ? t('starting_payment') : t('pay_online')}
+             </button>
+           )}
+           {context?.capabilities.request_bill_enabled && !order.billed && (
+@@ -164,7 +169,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+               disabled={billRequested}
+               onClick={handleRequestBill}
+             >
+-              {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
++              {billRequested ? t('bill_requested') : t('request_bill')}
+             </button>
+           )}
+         </section>
+@@ -172,24 +177,24 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+ 
+       <div className="flex flex-1 gap-4 px-6 pt-4">
+         <nav
+-          aria-label="Menu categories"
++          aria-label={t('menu_categories')}
+           className="flex w-40 shrink-0 flex-col gap-2 self-start rounded-lg border p-2"
+         >
+           <button
+             onClick={() => setSelectedCategory(ALL_CATEGORY)}
+-            className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
++            className={`rounded-md px-3 py-3 text-start text-sm font-medium transition ${
+               selectedCategory === ALL_CATEGORY
+                 ? 'bg-primary text-primary-foreground'
+                 : 'text-foreground hover:bg-muted'
+             }`}
+           >
+-            All Items
++            {t('all_items')}
+           </button>
+           {categories.map((category) => (
+             <button
+               key={category.course}
+               onClick={() => setSelectedCategory(category.course)}
+-              className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
++              className={`rounded-md px-3 py-3 text-start text-sm font-medium transition ${
+                 selectedCategory === category.course
+                   ? 'bg-primary text-primary-foreground'
+                   : 'text-foreground hover:bg-muted'
+@@ -225,7 +230,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+                       <button
+                         onClick={() => decrementCart(entry.item.item)}
+                         className="h-8 w-8 rounded-full border text-base leading-none"
+-                        aria-label={`Remove one ${entry.item.item_name}`}
++                        aria-label={t('remove_one', { name: entry.item.item_name })}
+                       >
+                         −
+                       </button>
+@@ -233,7 +238,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+                       <button
+                         onClick={() => addToCart(entry.item)}
+                         className="h-8 w-8 rounded-full border text-base leading-none"
+-                        aria-label={`Add one more ${entry.item.item_name}`}
++                        aria-label={t('add_one', { name: entry.item.item_name })}
+                       >
+                         +
+                       </button>
+@@ -247,11 +252,11 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+           <div className="flex items-center gap-3 p-4">
+             <button
+               onClick={() => setCartExpanded((prev) => !prev)}
+-              className="flex flex-1 items-center justify-between rounded-md border px-4 py-3 text-left"
++              className="flex flex-1 items-center justify-between rounded-md border px-4 py-3 text-start"
+               aria-expanded={cartExpanded}
+             >
+               <span className="text-base font-semibold">
+-                {cartCount} item{cartCount > 1 ? 's' : ''}
++                {items(cartCount)}
+               </span>
+               <span className="text-base font-semibold tabular-nums">{formatCurrency(cartTotal)}</span>
+             </button>
+@@ -260,7 +265,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+               disabled={submitting}
+               className="rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+             >
+-              {submitting ? 'Placing…' : 'Place Order'}
++              {submitting ? t('placing') : t('place_order')}
+             </button>
+           </div>
+         </div>
+@@ -269,14 +274,14 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
+       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+         <DialogContent onClose={handleStillHere}>
+           <DialogHeader>
+-            <DialogTitle>Still there?</DialogTitle>
++            <DialogTitle>{t('still_there')}</DialogTitle>
+           </DialogHeader>
+           <DialogFooter>
+             <button
+               onClick={handleStillHere}
+               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+             >
+-              I'm still here
++              {t('still_here')}
+             </button>
+           </DialogFooter>
+         </DialogContent>
+@@ -296,10 +301,11 @@ function MenuCard({
+   showImage: boolean
+   onAdd: () => void
+ }) {
++  const { t } = useI18n()
+   return (
+     <button
+       onClick={onAdd}
+-      className="flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
++      className="flex flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
+     >
+       {showImage && item.item_image && (
+         <img src={item.item_image} alt={item.item_name} className="h-48 w-full object-cover" />
+@@ -308,7 +314,7 @@ function MenuCard({
+         <div className="text-lg font-medium">{item.item_name}</div>
+         <div className="mt-1 text-base text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
+         {qtyInCart > 0 && (
+-          <div className="mt-2 text-sm font-semibold text-primary">In cart: {qtyInCart}</div>
++          <div className="mt-2 text-sm font-semibold text-primary">{t('in_cart', { qty: qtyInCart })}</div>
+         )}
+       </div>
+     </button>
+diff --git a/self-order/src/layouts/TabletLayout.tsx b/self-order/src/layouts/TabletLayout.tsx
+index 2d00f61f..0618e000 100644
+--- a/self-order/src/layouts/TabletLayout.tsx
++++ b/self-order/src/layouts/TabletLayout.tsx
+@@ -5,6 +5,7 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
+ import type { OrderingContext } from '../lib/api'
+ import CartPanel from './shared/CartPanel'
+ import MenuGrid from './shared/MenuGrid'
++import { LanguageSwitch, useI18n } from '../i18n'
+ 
+ const IDLE_WARN_MS = 60000
+ const IDLE_RESET_GRACE_MS = 15000
+@@ -40,12 +41,13 @@ function TabletLayout({ initialContext }: LayoutProps) {
+     cartCount,
+     cartTotal,
+   } = useOrderingSession(initialContext)
++  const { t } = useI18n()
+ 
+   const [showIdleWarning, setShowIdleWarning] = useState(false)
+   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+ 
+   function handleReset() {
+-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
++    if (window.confirm(t('new_order_confirm'))) {
+       resetSession()
+     }
+   }
+@@ -73,7 +75,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
+   if (loading) {
+     return (
+       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+-        Loading menu…
++        {t('loading_menu')}
+       </div>
+     )
+   }
+@@ -90,14 +92,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
+     <div className="flex h-screen flex-col overflow-hidden">
+       <header className="flex items-center justify-between border-b bg-background/95 px-6 py-4">
+         <h1 className="text-xl font-semibold">
+-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
++          {context?.table ? t('table', { table: context.table }) : t('order_for_pickup')}
+         </h1>
+-        <button
+-          onClick={handleReset}
+-          className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
+-        >
+-          New Order
+-        </button>
++        <div className="flex items-center gap-3">
++          <LanguageSwitch />
++          <button
++            onClick={handleReset}
++            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
++          >
++            {t('new_order')}
++          </button>
++        </div>
+       </header>
+ 
+       {error && (
+@@ -112,7 +117,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
+             capabilities={context?.capabilities}
+             onAdd={addToCart}
+             gridClassName="grid grid-cols-3 gap-4 lg:grid-cols-4"
+-            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
++            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
+             imageClassName="h-32 w-full object-cover"
+           />
+         </main>
+@@ -131,21 +136,21 @@ function TabletLayout({ initialContext }: LayoutProps) {
+           onSubmit={submitCart}
+           onRequestBill={handleRequestBill}
+           onPayOnline={payOnline}
+-          className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
++          className="flex w-[32%] flex-col overflow-hidden border-s bg-background p-4"
+         />
+       </div>
+ 
+       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+         <DialogContent onClose={handleStillHere}>
+           <DialogHeader>
+-            <DialogTitle>Still there?</DialogTitle>
++            <DialogTitle>{t('still_there')}</DialogTitle>
+           </DialogHeader>
+           <DialogFooter>
+             <button
+               onClick={handleStillHere}
+               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+             >
+-              I'm still here
++              {t('still_here')}
+             </button>
+           </DialogFooter>
+         </DialogContent>
+diff --git a/self-order/src/layouts/shared/CartPanel.tsx b/self-order/src/layouts/shared/CartPanel.tsx
+index a3d97b71..7500ae8d 100644
+--- a/self-order/src/layouts/shared/CartPanel.tsx
++++ b/self-order/src/layouts/shared/CartPanel.tsx
+@@ -1,5 +1,6 @@
+ import { formatCurrency } from '@ury/core'
+ import type { CustomerOrder, MenuItem, OrderingContext } from '../../lib/api'
++import { useI18n } from '../../i18n'
+ 
+ type CartEntry = { item: MenuItem; qty: number }
+ 
+@@ -41,33 +42,34 @@ function CartPanel({
+   onPayOnline,
+   className,
+ }: CartPanelProps) {
++  const { t, items } = useI18n()
+   return (
+     <aside className={className}>
+       <div className="flex-1 overflow-y-auto">
+         {order && order.items.length > 0 && (
+           <section className="mb-4 rounded-lg border p-3">
+-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
++            <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order_so_far')}</h2>
+             <ul className="space-y-1 text-sm">
+               {order.items.map((row, idx) => (
+                 <li key={`${row.item_code}-${idx}`} className="flex justify-between">
+                   <span>
+                     {row.item_name} × {row.qty}
+                   </span>
+-                  <span>{row.amount}</span>
++                  <span className="tabular-nums">{formatCurrency(row.amount)}</span>
+                 </li>
+               ))}
+             </ul>
+             <div className="mt-2 flex justify-between border-t pt-2 text-sm font-semibold">
+-              <span>Total</span>
+-              <span>{order.grand_total}</span>
++              <span>{t('total')}</span>
++              <span className="tabular-nums">{formatCurrency(order.grand_total)}</span>
+             </div>
+           </section>
+         )}
+ 
+         <section>
+-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Cart</h2>
++          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('cart')}</h2>
+           {cartItems.length === 0 ? (
+-            <p className="text-sm text-muted-foreground">Tap a menu item to add it to your cart.</p>
++            <p className="text-sm text-muted-foreground">{t('cart_empty')}</p>
+           ) : (
+             <ul className="space-y-2 text-sm">
+               {cartItems.map((entry) => (
+@@ -77,7 +79,7 @@ function CartPanel({
+                     <button
+                       onClick={() => onDecrement(entry.item.item)}
+                       className="h-7 w-7 rounded-full border text-sm leading-none"
+-                      aria-label={`Remove one ${entry.item.item_name}`}
++                      aria-label={t('remove_one', { name: entry.item.item_name })}
+                     >
+                       −
+                     </button>
+@@ -85,7 +87,7 @@ function CartPanel({
+                     <button
+                       onClick={() => onIncrement(entry.item)}
+                       className="h-7 w-7 rounded-full border text-sm leading-none"
+-                      aria-label={`Add one more ${entry.item.item_name}`}
++                      aria-label={t('add_one', { name: entry.item.item_name })}
+                     >
+                       +
+                     </button>
+@@ -100,7 +102,7 @@ function CartPanel({
+       <div className="border-t pt-3">
+         <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+           <span>
+-            {cartCount} item{cartCount !== 1 ? 's' : ''}
++            {items(cartCount)}
+           </span>
+           <span className="tabular-nums">{formatCurrency(cartTotal)}</span>
+         </div>
+@@ -109,7 +111,7 @@ function CartPanel({
+           disabled={submitting || cartCount === 0}
+           className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
+         >
+-          {submitting ? 'Placing order…' : 'Place Order'}
++          {submitting ? t('placing_order') : t('place_order')}
+         </button>
+         {context?.capabilities.customer_payment_enabled && order && !order.billed && (
+           <button
+@@ -117,7 +119,7 @@ function CartPanel({
+             disabled={payingOnline}
+             onClick={onPayOnline}
+           >
+-            {payingOnline ? 'Starting payment…' : 'Pay Online'}
++            {payingOnline ? t('starting_payment') : t('pay_online')}
+           </button>
+         )}
+         {context?.capabilities.request_bill_enabled && order && !order.billed && (
+@@ -126,7 +128,7 @@ function CartPanel({
+             disabled={billRequested}
+             onClick={onRequestBill}
+           >
+-            {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
++            {billRequested ? t('bill_requested') : t('request_bill')}
+           </button>
+         )}
+       </div>
+diff --git a/self-order/src/layouts/shared/MenuGrid.tsx b/self-order/src/layouts/shared/MenuGrid.tsx
+index 208e7916..68401de2 100644
+--- a/self-order/src/layouts/shared/MenuGrid.tsx
++++ b/self-order/src/layouts/shared/MenuGrid.tsx
+@@ -1,5 +1,6 @@
+ import { formatCurrency } from '@ury/core'
+ import type { MenuItem, OrderingCapabilities } from '../../lib/api'
++import { useI18n } from '../../i18n'
+ 
+ type Cart = Record<string, { item: MenuItem; qty: number }>
+ 
+@@ -21,6 +22,7 @@ interface MenuGridProps {
+  * differ (larger cards, more columns on the kiosk).
+  */
+ function MenuGrid({ menu, cart, capabilities, onAdd, gridClassName, cardClassName, imageClassName }: MenuGridProps) {
++  const { t } = useI18n()
+   return (
+     <div className={gridClassName}>
+       {menu.map((item) => (
+@@ -36,7 +38,7 @@ function MenuGrid({ menu, cart, capabilities, onAdd, gridClassName, cardClassNam
+             <div className="font-medium">{item.item_name}</div>
+             <div className="text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
+             {cart[item.item] && (
+-              <div className="mt-1 text-sm font-semibold text-primary">In cart: {cart[item.item].qty}</div>
++              <div className="mt-1 text-sm font-semibold text-primary">{t('in_cart', { qty: cart[item.item].qty })}</div>
+             )}
+           </div>
+         </button>
+diff --git a/self-order/src/lib/api.ts b/self-order/src/lib/api.ts
+index e56fac30..63379bcb 100644
+--- a/self-order/src/lib/api.ts
++++ b/self-order/src/lib/api.ts
+@@ -1,3 +1,4 @@
++import { activeLang } from '../i18n'
+ import { call } from '@ury/core'
+ 
+ const M = 'ury.ury.api.self_ordering'
+@@ -114,13 +115,13 @@ interface FrappeResponse<T> {
+ }
+ 
+ export async function bootstrap(token: string): Promise<OrderingContext> {
+-  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { token })
++  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(), token })
+   storeContext(response.message)
+   return response.message
+ }
+ 
+ export async function bootstrapDevice(deviceId: string, deviceCredential: string): Promise<OrderingContext> {
+-  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, {
++  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(),
+     device_id: deviceId,
+     device_credential: deviceCredential,
+   })
+@@ -134,7 +135,7 @@ export async function assignDeviceTable(
+   staffPin: string,
+   table: string,
+ ): Promise<OrderingContext> {
+-  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, {
++  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, { _lang: activeLang(),
+     device_id: deviceId,
+     device_credential: deviceCredential,
+     staff_pin: staffPin,
+@@ -145,12 +146,12 @@ export async function assignDeviceTable(
+ }
+ 
+ export async function getMenu(session: string): Promise<MenuResponse> {
+-  const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { session })
++  const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+ export async function getCurrentOrder(session: string): Promise<CustomerOrder> {
+-  const response = await call.get<FrappeResponse<CustomerOrder>>(`${M}.get_customer_order`, { session })
++  const response = await call.get<FrappeResponse<CustomerOrder>>(`${M}.get_customer_order`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+@@ -158,7 +159,7 @@ export async function addItems(
+   session: string,
+   items: { item: string; qty: number; comment?: string }[],
+ ): Promise<CustomerOrder> {
+-  const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, {
++  const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, { _lang: activeLang(),
+     session,
+     items: JSON.stringify(items),
+   })
+@@ -166,12 +167,12 @@ export async function addItems(
+ }
+ 
+ export async function requestBill(session: string): Promise<{ status: string; request: string }> {
+-  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { session })
++  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+ export async function getStatus(session: string): Promise<OrderStatus> {
+-  const response = await call.get<FrappeResponse<OrderStatus>>(`${M}.get_order_status`, { session })
++  const response = await call.get<FrappeResponse<OrderStatus>>(`${M}.get_order_status`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+@@ -190,12 +191,12 @@ export interface PaymentStatusResult {
+ }
+ 
+ export async function createPaymentRequest(session: string): Promise<PaymentRequestResult> {
+-  const response = await call.post<FrappeResponse<PaymentRequestResult>>(`${M}.create_payment_request`, { session })
++  const response = await call.post<FrappeResponse<PaymentRequestResult>>(`${M}.create_payment_request`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+ export async function getPaymentStatus(session: string): Promise<PaymentStatusResult> {
+-  const response = await call.get<FrappeResponse<PaymentStatusResult>>(`${M}.get_payment_status`, { session })
++  const response = await call.get<FrappeResponse<PaymentStatusResult>>(`${M}.get_payment_status`, { _lang: activeLang(), session })
+   return response.message
+ }
+ 
+@@ -205,7 +206,7 @@ export async function sharePaymentLink(
+ ): Promise<{ status: string; payment_request: string }> {
+   const response = await call.post<FrappeResponse<{ status: string; payment_request: string }>>(
+     `${M}.share_payment_link`,
+-    { session, recipient },
++    { _lang: activeLang(), session, recipient },
+   )
+   return response.message
+ }
+diff --git a/self-order/src/main.tsx b/self-order/src/main.tsx
+index bef5202a..8d153fad 100644
+--- a/self-order/src/main.tsx
++++ b/self-order/src/main.tsx
+@@ -2,9 +2,12 @@ import { StrictMode } from 'react'
+ import { createRoot } from 'react-dom/client'
+ import './index.css'
+ import App from './App.tsx'
++import { I18nProvider } from './i18n'
+ 
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+-    <App />
++    <I18nProvider>
++      <App />
++    </I18nProvider>
+   </StrictMode>,
+ )
+diff --git a/ury/www/order.py b/ury/www/order.py
+index 4d7ad0f7..aa829cf4 100644
+--- a/ury/www/order.py
++++ b/ury/www/order.py
+@@ -24,6 +24,8 @@ def get_context(context):
+ 	frappe.db.commit()  # nosemgrep
+ 
+ 	boot = frappe.website.utils.get_boot_data()
++	# Patch 24: the restaurant's default language, used by the page until the customer picks one.
++	boot["restaurant_lang"] = frappe.db.get_single_value("System Settings", "language") or "en"
+ 
+ 	boot_json = frappe.as_json(boot, indent=None, separators=(",", ":"))
+ 	boot_json = SCRIPT_TAG_PATTERN.sub("", boot_json)

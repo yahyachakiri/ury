@@ -1015,6 +1015,46 @@ Acceptance criteria:
 
 Risk profile: low. On a conflict keep `prefilledId` and `handlePaymentInputChange`.
 
+### Patch 24 — Customer self-ordering app in French and Arabic
+
+Feature (owner request 2026-10-20). URY's customer app (`/order`, QR at the
+table, pickup, kiosk, table tablet) had every text hardcoded in English and no
+translation support.
+
+Files touched:
+- `self-order/src/i18n.tsx` (new: en/fr/ar texts, language provider, FR / ع / EN switch)
+- `self-order/src/main.tsx`, `App.tsx`, `hooks/useOrderingSession.ts`,
+  `hooks/useDeviceBootstrap.ts`, `lib/api.ts`
+- `self-order/src/layouts/MobileQRLayout.tsx`, `TabletLayout.tsx`,
+  `LandscapeKioskLayout.tsx`, `PortraitKioskLayout.tsx`,
+  `PortableTabletAssignment.tsx`, `shared/CartPanel.tsx`, `shared/MenuGrid.tsx`
+- `ury/www/order.py` (boot `restaurant_lang`)
+
+What it does: about 55 texts go through `t()` (en, fr, ar). Language: the
+customer's choice (localStorage `ury_order_lang`), else the restaurant's
+default language (System Settings, sent in the page boot as `restaurant_lang`
+by `www/order.py`), else English. A FR / ع / EN switch sits in each header;
+Arabic sets `dir="rtl"` (left/right classes changed to start/end). Every API
+call sends `_lang`, so server messages (already translated in erp_restaurant's
+fr/ar csv) come in the page's language. Order lines and totals now use the
+currency formatter like the cart.
+
+Why it can't be done in `erp_restaurant`: the texts are compiled into the
+self-order bundle; the page boot is built by URY's `www/order.py`.
+
+Acceptance criteria:
+1. Restaurant default language French, phone never used the page: a scanned
+   table code opens the menu in French ("Commander", "Votre commande", "Total").
+2. Switch to ع: right to left, Arabic texts; the choice stays after a reload.
+3. A refused action (for example ordering disabled) shows the server message
+   in the page's language.
+
+Build: self-order only, not built by the deploy: `cd apps/ury/self-order && yarn build`
+on the server; `www/order.py` needs the normal restart.
+
+Risk profile: medium on update (texts spread over the layouts upstream edits).
+On a conflict keep the `t('...')` calls; new upstream texts need keys in `i18n.tsx`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

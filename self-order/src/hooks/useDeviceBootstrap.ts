@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { useEffect, useState } from 'react'
 import { bootstrapDevice, type OrderingContext } from '../lib/api'
 
@@ -40,7 +41,7 @@ export function useDeviceBootstrap() {
         const context = await bootstrapDevice(deviceId, deviceCredential)
         setDeviceContext(context)
       } catch (err) {
-        setDeviceError(err instanceof Error ? err.message : 'Unable to bootstrap this device.')
+        setDeviceError(err instanceof Error ? err.message : tr('device_bootstrap_failed'))
       } finally {
         setDeviceLoading(false)
       }

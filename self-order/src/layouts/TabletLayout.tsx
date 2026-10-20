@@ -5,6 +5,7 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+import { LanguageSwitch, useI18n } from '../i18n'
 
 const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
@@ -40,12 +41,13 @@ function TabletLayout({ initialContext }: LayoutProps) {
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+  const { t } = useI18n()
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(t('new_order_confirm'))) {
       resetSession()
     }
   }
@@ -73,7 +75,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading menu…
+        {t('loading_menu')}
       </div>
     )
   }
@@ -90,14 +92,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b bg-background/95 px-6 py-4">
         <h1 className="text-xl font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {context?.table ? t('table', { table: context.table }) : t('order_for_pickup')}
         </h1>
-        <button
-          onClick={handleReset}
-          className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
-        >
-          New Order
-        </button>
+        <div className="flex items-center gap-3">
+          <LanguageSwitch />
+          <button
+            onClick={handleReset}
+            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
+          >
+            {t('new_order')}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -112,7 +117,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
             capabilities={context?.capabilities}
             onAdd={addToCart}
             gridClassName="grid grid-cols-3 gap-4 lg:grid-cols-4"
-            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
+            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
             imageClassName="h-32 w-full object-cover"
           />
         </main>
@@ -131,21 +136,21 @@ function TabletLayout({ initialContext }: LayoutProps) {
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
-          className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
+          className="flex w-[32%] flex-col overflow-hidden border-s bg-background p-4"
         />
       </div>
 
       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
         <DialogContent onClose={handleStillHere}>
           <DialogHeader>
-            <DialogTitle>Still there?</DialogTitle>
+            <DialogTitle>{t('still_there')}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={handleStillHere}
               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
             >
-              I'm still here
+              {t('still_here')}
             </button>
           </DialogFooter>
         </DialogContent>

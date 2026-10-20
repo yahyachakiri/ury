@@ -24,6 +24,8 @@ def get_context(context):
 	frappe.db.commit()  # nosemgrep
 
 	boot = frappe.website.utils.get_boot_data()
+	# Patch 24: the restaurant's default language, used by the page until the customer picks one.
+	boot["restaurant_lang"] = frappe.db.get_single_value("System Settings", "language") or "en"
 
 	boot_json = frappe.as_json(boot, indent=None, separators=(",", ":"))
 	boot_json = SCRIPT_TAG_PATTERN.sub("", boot_json)
