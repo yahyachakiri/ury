@@ -6,6 +6,8 @@
   <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
   <link rel="icon" href="{{ favicon }}" />
   <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+  <!-- Patch 26: texts in the restaurant's default language (erp_restaurant branding.py) -->
+  <script>window.restaurant_lang = {{ (restaurant_lang or "en") | tojson }};</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mosaic</title>
 </head>

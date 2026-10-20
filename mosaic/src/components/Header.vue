@@ -1,12 +1,15 @@
 <template>
   <header class="bg-white p-4 flex justify-between items-center border-b border-gray-200">
-    <router-link to="/" class="flex items-center cursor-pointer">
-      <img :src="imagePath" alt="Logo" class="ml-20 w-40 h-15 mr-2">
+    <!-- Patch 26: "Kitchen" in the restaurant's language instead of the (oversized) logo -->
+    <router-link to="/" class="flex items-center cursor-pointer ms-4 text-2xl font-bold text-gray-900">
+      {{ $t('kitchen') }}
     </router-link>
     <div class="flex items-center gap-4">
       <button 
         class="flex justify-center items-center h-12 w-12 rounded-xl hover:bg-slate-200 transition-colors text-blue-800" 
         @click="reloadKOT"
+        :title="$t('refresh')"
+        :aria-label="$t('refresh')"
       >
         <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
           <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/>
@@ -31,7 +34,7 @@
           </svg>
         </button>
 
-        <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div v-if="showUserMenu" class="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
           <div class="p-4 border-b border-gray-200">
             <p class="text-sm font-semibold text-gray-900">{{ userName }}</p>
             <p class="text-sm font-semibold text-gray-500">{{ userId }}</p>
@@ -46,7 +49,7 @@
                 <line x1="8" x2="16" y1="21" y2="21"/>
                 <line x1="12" x2="12" y1="17" y2="21"/>
               </svg>
-              Switch to Dashboard
+              {{ $t('switch_to_dashboard') }}
             </button>
             
             <button
@@ -58,7 +61,7 @@
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" x2="9" y1="12" y2="12"/>
               </svg>
-              Logout
+              {{ $t('logout') }}
             </button>
           </div>
         </div>
@@ -68,14 +71,10 @@
 </template>
 
 <script>
-// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
-const urimosaicImage = window.app_logo_url || "";
-
 export default {
   name: "Header",
   data() {
     return {
-      imagePath: urimosaicImage,
       showUserMenu: false,
       userName: "User",
       userId: "user@example.com"

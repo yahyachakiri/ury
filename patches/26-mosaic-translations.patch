@@ -1,0 +1,495 @@
+diff --git a/mosaic/index.html b/mosaic/index.html
+index 26273c9a..f6cde365 100644
+--- a/mosaic/index.html
++++ b/mosaic/index.html
+@@ -6,6 +6,8 @@
+   <!-- Patch 15: desk logo (erp_restaurant branding.py) -->
+   <link rel="icon" href="{{ favicon }}" />
+   <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
++  <!-- Patch 26: texts in the restaurant's default language (erp_restaurant branding.py) -->
++  <script>window.restaurant_lang = {{ (restaurant_lang or "en") | tojson }};</script>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>Mosaic</title>
+ </head>
+diff --git a/mosaic/src/components/Header.vue b/mosaic/src/components/Header.vue
+index 41fcbbdb..99e32304 100644
+--- a/mosaic/src/components/Header.vue
++++ b/mosaic/src/components/Header.vue
+@@ -1,12 +1,15 @@
+ <template>
+   <header class="bg-white p-4 flex justify-between items-center border-b border-gray-200">
+-    <router-link to="/" class="flex items-center cursor-pointer">
+-      <img :src="imagePath" alt="Logo" class="ml-20 w-40 h-15 mr-2">
++    <!-- Patch 26: "Kitchen" in the restaurant's language instead of the (oversized) logo -->
++    <router-link to="/" class="flex items-center cursor-pointer ms-4 text-2xl font-bold text-gray-900">
++      {{ $t('kitchen') }}
+     </router-link>
+     <div class="flex items-center gap-4">
+       <button 
+         class="flex justify-center items-center h-12 w-12 rounded-xl hover:bg-slate-200 transition-colors text-blue-800" 
+         @click="reloadKOT"
++        :title="$t('refresh')"
++        :aria-label="$t('refresh')"
+       >
+         <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
+           <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/>
+@@ -31,7 +34,7 @@
+           </svg>
+         </button>
+ 
+-        <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
++        <div v-if="showUserMenu" class="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+           <div class="p-4 border-b border-gray-200">
+             <p class="text-sm font-semibold text-gray-900">{{ userName }}</p>
+             <p class="text-sm font-semibold text-gray-500">{{ userId }}</p>
+@@ -46,7 +49,7 @@
+                 <line x1="8" x2="16" y1="21" y2="21"/>
+                 <line x1="12" x2="12" y1="17" y2="21"/>
+               </svg>
+-              Switch to Dashboard
++              {{ $t('switch_to_dashboard') }}
+             </button>
+             
+             <button
+@@ -58,7 +61,7 @@
+                 <polyline points="16 17 21 12 16 7"/>
+                 <line x1="21" x2="9" y1="12" y2="12"/>
+               </svg>
+-              Logout
++              {{ $t('logout') }}
+             </button>
+           </div>
+         </div>
+@@ -68,14 +71,10 @@
+ </template>
+ 
+ <script>
+-// Patch 15: desk logo (set by the page, erp_restaurant branding.py).
+-const urimosaicImage = window.app_logo_url || "";
+-
+ export default {
+   name: "Header",
+   data() {
+     return {
+-      imagePath: urimosaicImage,
+       showUserMenu: false,
+       userName: "User",
+       userId: "user@example.com"
+diff --git a/mosaic/src/components/kot.vue b/mosaic/src/components/kot.vue
+index 837fe06c..fb0a12d2 100644
+--- a/mosaic/src/components/kot.vue
++++ b/mosaic/src/components/kot.vue
+@@ -13,12 +13,12 @@
+             <span
+               class="w-3 h-3 rounded-full inline-block mr-1 bg-red-500"
+             ></span>
+-            Not Permitted
++            {{ $t('not_permitted') }}
+           </p>
+           <hr class="border-gray-200" />
+ 
+           <p class="text-left text-xl mt-6 font-medium text-gray-500">
+-            Log in to access this page.
++            {{ $t('login_to_access') }}
+           </p>
+ 
+           <div class="flex justify">
+@@ -29,7 +29,7 @@
+               "
+               class="mt-8 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+             >
+-              Login
++              {{ $t('login') }}
+             </button>
+           </div>
+         </div>
+@@ -38,7 +38,7 @@
+     <!-- Alert Modal div end-->
+ 
+     <div v-if="kot.filter(k => k.production === production).length === 0 && !loadingKots" class="text-center py-10 text-gray-500 text-xl">
+-      No active orders for {{ production }}
++      {{ $t('no_active_orders', { unit: production }) }}
+     </div>
+ 
+     <div
+@@ -68,8 +68,8 @@
+               >
+                 {{
+                   kot.type === "Cancelled" || kot.type === "Partially cancelled"
+-                    ? "Confirm"
+-                    : "Serve"
++                    ? $t('confirm')
++                    : $t('serve')
+                 }}
+               </button>
+             </div>
+@@ -83,23 +83,23 @@
+                   <span
+                     v-if="kot.tableortakeaway !== 'Takeaway'"
+                     class="text-sm font-medium text-[#6B7280]"
+-                    >Table
++                    >{{ $t('table') }}
+                   </span>
+                   <span class="text-black-500 font-semibold">
+-                    {{ kot.tableortakeaway }}
++                    {{ kot.tableortakeaway === 'Takeaway' ? $t('takeaway') : kot.tableortakeaway }}
+                     <span class="text-sm font-medium text-[#6B7280]"
+                       >( {{ kot.user }} )</span
+                     ></span
+                   ><br />
+-                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator</span>
++                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">{{ $t('aggregator') }}</span>
+                   <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                     >{{ kot.customer_name }}
+                   </span><br v-if="kot.is_aggregator" />
+-                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator ID</span>
++                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">{{ $t('aggregator_id') }}</span>
+                   <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                     >{{ kot.aggregator_id }}
+                   </span><br v-if="kot.is_aggregator"/>
+-                  <span class="text-sm font-medium text-[#6B7280]">Order</span>
++                  <span class="text-sm font-medium text-[#6B7280]">{{ $t('order') }}</span>
+                   <span class="text-black-500 ml-2 font-semibold"
+                     >{{ this.daily_order_number ? kot.order_no : kot.invoice.slice(-4) }}
+                     
+@@ -111,7 +111,7 @@
+                       kot.type === 'Cancelled'
+                     "
+                   >
+-                    ( {{ kot.type }} )</span
++                    ( {{ $kotType(kot.type) }} )</span
+                   >
+                 </div>
+                 <div
+@@ -125,7 +125,7 @@
+                 v-if="kot.type === 'Duplicate'"
+                 class="text-[#DC0000] font-medium"
+               >
+-                ( Duplicate KOT ( CHECK WITH CAPTAIN ) )
++                ( {{ $t('duplicate_kot') }} )
+               </div>
+               <div v-show="kot.comments" class="text-[#6B7280] font-medium">
+                 ( {{ kot.comments }} )
+@@ -160,7 +160,7 @@
+                           kot.type === 'Partially cancelled' ||
+                           kot.type === 'Cancelled'
+                         "
+-                        >[Old Qty = {{ kotitem.quantity }}]</span
++                        >[{{ $t('old_qty', { qty: kotitem.quantity }) }}]</span
+                       >
+                     </div>
+                     <div>
+@@ -190,7 +190,7 @@
+       v-if="showAudioAlertMessage"
+       class="absolute top-1 left-1/2 transform -translate-x-1/2 p-2 font-bold text-2xl text-red-500 text-center"
+     >
+-      Audio notifications disabled. Click anywhere to enable.
++      {{ $t('audio_disabled') }}
+     </div>
+ 
+     <!-- KOT Delay Error Alert Banner -->
+@@ -203,11 +203,11 @@
+           <span class="text-3xl">⚠️</span>
+         </div>
+         <div class="flex-1">
+-          <p class="font-bold text-red-700">Order Delayed</p>
++          <p class="font-bold text-red-700">{{ $t('order_delayed') }}</p>
+           <p class="text-red-600 text-sm mt-1">
+-            <span v-if="!daily_order_number">Invoice: {{ kotErrorAlert.invoice.slice(-4) }}</span>
+-            <span v-else>Order #: {{ kotErrorAlert.order_no }}</span>
+-            | Table: {{ kotErrorAlert.tableortakeaway }} | Time: {{ kotErrorAlert.timestamp }}
++            <span v-if="!daily_order_number">{{ $t('invoice') }} : {{ kotErrorAlert.invoice.slice(-4) }}</span>
++            <span v-else>{{ $t('order_no') }} {{ kotErrorAlert.order_no }}</span>
++            | {{ $t('table') }} : {{ kotErrorAlert.tableortakeaway === 'Takeaway' ? $t('takeaway') : kotErrorAlert.tableortakeaway }} | {{ $t('time') }} : {{ kotErrorAlert.timestamp }}
+           </p>
+         </div>
+       </div>
+@@ -244,6 +244,7 @@
+ import { FrappeApp } from "frappe-js-sdk";
+ import Masonry from "masonry-layout";
+ import io from "socket.io-client";
++import { t } from "../i18n";
+ 
+ let host = window.location.hostname;
+ let port = window.location.port;
+@@ -580,7 +581,7 @@ export default {
+     },
+     handleOnline() {
+       this.isOnline = true;
+-      this.setStatusMessage("You are online");
++      this.setStatusMessage(t('online'));
+       this.hideStatusMessageAfterDelay();
+       this.fetchKOT().then(() => {
+         this.masonryLoading();
+@@ -588,7 +589,7 @@ export default {
+     },
+     handleOffline() {
+       this.isOnline = false;
+-      this.setStatusMessage("You are Offline");
++      this.setStatusMessage(t('offline'));
+     },
+     setStatusMessage(message) {
+       this.statusMessage = message;
+@@ -652,7 +653,7 @@ export default {
+ 
+             this.kotErrorAlert = {
+               invoice: doc.invoice,
+-              tableortakeaway: matchingKot?.tableortakeaway || 'Table/Takeaway info unavailable',
++              tableortakeaway: matchingKot?.tableortakeaway || t('table_unknown'),
+               order_no: matchingKot?.order_no || 'N/A',
+               timestamp: new Date().toLocaleTimeString()
+             };
+diff --git a/mosaic/src/components/production/ProductionCard.vue b/mosaic/src/components/production/ProductionCard.vue
+index 4dafa3c2..ef9252e4 100644
+--- a/mosaic/src/components/production/ProductionCard.vue
++++ b/mosaic/src/components/production/ProductionCard.vue
+@@ -20,7 +20,7 @@
+         </h2>
+ 
+         <p class="text-sm text-gray-500">
+-          Production Unit
++          {{ $t('production_unit') }}
+         </p>
+       </div>
+     </div>
+@@ -35,7 +35,7 @@
+         </div>
+ 
+         <div class="text-xs text-gray-500 mt-1">
+-          Active
++          {{ $t('active') }}
+         </div>
+       </div>
+ 
+@@ -46,7 +46,7 @@
+         </div>
+ 
+         <div class="text-xs text-gray-500 mt-1">
+-          Served
++          {{ $t('served') }}
+         </div>
+       </div>
+ 
+@@ -57,7 +57,7 @@
+         </div>
+ 
+         <div class="text-xs text-gray-500 mt-1">
+-          Total
++          {{ $t('total') }}
+         </div>
+       </div>
+ 
+@@ -66,7 +66,7 @@
+     <!-- Footer -->
+     <div class="mt-6 border-t pt-4">
+       <span class="text-xs text-gray-400">
+-        Click to view KOTs
++        {{ $t('open_unit') }}
+       </span>
+     </div>
+ 
+diff --git a/mosaic/src/components/production/ProductionDashboard.vue b/mosaic/src/components/production/ProductionDashboard.vue
+index f4109e15..1ad4a4eb 100644
+--- a/mosaic/src/components/production/ProductionDashboard.vue
++++ b/mosaic/src/components/production/ProductionDashboard.vue
+@@ -4,7 +4,7 @@
+     <!-- Loading -->
+     <div v-if="loading" class="text-center py-10">
+       <h2 class="text-lg font-semibold text-gray-500">
+-        Loading Production Dashboard...
++        {{ $t('loading_dashboard') }}
+       </h2>
+     </div>
+ 
+diff --git a/mosaic/src/i18n.js b/mosaic/src/i18n.js
+new file mode 100644
+index 00000000..ab8857c0
+--- /dev/null
++++ b/mosaic/src/i18n.js
+@@ -0,0 +1,141 @@
++// Patch 26: kitchen screen texts in English, French and Arabic, in the restaurant's
++// default language (System Settings, set on the page by erp_restaurant as window.restaurant_lang).
++
++const MESSAGES = {
++  en: {
++    kitchen: "Kitchen",
++    switch_to_dashboard: "Switch to Dashboard",
++    logout: "Logout",
++    refresh: "Refresh",
++    loading_dashboard: "Loading kitchen dashboard…",
++    production_unit: "Production unit",
++    active: "Active",
++    served: "Served",
++    total: "Total",
++    open_unit: "Tap to see the orders",
++    not_permitted: "Not permitted",
++    login_to_access: "Log in to access this page.",
++    login: "Log in",
++    no_active_orders: "No active orders for {unit}",
++    confirm: "Confirm",
++    serve: "Serve",
++    table: "Table",
++    takeaway: "Takeaway",
++    aggregator: "Aggregator",
++    aggregator_id: "Aggregator ID",
++    order: "Order",
++    type_cancelled: "Cancelled",
++    type_partially_cancelled: "Partially cancelled",
++    duplicate_kot: "Duplicate ticket: check with the waiter",
++    old_qty: "Old qty = {qty}",
++    audio_disabled: "Sound alerts are off. Tap anywhere to turn them on.",
++    order_delayed: "Order delayed",
++    invoice: "Invoice",
++    order_no: "Order #",
++    time: "Time",
++    table_unknown: "Table or takeaway unknown",
++    online: "You are online",
++    offline: "You are offline",
++    username: "Username",
++    password: "Password",
++    sign_in: "Sign in",
++  },
++  fr: {
++    kitchen: "Cuisine",
++    switch_to_dashboard: "Aller au tableau de bord",
++    logout: "Se déconnecter",
++    refresh: "Actualiser",
++    loading_dashboard: "Chargement de la cuisine…",
++    production_unit: "Poste de production",
++    active: "En cours",
++    served: "Servies",
++    total: "Total",
++    open_unit: "Touchez pour voir les commandes",
++    not_permitted: "Accès refusé",
++    login_to_access: "Connectez-vous pour accéder à cette page.",
++    login: "Se connecter",
++    no_active_orders: "Aucune commande en cours pour {unit}",
++    confirm: "Confirmer",
++    serve: "Servir",
++    table: "Table",
++    takeaway: "À emporter",
++    aggregator: "Plateforme",
++    aggregator_id: "N° plateforme",
++    order: "Commande",
++    type_cancelled: "Annulée",
++    type_partially_cancelled: "Annulée en partie",
++    duplicate_kot: "Ticket en double : vérifiez avec le serveur",
++    old_qty: "Ancienne qté = {qty}",
++    audio_disabled: "Les alertes sonores sont coupées. Touchez l'écran pour les activer.",
++    order_delayed: "Commande en retard",
++    invoice: "Facture",
++    order_no: "Commande n°",
++    time: "Heure",
++    table_unknown: "Table ou emporter inconnu",
++    online: "Vous êtes en ligne",
++    offline: "Vous êtes hors ligne",
++    username: "Identifiant",
++    password: "Mot de passe",
++    sign_in: "Se connecter",
++  },
++  ar: {
++    kitchen: "المطبخ",
++    switch_to_dashboard: "الانتقال إلى لوحة التحكم",
++    logout: "تسجيل الخروج",
++    refresh: "تحديث",
++    loading_dashboard: "جارٍ تحميل المطبخ…",
++    production_unit: "وحدة الإنتاج",
++    active: "قيد التحضير",
++    served: "تم تقديمها",
++    total: "المجموع",
++    open_unit: "اضغط لعرض الطلبات",
++    not_permitted: "غير مسموح",
++    login_to_access: "سجّل الدخول للوصول إلى هذه الصفحة.",
++    login: "تسجيل الدخول",
++    no_active_orders: "لا توجد طلبات جارية لـ {unit}",
++    confirm: "تأكيد",
++    serve: "تقديم",
++    table: "الطاولة",
++    takeaway: "سفري",
++    aggregator: "منصة التوصيل",
++    aggregator_id: "رقم المنصة",
++    order: "الطلب",
++    type_cancelled: "ملغى",
++    type_partially_cancelled: "ملغى جزئيا",
++    duplicate_kot: "تذكرة مكررة: تحقق مع النادل",
++    old_qty: "الكمية السابقة = {qty}",
++    audio_disabled: "التنبيهات الصوتية متوقفة. اضغط على الشاشة لتفعيلها.",
++    order_delayed: "طلب متأخر",
++    invoice: "الفاتورة",
++    order_no: "رقم الطلب",
++    time: "الوقت",
++    table_unknown: "الطاولة أو السفري غير معروف",
++    online: "أنت متصل",
++    offline: "أنت غير متصل",
++    username: "اسم المستخدم",
++    password: "كلمة المرور",
++    sign_in: "تسجيل الدخول",
++  },
++};
++
++const base = String(window.restaurant_lang || "en").slice(0, 2);
++export const lang = MESSAGES[base] ? base : "en";
++
++export function t(key, params) {
++  let text = MESSAGES[lang][key] ?? MESSAGES.en[key] ?? key;
++  for (const [name, value] of Object.entries(params || {})) text = text.split(`{${name}}`).join(String(value));
++  return text;
++}
++
++/** KOT type as shown to the kitchen (the stored value stays URY's English). */
++export function kotType(type) {
++  if (type === "Cancelled") return t("type_cancelled");
++  if (type === "Partially cancelled") return t("type_partially_cancelled");
++  return type;
++}
++
++export function applyDocumentLanguage() {
++  document.documentElement.lang = lang;
++  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
++  document.title = t("kitchen");
++}
+diff --git a/mosaic/src/main.js b/mosaic/src/main.js
+index 6223d1d0..9c92466f 100644
+--- a/mosaic/src/main.js
++++ b/mosaic/src/main.js
+@@ -3,9 +3,15 @@ import { createApp, reactive } from "vue";
+ import App from "./App.vue";
+ 
+ import router from './router';
++import { applyDocumentLanguage, kotType, t } from "./i18n";
+ 
++applyDocumentLanguage();
+ const app = createApp(App);
+ 
++// Patch 26: translations in every template ($t, $kotType).
++app.config.globalProperties.$t = t;
++app.config.globalProperties.$kotType = kotType;
++
+ // Plugins
+ app.use(router);
+ 
+diff --git a/mosaic/src/views/Login.vue b/mosaic/src/views/Login.vue
+index 49de60e3..21c0dd35 100644
+--- a/mosaic/src/views/Login.vue
++++ b/mosaic/src/views/Login.vue
+@@ -2,17 +2,17 @@
+   <div class="min-h-screen bg-white flex">
+ 	<div class="mx-auto w-full max-w-sm lg:w-96">
+ 	  <form @submit.prevent="login" class="space-y-6">
+-		<label for="email"> Username: </label>
++		<label for="email"> {{ $t('username') }} : </label>
+ 		<input type="text" v-model="email" />
+ 		<br />
+-		<label for="password"> Password: </label>
++		<label for="password"> {{ $t('password') }} : </label>
+ 		<input type="password" v-model="password" />
+ 
+ 		<button
+ 		  class="bg-blue-500 block text-white p-2 hover:bg-blue-700"
+ 		  type="submit"
+ 		>
+-		  Sign in
++		  {{ $t('sign_in') }}
+ 		</button>
+ 	  </form>
+ 	</div>

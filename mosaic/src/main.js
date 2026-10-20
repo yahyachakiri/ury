@@ -3,8 +3,14 @@ import { createApp, reactive } from "vue";
 import App from "./App.vue";
 
 import router from './router';
+import { applyDocumentLanguage, kotType, t } from "./i18n";
 
+applyDocumentLanguage();
 const app = createApp(App);
+
+// Patch 26: translations in every template ($t, $kotType).
+app.config.globalProperties.$t = t;
+app.config.globalProperties.$kotType = kotType;
 
 // Plugins
 app.use(router);

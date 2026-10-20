@@ -1085,8 +1085,49 @@ Acceptance criteria:
    about 45 s without reloading.
 3. A delivery recorded in /admin makes the meal available again on the next refresh.
 
+Commit: `ebe131d444aa3ffd9d86f1c7a9aa0befed59b278` (with erp_restaurant 47b1f9d). Owner test passed 2026-10-20.
+
 Risk profile: medium (pos-store.ts is high-risk). On a conflict keep the two
 mapped fields, the `silent` parameter and the MenuCard props.
+
+### Patch 26 — Kitchen screen (Mosaic) in the restaurant's language, "Kitchen" title
+
+Feature (owner request 2026-10-20).
+
+Files touched:
+- `mosaic/src/i18n.js` (new: en/fr/ar texts, `t()`, KOT type labels, document lang/dir)
+- `mosaic/src/main.js` (`$t`, `$kotType` on every template)
+- `mosaic/src/components/Header.vue`, `kot.vue`, `production/ProductionCard.vue`,
+  `production/ProductionDashboard.vue`, `mosaic/src/views/Login.vue`
+- `mosaic/index.html` (`window.restaurant_lang`)
+
+What it does: Mosaic had every text in English. All texts (header menu,
+dashboard, production unit cards, order cards, Serve / Confirm, cancelled
+types, delayed-order banner, online / offline messages, login) now come from
+`i18n.js` in English, French or Arabic, in the restaurant's default language
+(System Settings), which erp_restaurant's `update_website_context`
+(branding.py) puts on the page as `restaurant_lang`. Arabic sets `dir="rtl"`.
+The header's logo link (Patch 15's desk logo, too big there) is replaced by the
+word "Kitchen" / "Cuisine" / "المطبخ". URY's stored values ("Takeaway",
+"Cancelled") are unchanged; only their display is translated.
+
+Why it can't be done in `erp_restaurant`: the texts are compiled into the Mosaic
+bundle; the language itself comes from `erp_restaurant`.
+
+Acceptance criteria:
+1. Restaurant default language French: /mosaic shows "Cuisine", the unit cards
+   ("Poste de production", "En cours", "Servies"), order cards ("Table", "À
+   emporter", "Commande", "Servir") in French.
+2. Arabic default language: right to left, Arabic texts.
+3. Serving and confirming an order still work.
+
+Build: Mosaic is not built by the deploy and its build reads the bench's
+`sites/common_site_config.json` (server only): on the server run
+`cd apps/ury/mosaic && yarn install && yarn build`. Checked locally by compiling
+every component with `@vue/compiler-sfc` (the full build needs the bench file).
+
+Risk profile: low to medium (kot.vue is long and edited upstream). On a conflict
+keep the `$t(...)` calls; stored values must stay English.
 
 ## Build and deploy
 
