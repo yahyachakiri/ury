@@ -603,7 +603,7 @@ export default function CaptainOrder() {
       </div>
 
       {/* Tablet layout: side-by-side Menu | Order with primary action */}
-      <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:overflow-hidden">
+      <div className="hidden lg:flex lg:flex-col lg:flex-1">
         <div className="flex flex-row gap-4 flex-1 overflow-hidden p-3">
           {canModify && (
             <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -617,7 +617,7 @@ export default function CaptainOrder() {
 
         {/* Primary action for tablet */}
         {canModify && (
-          <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg">
+          <div className="sticky bottom-0 z-20 shrink-0">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>

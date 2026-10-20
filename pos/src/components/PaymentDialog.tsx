@@ -65,6 +65,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // percentage (10% of 250 MAD sent 25, the invoice got 25% off).
   const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
+  const [prefilledId, setPrefilledId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPaymentModes();
@@ -177,14 +178,27 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // Handler for input focus to auto-fill remaining balance
   const handlePaymentInputFocus = (id: string) => {
-    setPaymentInputs(inputs => {
-      // Only auto-fill if the field is empty or zero
-      if (!inputs[id] || parseFloat(inputs[id]) === 0) {
-        const remaining = getRemainingBalance(id);
-        return { ...inputs, [id]: remaining > 0 ? String(remaining) : '' };
+    // Only auto-fill if the field is empty or zero
+    if (!paymentInputs[id] || parseFloat(paymentInputs[id]) === 0) {
+      const remaining = getRemainingBalance(id);
+      if (remaining > 0) {
+        setPaymentInputs(inputs => ({ ...inputs, [id]: String(remaining) }));
+        // Patch 19/23: the next keystroke replaces the prefilled amount (tendered cash
+        // 100 on 68 gives 100, not 68100), even when typed before the selection shows.
+        setPrefilledId(id);
       }
-      return inputs;
-    });
+    }
+  };
+
+  const handlePaymentInputChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    if (prefilledId === id) {
+      const input = e.nativeEvent as InputEvent;
+      if (input.inputType === 'insertText' && input.data) value = input.data;
+      else if (input.inputType?.startsWith('delete')) value = '';
+      setPrefilledId(null);
+    }
+    setPaymentInputs(inputs => ({ ...inputs, [id]: value }));
   };
 
   const handlePayment = async () => {
@@ -294,7 +308,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                       min="0"
                       step="0.01"
                       value={paymentInputs[id] || ''}
-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
+                      onChange={e => handlePaymentInputChange(id, e)}
+                      onBlur={() => setPrefilledId(null)}
                       onFocus={(e) => {
                         handlePaymentInputFocus(id);
                         // Select the prefilled amount so typing the tendered cash replaces it (100, not 68100).

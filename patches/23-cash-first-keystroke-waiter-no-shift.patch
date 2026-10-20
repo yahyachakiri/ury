@@ -1,0 +1,118 @@
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index c67ad13d..7dd1fcce 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -603,7 +603,7 @@ export default function CaptainOrder() {
+       </div>
+ 
+       {/* Tablet layout: side-by-side Menu | Order with primary action */}
+-      <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:overflow-hidden">
++      <div className="hidden lg:flex lg:flex-col lg:flex-1">
+         <div className="flex flex-row gap-4 flex-1 overflow-hidden p-3">
+           {canModify && (
+             <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+@@ -617,7 +617,7 @@ export default function CaptainOrder() {
+ 
+         {/* Primary action for tablet */}
+         {canModify && (
+-          <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg">
++          <div className="sticky bottom-0 z-20 shrink-0">
+             <div className="flex items-center justify-between mb-2 px-1">
+               <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
+               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
+index 7a0e2d0d..63168205 100644
+--- a/pos/src/components/PaymentDialog.tsx
++++ b/pos/src/components/PaymentDialog.tsx
+@@ -65,6 +65,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+   // percentage (10% of 250 MAD sent 25, the invoice got 25% off).
+   const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
+   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
++  const [prefilledId, setPrefilledId] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     fetchPaymentModes();
+@@ -177,14 +178,27 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+ 
+   // Handler for input focus to auto-fill remaining balance
+   const handlePaymentInputFocus = (id: string) => {
+-    setPaymentInputs(inputs => {
+-      // Only auto-fill if the field is empty or zero
+-      if (!inputs[id] || parseFloat(inputs[id]) === 0) {
+-        const remaining = getRemainingBalance(id);
+-        return { ...inputs, [id]: remaining > 0 ? String(remaining) : '' };
++    // Only auto-fill if the field is empty or zero
++    if (!paymentInputs[id] || parseFloat(paymentInputs[id]) === 0) {
++      const remaining = getRemainingBalance(id);
++      if (remaining > 0) {
++        setPaymentInputs(inputs => ({ ...inputs, [id]: String(remaining) }));
++        // Patch 19/23: the next keystroke replaces the prefilled amount (tendered cash
++        // 100 on 68 gives 100, not 68100), even when typed before the selection shows.
++        setPrefilledId(id);
+       }
+-      return inputs;
+-    });
++    }
++  };
++
++  const handlePaymentInputChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
++    let value = e.target.value;
++    if (prefilledId === id) {
++      const input = e.nativeEvent as InputEvent;
++      if (input.inputType === 'insertText' && input.data) value = input.data;
++      else if (input.inputType?.startsWith('delete')) value = '';
++      setPrefilledId(null);
++    }
++    setPaymentInputs(inputs => ({ ...inputs, [id]: value }));
+   };
+ 
+   const handlePayment = async () => {
+@@ -294,7 +308,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+                       min="0"
+                       step="0.01"
+                       value={paymentInputs[id] || ''}
+-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
++                      onChange={e => handlePaymentInputChange(id, e)}
++                      onBlur={() => setPrefilledId(null)}
+                       onFocus={(e) => {
+                         handlePaymentInputFocus(id);
+                         // Select the prefilled amount so typing the tendered cash replaces it (100, not 68100).
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 94377a4c..70fdb60c 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -145,7 +145,7 @@
+         "loading": "جاري تحميل بيانات الفتح...",
+         "no_profiles": "لا يوجد ملف تعريف نقطة بيع متاح لمستخدمك في هذا الفرع. تواصل مع المدير.",
+         "no_payment_modes": "لا توجد طرق دفع مهيأة لهذه المحطة. تواصل مع المدير.",
+-        "no_permission": "ليس لديك صلاحية فتح جلسة. تواصل مع المدير.",
++        "no_permission": "لا توجد وردية مفتوحة ولا يمكنك فتح واحدة. اطلب من أمين الصندوق أو المسؤول فتح الصندوق.",
+         "previous_day_not_closed": "لم يتم إغلاق جلسة الأمس. تواصل مع المدير لإغلاقها قبل فتح جلسة اليوم.",
+         "main_cashier_not_open": "لم يفتح أمين الصندوق الرئيسي السجل بعد. يرجى الانتظار أو التواصل معه.",
+         "main_cashier_not_configured": "لم يتم إعداد أمين صندوق رئيسي لهذه المحطة. تواصل مع المدير.",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index e7ed1bbb..3621d504 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -138,7 +138,7 @@
+     "loading": "Loading opening data...",
+     "no_profiles": "No POS Profile is available for your user in this branch. Contact your manager.",
+     "no_payment_modes": "This terminal has no payment methods configured. Contact your manager.",
+-    "no_permission": "You don't have permission to open a session. Contact your manager.",
++    "no_permission": "No shift is open, and you cannot open one. Ask the cashier or the manager to open the till.",
+     "previous_day_not_closed": "Yesterday's session was never closed. Contact your manager to close it before opening today.",
+     "main_cashier_not_open": "The main cashier hasn't opened the register yet. Please wait or contact your main cashier.",
+     "main_cashier_not_configured": "No main cashier is set up for this terminal. Contact your manager.",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 4f7c1e53..b3f96839 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -138,7 +138,7 @@
+     "loading": "Chargement des données d'ouverture...",
+     "no_profiles": "Aucun profil PDV n'est disponible pour votre utilisateur dans cette succursale. Contactez votre responsable.",
+     "no_payment_modes": "Aucun mode de paiement n'est configuré sur ce terminal. Contactez votre responsable.",
+-    "no_permission": "Vous n'avez pas la permission d'ouvrir une session. Contactez votre responsable.",
++    "no_permission": "Aucun service n'est ouvert et vous ne pouvez pas en ouvrir. Demandez au caissier ou au responsable d'ouvrir la caisse.",
+     "previous_day_not_closed": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
+     "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
+     "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",

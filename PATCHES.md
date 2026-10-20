@@ -985,6 +985,35 @@ Not covered: dates in the POS use the browser's English format ("Oct 20, 1:04 PM
 Risk profile: low to medium (CaptainOrder.tsx is edited upstream). On a conflict
 keep the `t('...')` calls and `fetchPosProfile(true)`.
 
+### Patch 23 — Cash amount replaced on the first keystroke, waiter no-shift message, wide waiter layout
+
+Bug fix (browser retest 3, 2026-10-20, findings N1 and N3) and owner layout change.
+
+Files touched:
+- `pos/src/components/PaymentDialog.tsx`
+- `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`pos_opening.no_permission` reworded)
+- `pos/src/captain/pages/CaptainOrder.tsx` (owner change)
+
+What it does:
+- Patch 19 selected the prefilled payment amount one frame after focus; typing at
+  once still appended (38 + "50" = 3850). The field now remembers that it was
+  prefilled and the first typed character replaces the amount (a delete clears
+  it), whatever the selection timing. The selection is kept for the visual cue.
+- A waiter opening the POS with no open shift saw "You don't have permission to
+  open a session": the text now says no shift is open and asks the cashier or
+  manager to open the till (same key for any user who cannot open a shift).
+- Waiter order screen on wide screens (lg): the total and Send/Update Order bar
+  stays at the bottom (sticky) instead of scrolling away (owner change).
+
+Why it can't be done in `erp_restaurant`: POS bundle code and texts.
+
+Acceptance criteria:
+1. Payment of 38: tap Espèces and type 50 at once: 50, change 12. Same for 100 on 68.
+2. Waiter, no shift open: the French message asks the cashier to open the till.
+3. Waiter order screen at 1024 px and wider: total and Send Order always visible.
+
+Risk profile: low. On a conflict keep `prefilledId` and `handlePaymentInputChange`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

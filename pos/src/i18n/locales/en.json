@@ -138,7 +138,7 @@
     "loading": "Loading opening data...",
     "no_profiles": "No POS Profile is available for your user in this branch. Contact your manager.",
     "no_payment_modes": "This terminal has no payment methods configured. Contact your manager.",
-    "no_permission": "You don't have permission to open a session. Contact your manager.",
+    "no_permission": "No shift is open, and you cannot open one. Ask the cashier or the manager to open the till.",
     "previous_day_not_closed": "Yesterday's session was never closed. Contact your manager to close it before opening today.",
     "main_cashier_not_open": "The main cashier hasn't opened the register yet. Please wait or contact your main cashier.",
     "main_cashier_not_configured": "No main cashier is set up for this terminal. Contact your manager.",

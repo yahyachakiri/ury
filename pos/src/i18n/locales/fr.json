@@ -138,7 +138,7 @@
     "loading": "Chargement des données d'ouverture...",
     "no_profiles": "Aucun profil PDV n'est disponible pour votre utilisateur dans cette succursale. Contactez votre responsable.",
     "no_payment_modes": "Aucun mode de paiement n'est configuré sur ce terminal. Contactez votre responsable.",
-    "no_permission": "Vous n'avez pas la permission d'ouvrir une session. Contactez votre responsable.",
+    "no_permission": "Aucun service n'est ouvert et vous ne pouvez pas en ouvrir. Demandez au caissier ou au responsable d'ouvrir la caisse.",
     "previous_day_not_closed": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
     "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
     "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",
