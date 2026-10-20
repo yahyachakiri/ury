@@ -1129,6 +1129,30 @@ every component with `@vue/compiler-sfc` (the full build needs the bench file).
 Risk profile: low to medium (kot.vue is long and edited upstream). On a conflict
 keep the `$t(...)` calls; stored values must stay English.
 
+### Patch 27 — Close Shift expected cash includes the opening float
+
+Bug fix (owner report 2026-10-20).
+
+Files touched: `pos/src/components/POSClosingDialog.tsx` (`buildRows`)
+
+What it does: URY's Close Shift table showed "Expected" as the shift's takings
+only, without the opening amount: a shift opened with 10, no sale, counted 10,
+showed a +10 difference (and was saved that way, since the erp_restaurant
+closing hook only recomputed when there were invoices). Expected is now opening
+amount + takings per payment method, as ERPNext computes it and as the
+erp_restaurant hook saves it (pos_closing_hooks.py now also recomputes a shift
+with no sale).
+
+Why it can't be done in `erp_restaurant`: the dialog's figures are computed in
+the POS bundle (the saved closing is fixed in erp_restaurant).
+
+Acceptance criteria:
+1. Open with 10, no sale, close counting 10: Expected 10, difference 0, in the
+   dialog and in /admin Clôture du jour.
+2. Open with 10, cash sales 400: Expected 410; counting 410 gives 0.
+
+Risk profile: low. On a conflict keep the opening amount in `expected_amount`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

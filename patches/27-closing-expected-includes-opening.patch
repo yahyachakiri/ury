@@ -1,0 +1,22 @@
+diff --git a/pos/src/components/POSClosingDialog.tsx b/pos/src/components/POSClosingDialog.tsx
+index 740692dc..37217801 100644
+--- a/pos/src/components/POSClosingDialog.tsx
++++ b/pos/src/components/POSClosingDialog.tsx
+@@ -146,10 +146,16 @@ function buildRows(
+     });
+   });
+ 
++  // Patch 27: expected = opening float + takings, as ERPNext and the saved closing compute it
++  // (URY showed takings only: opening 10, no sale, counted 10 gave a +10 difference).
++  rows.forEach((row) => {
++    row.expected_amount = row.opening_amount;
++  });
++
+   Object.entries(expectedByMode).forEach(([mode, expected]) => {
+     const existing = rows.get(mode);
+     if (existing) {
+-      existing.expected_amount = expected;
++      existing.expected_amount = existing.opening_amount + expected;
+     } else {
+       rows.set(mode, {
+         mode_of_payment: mode,
