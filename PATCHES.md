@@ -1003,7 +1003,8 @@ What it does:
   open a session": the text now says no shift is open and asks the cashier or
   manager to open the till (same key for any user who cannot open a shift).
 - Waiter order screen on wide screens (lg): the total and Send/Update Order bar
-  stays at the bottom (sticky) instead of scrolling away (owner change).
+  stays at the bottom (sticky) instead of scrolling away, on a white card with a
+  top border (owner change).
 
 Why it can't be done in `erp_restaurant`: POS bundle code and texts.
 

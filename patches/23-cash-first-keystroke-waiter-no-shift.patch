@@ -116,3 +116,16 @@ index 4f7c1e53..b3f96839 100644
      "previous_day_not_closed": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
      "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
      "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index 7dd1fcce..57f37382 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -617,7 +617,7 @@ export default function CaptainOrder() {
+ 
+         {/* Primary action for tablet */}
+         {canModify && (
+-          <div className="sticky bottom-0 z-20 shrink-0">
++          <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg sticky bottom-0 z-20 shrink-0">
+             <div className="flex items-center justify-between mb-2 px-1">
+               <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
+               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>

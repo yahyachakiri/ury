@@ -617,7 +617,7 @@ export default function CaptainOrder() {
 
         {/* Primary action for tablet */}
         {canModify && (
-          <div className="sticky bottom-0 z-20 shrink-0">
+          <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg sticky bottom-0 z-20 shrink-0">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
