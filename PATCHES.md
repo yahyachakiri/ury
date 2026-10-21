@@ -1180,6 +1180,24 @@ Acceptance criteria:
 Risk profile: low. On a conflict keep `invoice.branch = branch` right after the
 branch is computed in the non-table path.
 
+### Patch 29 — Order types in the order Dine In, Take Away, Aggregators, then the rest
+
+Feature (owner request 2026-10-21).
+
+Files touched: `pos/src/data/order-types.ts` (`ORDER_TYPES` order only)
+
+What it does: the order type buttons on the POS page show Dine In, Take Away,
+Aggregators, Delivery, Phone In (upstream: Aggregators last). Values and
+labels unchanged; only the order of the array.
+
+Why it can't be done in `erp_restaurant`: the list is a constant in the POS bundle.
+
+Acceptance criteria:
+1. POS page: the order type buttons read Sur place, À emporter, Agrégateurs, then Livraison, Commande par téléphone (French), same order in Arabic (right to left).
+2. Each type still selects as before (default Take Away).
+
+Risk profile: low. On a conflict keep upstream entries and move Aggregators third.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

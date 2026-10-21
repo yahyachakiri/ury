@@ -1,0 +1,36 @@
+diff --git a/pos/src/data/order-types.ts b/pos/src/data/order-types.ts
+index 2cabe5b9..965c1eb4 100644
+--- a/pos/src/data/order-types.ts
++++ b/pos/src/data/order-types.ts
+@@ -8,6 +8,7 @@ export type OrderTypes= {
+     icon: React.ElementType;
+ }
+ 
++// Patch 29: Dine In, Take Away, Aggregators first (most used), then the rest.
+ export const ORDER_TYPES: OrderTypes[] = [
+     {
+         label: "Dine In",
+@@ -19,6 +20,11 @@ export const ORDER_TYPES: OrderTypes[] = [
+         value: "Take Away",
+         icon: ShoppingBag
+     },
++    {
++        label: "Aggregators",
++        value: "Aggregators",
++        icon: Globe
++    },
+     {
+         label: "Delivery",
+         value: "Delivery",
+@@ -28,11 +34,6 @@ export const ORDER_TYPES: OrderTypes[] = [
+         label: "Phone In",
+         value: "Phone In",
+         icon: Phone
+-    },
+-    {
+-        label: "Aggregators",
+-        value: "Aggregators",
+-        icon: Globe
+     }
+ ]
+ 

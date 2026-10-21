@@ -8,6 +8,7 @@ export type OrderTypes= {
     icon: React.ElementType;
 }
 
+// Patch 29: Dine In, Take Away, Aggregators first (most used), then the rest.
 export const ORDER_TYPES: OrderTypes[] = [
     {
         label: "Dine In",
@@ -20,6 +21,11 @@ export const ORDER_TYPES: OrderTypes[] = [
         icon: ShoppingBag
     },
     {
+        label: "Aggregators",
+        value: "Aggregators",
+        icon: Globe
+    },
+    {
         label: "Delivery",
         value: "Delivery",
         icon: Truck
@@ -28,11 +34,6 @@ export const ORDER_TYPES: OrderTypes[] = [
         label: "Phone In",
         value: "Phone In",
         icon: Phone
-    },
-    {
-        label: "Aggregators",
-        value: "Aggregators",
-        icon: Globe
     }
 ]
 
