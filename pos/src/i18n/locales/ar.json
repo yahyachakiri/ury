@@ -97,7 +97,11 @@
         "processing": "جاري المعالجة...",
         "short_by": "ناقص {{amount}}",
         "change_due": "الباقي: {{amount}}",
-        "success": "تم الدفع بنجاح: تم استلام {{amount}}"
+        "success": "تم الدفع بنجاح: تم استلام {{amount}}",
+        "handed_over": "سُلّم للموصّل",
+        "handed_over_confirm": "اضغط مرة أخرى: ستدفع المنصة لاحقًا",
+        "handed_over_done": "سُلّم للموصّل: {{platform}} مدين لنا بـ {{amount}}.",
+        "no_platform_method": "ليس لهذه المنصة طريقة دفع في هذا الفرع: اضبطها في تطبيق المالك."
     },
     "pos": {
         "not_opened_title": "نقطة البيع غير مفتوحة",

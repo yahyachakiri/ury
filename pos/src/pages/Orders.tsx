@@ -78,6 +78,13 @@ export default function Orders() {
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
+  // Patch 31: an aggregator order is handed to the courier, not paid at the counter.
+  const [confirmHandOver, setConfirmHandOver] = React.useState(false);
+  const [handingOver, setHandingOver] = React.useState(false);
+  // A first tap on one order never confirms another one (no blur on iPad Safari).
+  useEffect(() => {
+    setConfirmHandOver(false);
+  }, [selectedOrder?.name]);
   const [showSplitDialog, setShowSplitDialog] = React.useState(false);
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
@@ -756,7 +763,56 @@ export default function Orders() {
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
-                {isOrderEditable(selectedOrder.status) && (
+                {isOrderEditable(selectedOrder.status) && selectedOrder.order_type === 'Aggregators' && !isMergedBill(selectedOrder) && (
+                  // Patch 31: the platform pays later (weekly or monthly statement): the order is
+                  // settled with the platform's payment method for its total, no cash dialog.
+                  <Button
+                    className="flex-1"
+                    variant={confirmHandOver ? 'destructive' : 'default'}
+                    disabled={handingOver}
+                    onBlur={() => setConfirmHandOver(false)}
+                    onClick={async () => {
+                      if (String(selectedOrder.invoice_printed) === '0') {
+                        showToast.error(t('errors.please_print_first'));
+                        return;
+                      }
+                      if (!confirmHandOver) {
+                        setConfirmHandOver(true);
+                        return;
+                      }
+                      setConfirmHandOver(false);
+                      setHandingOver(true);
+                      try {
+                        const mop = await call.get('ury.ury_pos.api.getAggregatorMOP', { aggregator: selectedOrder.customer });
+                        const mode = mop?.message?.[0]?.mode_of_payment;
+                        if (!mode) throw new Error(t('payment.no_platform_method'));
+                        const amount = Number(selectedOrder.rounded_total) || Number(selectedOrder.grand_total) || 0;
+                        await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+                          // Keep a discount already on the order (make_invoice resets it when null).
+                          additionalDiscount:
+                            Number(selectedOrder.additional_discount_percentage) > 0 ? selectedOrder.additional_discount_percentage : null,
+                          cashier: posStore.posProfile?.cashier || '',
+                          customer: selectedOrder.customer,
+                          invoice: selectedOrder.name,
+                          owner: posStore.posProfile?.cashier || '',
+                          payments: [{ mode_of_payment: mode, amount }],
+                          pos_profile: posStore.posProfile?.name || '',
+                          table: null,
+                        });
+                        showToast.success(t('payment.handed_over_done', { platform: selectedOrder.customer, amount: formatCurrency(amount) }));
+                        clearSelectedOrder();
+                        await fetchOrders();
+                      } catch (err) {
+                        showToast.error(parseFrappeError(err, t('errors.payment_failed')));
+                      } finally {
+                        setHandingOver(false);
+                      }
+                    }}
+                  >
+                    {handingOver ? t('payment.processing') : confirmHandOver ? t('payment.handed_over_confirm') : t('payment.handed_over')}
+                  </Button>
+                )}
+                {isOrderEditable(selectedOrder.status) && (selectedOrder.order_type !== 'Aggregators' || isMergedBill(selectedOrder)) && (
                   <Button
                     className="flex-1"
                     onClick={() => {

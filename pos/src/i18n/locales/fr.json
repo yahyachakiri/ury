@@ -90,7 +90,11 @@
     "processing": "Traitement...",
     "short_by": "Manque {{amount}}",
     "change_due": "Monnaie à rendre : {{amount}}",
-    "success": "Paiement réussi : {{amount}} reçu"
+    "success": "Paiement réussi : {{amount}} reçu",
+    "handed_over": "Remis au livreur",
+    "handed_over_confirm": "Touchez encore : la plateforme paiera plus tard",
+    "handed_over_done": "Remis au livreur : {{platform}} nous doit {{amount}}.",
+    "no_platform_method": "Cette plateforme n'a pas de moyen de paiement dans cette succursale : configurez-la dans l'application du propriétaire."
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",

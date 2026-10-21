@@ -1224,6 +1224,41 @@ Acceptance criteria:
 Risk profile: medium (high-risk file). On a conflict keep Patch 08's block and
 add `|| selectedOrderType === 'Aggregators'` to its condition.
 
+### Patch 31 — Aggregator order "Handed to the courier" instead of a counter payment
+
+Feature (owner request 2026-10-21, ticket 23e). In Morocco the courier takes the
+order without paying; the platform pays the restaurant later (weekly or monthly).
+
+Files touched: `pos/src/pages/Orders.tsx` (payment button of the selected order),
+`pos/src/i18n/locales/{en,fr,ar}.json` (4 keys under `payment`)
+
+What it does: for a selected Aggregators order, the Payment button becomes
+"Remis au livreur" (second tap to confirm, print still required first). It reads
+the platform's payment method for the branch (URY `ury_pos.api.getAggregatorMOP`)
+and calls URY `make_invoice` with that method for the order total: no cash
+dialog, no change. The amount lands on the platform's "owes us" account set up
+by erp_restaurant (api/owner_aggregators.py), and the platform statements in the
+owner app list the order. Other order types keep the payment dialog. Upstream,
+the payment dialog offered only the till's methods, so an aggregator order was
+recorded as cash or card.
+
+Why it can't be done in `erp_restaurant`: the button and what it sends are POS bundle code.
+
+Acceptance criteria:
+1. Aggregators order (Glovo), printed, "Remis au livreur", tap again: paid, leaves the Draft list; payment method Glovo, amount = order total.
+2. Not printed: "please print first", nothing paid.
+3. A platform without a payment method on the branch: clear error, nothing paid.
+4. Take Away and Dine In: payment dialog as before.
+5. French and Arabic texts.
+6. A discount already on the order is kept; a merged bill keeps the payment dialog;
+   a first tap on one order never confirms another (confirm resets when the
+   selected order changes).
+7. The cashier's closing shows no shortfall for the platform method
+   (erp_restaurant pos_closing_hooks counts it as expected).
+
+Risk profile: low to medium. On a conflict keep the upstream Payment button for
+other order types and the Patch 31 branch for `order_type === 'Aggregators'`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

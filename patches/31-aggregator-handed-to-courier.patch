@@ -1,0 +1,127 @@
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 15da048b..b099ec0b 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -97,7 +97,11 @@
+         "processing": "جاري المعالجة...",
+         "short_by": "ناقص {{amount}}",
+         "change_due": "الباقي: {{amount}}",
+-        "success": "تم الدفع بنجاح: تم استلام {{amount}}"
++        "success": "تم الدفع بنجاح: تم استلام {{amount}}",
++        "handed_over": "سُلّم للموصّل",
++        "handed_over_confirm": "اضغط مرة أخرى: ستدفع المنصة لاحقًا",
++        "handed_over_done": "سُلّم للموصّل: {{platform}} مدين لنا بـ {{amount}}.",
++        "no_platform_method": "ليس لهذه المنصة طريقة دفع في هذا الفرع: اضبطها في تطبيق المالك."
+     },
+     "pos": {
+         "not_opened_title": "نقطة البيع غير مفتوحة",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 01c864b1..34940e36 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -90,7 +90,11 @@
+     "processing": "Processing...",
+     "short_by": "Short by {{amount}}",
+     "change_due": "Change due: {{amount}}",
+-    "success": "Payment successful: {{amount}} received"
++    "success": "Payment successful: {{amount}} received",
++    "handed_over": "Handed to the courier",
++    "handed_over_confirm": "Tap again: the platform pays later",
++    "handed_over_done": "Handed to the courier: {{platform}} owes {{amount}}.",
++    "no_platform_method": "This platform has no payment method in this branch: set it up in the owner app."
+   },
+   "pos": {
+     "not_opened_title": "POS Not Opened",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 8ba7f93b..26141867 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -90,7 +90,11 @@
+     "processing": "Traitement...",
+     "short_by": "Manque {{amount}}",
+     "change_due": "Monnaie à rendre : {{amount}}",
+-    "success": "Paiement réussi : {{amount}} reçu"
++    "success": "Paiement réussi : {{amount}} reçu",
++    "handed_over": "Remis au livreur",
++    "handed_over_confirm": "Touchez encore : la plateforme paiera plus tard",
++    "handed_over_done": "Remis au livreur : {{platform}} nous doit {{amount}}.",
++    "no_platform_method": "Cette plateforme n'a pas de moyen de paiement dans cette succursale : configurez-la dans l'application du propriétaire."
+   },
+   "pos": {
+     "not_opened_title": "PDV non ouvert",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 2f000089..cc6f66de 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -78,6 +78,13 @@ export default function Orders() {
+   const [cancelLoading, setCancelLoading] = React.useState(false);
+   const [editLoading, setEditLoading] = React.useState(false);
+   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
++  // Patch 31: an aggregator order is handed to the courier, not paid at the counter.
++  const [confirmHandOver, setConfirmHandOver] = React.useState(false);
++  const [handingOver, setHandingOver] = React.useState(false);
++  // A first tap on one order never confirms another one (no blur on iPad Safari).
++  useEffect(() => {
++    setConfirmHandOver(false);
++  }, [selectedOrder?.name]);
+   const [showSplitDialog, setShowSplitDialog] = React.useState(false);
+   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
+   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
+@@ -756,7 +763,56 @@ export default function Orders() {
+                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
+                 </Button>
+                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
+-                {isOrderEditable(selectedOrder.status) && (
++                {isOrderEditable(selectedOrder.status) && selectedOrder.order_type === 'Aggregators' && !isMergedBill(selectedOrder) && (
++                  // Patch 31: the platform pays later (weekly or monthly statement): the order is
++                  // settled with the platform's payment method for its total, no cash dialog.
++                  <Button
++                    className="flex-1"
++                    variant={confirmHandOver ? 'destructive' : 'default'}
++                    disabled={handingOver}
++                    onBlur={() => setConfirmHandOver(false)}
++                    onClick={async () => {
++                      if (String(selectedOrder.invoice_printed) === '0') {
++                        showToast.error(t('errors.please_print_first'));
++                        return;
++                      }
++                      if (!confirmHandOver) {
++                        setConfirmHandOver(true);
++                        return;
++                      }
++                      setConfirmHandOver(false);
++                      setHandingOver(true);
++                      try {
++                        const mop = await call.get('ury.ury_pos.api.getAggregatorMOP', { aggregator: selectedOrder.customer });
++                        const mode = mop?.message?.[0]?.mode_of_payment;
++                        if (!mode) throw new Error(t('payment.no_platform_method'));
++                        const amount = Number(selectedOrder.rounded_total) || Number(selectedOrder.grand_total) || 0;
++                        await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
++                          // Keep a discount already on the order (make_invoice resets it when null).
++                          additionalDiscount:
++                            Number(selectedOrder.additional_discount_percentage) > 0 ? selectedOrder.additional_discount_percentage : null,
++                          cashier: posStore.posProfile?.cashier || '',
++                          customer: selectedOrder.customer,
++                          invoice: selectedOrder.name,
++                          owner: posStore.posProfile?.cashier || '',
++                          payments: [{ mode_of_payment: mode, amount }],
++                          pos_profile: posStore.posProfile?.name || '',
++                          table: null,
++                        });
++                        showToast.success(t('payment.handed_over_done', { platform: selectedOrder.customer, amount: formatCurrency(amount) }));
++                        clearSelectedOrder();
++                        await fetchOrders();
++                      } catch (err) {
++                        showToast.error(parseFrappeError(err, t('errors.payment_failed')));
++                      } finally {
++                        setHandingOver(false);
++                      }
++                    }}
++                  >
++                    {handingOver ? t('payment.processing') : confirmHandOver ? t('payment.handed_over_confirm') : t('payment.handed_over')}
++                  </Button>
++                )}
++                {isOrderEditable(selectedOrder.status) && (selectedOrder.order_type !== 'Aggregators' || isMergedBill(selectedOrder)) && (
+                   <Button
+                     className="flex-1"
+                     onClick={() => {

@@ -90,7 +90,11 @@
     "processing": "Processing...",
     "short_by": "Short by {{amount}}",
     "change_due": "Change due: {{amount}}",
-    "success": "Payment successful: {{amount}} received"
+    "success": "Payment successful: {{amount}} received",
+    "handed_over": "Handed to the courier",
+    "handed_over_confirm": "Tap again: the platform pays later",
+    "handed_over_done": "Handed to the courier: {{platform}} owes {{amount}}.",
+    "no_platform_method": "This platform has no payment method in this branch: set it up in the owner app."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
