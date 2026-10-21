@@ -1259,6 +1259,47 @@ Acceptance criteria:
 Risk profile: low to medium. On a conflict keep the upstream Payment button for
 other order types and the Patch 31 branch for `order_type === 'Aggregators'`.
 
+### Patch 32 — Close Shift: delivery platform rows paid later, read-only
+
+Bug fix (owner report 2026-10-21: a shift with 0 opening cash and only Glovo
+orders could not be closed with 0 counted). Extends Patches 11 and 27.
+
+Files touched: `pos/src/components/POSClosingDialog.tsx` (load, validation),
+`pos/src/components/ClosingPaymentTable.tsx` (read-only platform row),
+`pos/src/i18n/locales/{en,fr,ar}.json` (`pos_closing.platform_paid_later`)
+
+What it does: the dialog reads the branch's delivery platforms and their
+payment methods (URY `getAggregator`, `getAggregatorMOP`). A platform method's
+row is pre-filled with counted = expected, marked as reviewed and shown as
+"Payé plus tard par la plateforme" (no input, difference 0). The all-zero rule
+(Patch 11) now looks only at rows with something to count, so a shift whose
+sales all went to platforms closes with 0 cash and 0 card. erp_restaurant
+pos_closing_hooks saves the platform row the same way.
+
+Why it can't be done in `erp_restaurant`: the refusal is the dialog's own
+validation; the saved closing is already fixed server side.
+
+Acceptance criteria:
+1. Opening 0, only Glovo orders, cash and card 0: Close Shift accepted; the Glovo
+   row shows "Payée plus tard", difference 0.
+2. Opening 0, a cash sale of 40 and Glovo orders, cash counted 0: blocked
+   (all zero with activity), as before.
+3. No platform set up: dialog as before (Patches 11, 27).
+4. French and Arabic.
+
+Each platform needs its own Mode of Payment (owner app creates one per
+platform): a platform pointed at a shared method such as Cash would make that
+row read-only.
+
+Manual test: as the main cashier (and as a sub-cashier if multiple cashier is
+used), open with 0, one Glovo order handed to the courier (Patch 31), close with
+cash and card 0: accepted; the saved POS Closing Entry (or Sub POS Closing) has
+the Glovo row with difference 0; fr and ar. Known gap: with multiple cashier
+on, URY's POS Closing Entry validate (ury_pos_closing_entry.calculate_closing_amount)
+rewrites every row's closing amount after erp_restaurant's hook (not checked).
+
+Risk profile: low. If the platform calls fail the dialog behaves as before.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

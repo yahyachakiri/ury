@@ -192,7 +192,8 @@
     "col_opening": "Opening",
     "col_expected": "Expected",
     "col_closing": "Closing",
-    "col_difference": "Difference"
+    "col_difference": "Difference",
+    "platform_paid_later": "Paid later by the platform"
   },
   "checklist": {
     "title_opening": "Opening Checklist",

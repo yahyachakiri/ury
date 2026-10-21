@@ -14,6 +14,7 @@ import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
+import { getAggregators } from '../lib/aggregator-api';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { getChecklist } from '../lib/checklist-api';
 import {
@@ -51,6 +52,24 @@ interface OpeningEntryDoc {
 }
 
 const pad = (value: number) => String(value).padStart(2, '0');
+
+/** Patch 32: payment methods of the branch's delivery platforms (paid later, nothing in the drawer). */
+async function getPlatformModes(): Promise<Set<string>> {
+  try {
+    const platforms = await getAggregators();
+    const modes = await Promise.all(
+      platforms.map((p) =>
+        call
+          .get<{ message: { mode_of_payment: string | null }[] }>('ury.ury_pos.api.getAggregatorMOP', { aggregator: p.customer })
+          .then((r) => r?.message?.[0]?.mode_of_payment || null)
+          .catch(() => null)
+      )
+    );
+    return new Set(modes.filter((m): m is string => !!m));
+  } catch {
+    return new Set();
+  }
+}
 
 /** Formats a Date as 'YYYY-MM-DD HH:mm:ss', matching the backend's expected format. */
 function formatDateTime(date: Date): string {
@@ -192,6 +211,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   // Modes the cashier has explicitly entered a closing amount for (Fix 2:
   // a blank input must not silently count as "reviewed and zero").
   const [touchedModes, setTouchedModes] = useState<Set<string>>(new Set());
+  // Patch 32: platform rows are counted as expected, read-only.
+  const [platformModes, setPlatformModes] = useState<Set<string>>(new Set());
   // Tracks a create-but-not-yet-submitted Sub POS Closing / POS Closing
   // Entry doc name so a retry after a failed submit re-submits the same
   // doc instead of creating a duplicate draft (Fix 3). Cleared only on
@@ -255,18 +276,21 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setPeriodEndDate(now);
       const end = formatDateTime(now);
 
-      const [invoices, openingDoc] = await Promise.all([
+      const [invoices, openingDoc, platforms] = await Promise.all([
         subCashier
           ? getSubCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name)
           : getMainCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name),
         db.getDoc<OpeningEntryDoc>('POS Opening Entry', ownEntry.name),
+        getPlatformModes(),
       ]);
 
       setInvoiceCount(invoices.length);
       const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
       setTotals(aggregatedTotals);
-      setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
-      setTouchedModes(new Set());
+      const built = buildRows(openingDoc?.balance_details ?? [], expectedByMode);
+      setPlatformModes(platforms);
+      setRows(built.map((row) => (platforms.has(row.mode_of_payment) ? { ...row, closing_amount: row.expected_amount } : row)));
+      setTouchedModes(new Set(built.filter((row) => platforms.has(row.mode_of_payment)).map((row) => row.mode_of_payment)));
     } catch (error) {
       console.error('Failed to load POS closing details:', error);
       setLoadError(extractServerErrorMessage(error, t('pos_closing.load_failed')));
@@ -318,10 +342,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     }
 
     const untouchedCount = rows.filter((row) => !touchedModes.has(row.mode_of_payment)).length;
-    const totalClosing = rows.reduce((sum, row) => sum + row.closing_amount, 0);
+    // Patch 32: platform rows (paid later) have nothing to count and do not make an
+    // all-zero count of the drawer invalid.
+    const counted = rows.filter((row) => !platformModes.has(row.mode_of_payment));
+    const totalClosing = counted.reduce((sum, row) => sum + row.closing_amount, 0);
     // Patch 11: a shift with no opening cash and no sales has nothing to
     // count, so an all-zero close is valid there.
-    const hasActivity = rows.some((row) => row.opening_amount !== 0 || row.expected_amount !== 0);
+    const hasActivity = counted.some((row) => row.opening_amount !== 0 || row.expected_amount !== 0);
 
     const zeroRowsWithActivity = rows.filter(
       (row) =>
@@ -343,7 +370,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         : null;
 
     return { isValid: !blockingMessage, blockingMessage, warningMessage };
-  }, [rows, touchedModes]);
+  }, [rows, touchedModes, platformModes]);
 
   const handleRequestSubmit = () => {
     if (!validation.isValid) return;
@@ -541,6 +568,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
               {hasRows ? (
                 <ClosingPaymentTable
                   rows={rows}
+                  platformModes={platformModes}
                   touchedModes={touchedModes}
                   onChange={handleRowChange}
                 />

@@ -192,7 +192,8 @@
     "col_opening": "Ouverture",
     "col_expected": "Attendu",
     "col_closing": "Compté",
-    "col_difference": "Écart"
+    "col_difference": "Écart",
+    "platform_paid_later": "Payé plus tard par la plateforme"
   },
   "checklist": {
     "title_opening": "Liste de contrôle d'ouverture",

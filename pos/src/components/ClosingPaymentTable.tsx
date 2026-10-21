@@ -9,12 +9,15 @@ interface ClosingPaymentTableProps {
   rows: ClosingPaymentSummary[];
   /** Modes the cashier has explicitly entered a closing amount for (see Fix 2). */
   touchedModes: Set<string>;
+  /** Patch 32: delivery platform methods, paid later: shown read-only, counted as expected. */
+  platformModes?: Set<string>;
   onChange: (modeOfPayment: string, closingAmount: number) => void;
 }
 
 const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
   rows,
   touchedModes,
+  platformModes,
   onChange,
 }) => {
   const handleClosingAmountChange = (modeOfPayment: string, value: string) => {
@@ -107,6 +110,9 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                   {formatCurrency(row.expected_amount)}
                 </td>
                 <td className="py-3 px-4">
+                  {platformModes?.has(row.mode_of_payment) ? (
+                    <span className="block text-center text-xs text-gray-500">{t('pos_closing.platform_paid_later')}</span>
+                  ) : (
                   <Input
                     type="number"
                     min="0"
@@ -119,6 +125,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                     className={cn('w-full text-center', !isTouched && 'border-amber-400')}
                     size="sm"
                   />
+                  )}
                 </td>
                 <td
                   className={cn(

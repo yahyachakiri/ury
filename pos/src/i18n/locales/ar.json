@@ -199,7 +199,8 @@
         "col_opening": "الافتتاح",
         "col_expected": "المتوقع",
         "col_closing": "المعدود",
-        "col_difference": "الفرق"
+        "col_difference": "الفرق",
+        "platform_paid_later": "تدفعها المنصة لاحقًا"
     },
     "checklist": {
         "title_opening": "قائمة تحقق الفتح",
