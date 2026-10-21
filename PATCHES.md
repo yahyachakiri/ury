@@ -1300,6 +1300,48 @@ rewrites every row's closing amount after erp_restaurant's hook (not checked).
 
 Risk profile: low. If the platform calls fail the dialog behaves as before.
 
+
+### Patch 33 — Aggregator order "Paid now" at the counter
+
+Feature (owner QA 2026-10-21, decision B). Some platform orders are paid at
+once at the counter (by the customer or the courier), at full price or minus
+the platform's commission. Extends Patch 31.
+
+Files touched: `pos/src/pages/Orders.tsx` (button, dialog, Patch 31 payment
+code moved into a shared `settleAggregatorOrder`), `pos/src/i18n/locales/{en,fr,ar}.json`
+(8 keys under `payment`, `paid_now*`)
+
+What it does: next to "Remis au livreur", an aggregator order gets "Payé sur
+place" (print still required first). The dialog takes the amount received
+(prefilled with the order total, any amount above 0 up to the total) and a
+till payment method. URY `make_invoice` is called with two payment rows: the
+amount received on the chosen method, and the rest of the total on the
+platform's payment method (`getAggregatorMOP`). ERPNext refuses a POS payment
+below the total, so the rest is recorded as owed by the platform; the owner
+settles it as commission in the platform statement (erp_restaurant
+owner_aggregators.record_payout with received 0 books it to "Delivery platform
+commissions"). Full amount received: one payment row, nothing owed.
+
+Why it can't be done in `erp_restaurant`: the button, the dialog and the
+payments sent are POS bundle code.
+
+Risk profile: medium. Orders.tsx is a busy upstream file (Patches 08, 10, 30, 31).
+If getAggregatorMOP fails, nothing is paid. The received amount is rounded to 2
+decimals once and the platform row is total minus it, so the rows sum to the total.
+
+Acceptance criteria:
+1. Glovo order of 80, printed, "Payé sur place", 80 in Cash: paid, one Cash row
+   of 80; the order is not in the Glovo statement.
+2. Same with 68 in Cash: rows Cash 68 and Glovo 12; Glovo statement lists the
+   order at 12; a payout with received 0 books 12 as commission.
+3. 0, empty or above the total: refused in the dialog, nothing paid; 3 decimals
+   (10.125) are rounded (10.13) and the rows still sum to the total. Glovo is
+   not offered as the method received.
+4. Not printed: "please print first". Platform without a method: clear error.
+5. Close Shift: cash expected includes the 68; the Glovo row is paid later
+   (Patch 32), no difference.
+6. "Remis au livreur" works as before (Patch 31). French and Arabic texts.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

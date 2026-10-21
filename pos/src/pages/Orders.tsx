@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@ury/ui';
+import { Badge, Button, Card, CardContent, Input } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
@@ -81,10 +81,55 @@ export default function Orders() {
   // Patch 31: an aggregator order is handed to the courier, not paid at the counter.
   const [confirmHandOver, setConfirmHandOver] = React.useState(false);
   const [handingOver, setHandingOver] = React.useState(false);
+  // Patch 33: an aggregator order paid at once at the counter (full price or minus the platform's
+  // commission): the amount received goes to a till method, the rest to the platform's method.
+  const [paidNowOpen, setPaidNowOpen] = React.useState(false);
+  const [paidNowAmount, setPaidNowAmount] = React.useState('');
+  const [paidNowMode, setPaidNowMode] = React.useState('');
+  // The platform's own method is not a way to receive money at the counter.
+  const [paidNowPlatformMode, setPaidNowPlatformMode] = React.useState('');
   // A first tap on one order never confirms another one (no blur on iPad Safari).
   useEffect(() => {
     setConfirmHandOver(false);
+    setPaidNowOpen(false);
   }, [selectedOrder?.name]);
+
+  type AggregatorOrder = NonNullable<typeof selectedOrder>;
+  const orderTotal = (order: AggregatorOrder) => Number(order.rounded_total) || Number(order.grand_total) || 0;
+
+  // Patches 31 and 33: pays an aggregator order through URY make_invoice. buildPayments gets the
+  // platform's payment method for the branch. Returns true when paid.
+  const settleAggregatorOrder = async (
+    order: AggregatorOrder,
+    buildPayments: (platformMode: string) => { mode_of_payment: string; amount: number }[],
+  ) => {
+    setHandingOver(true);
+    try {
+      const mop = await call.get('ury.ury_pos.api.getAggregatorMOP', { aggregator: order.customer });
+      const platformMode = mop?.message?.[0]?.mode_of_payment;
+      if (!platformMode) throw new Error(t('payment.no_platform_method'));
+      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+        // Keep a discount already on the order (make_invoice resets it when null).
+        additionalDiscount:
+          Number(order.additional_discount_percentage) > 0 ? order.additional_discount_percentage : null,
+        cashier: posStore.posProfile?.cashier || '',
+        customer: order.customer,
+        invoice: order.name,
+        owner: posStore.posProfile?.cashier || '',
+        payments: buildPayments(platformMode),
+        pos_profile: posStore.posProfile?.name || '',
+        table: null,
+      });
+      clearSelectedOrder();
+      await fetchOrders();
+      return true;
+    } catch (err) {
+      showToast.error(parseFrappeError(err, t('errors.payment_failed')));
+      return false;
+    } finally {
+      setHandingOver(false);
+    }
+  };
   const [showSplitDialog, setShowSplitDialog] = React.useState(false);
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
@@ -641,6 +686,86 @@ export default function Orders() {
                 </div>
               )}
             </div>
+            {/* Patch 33: aggregator order paid now, the rest owed by the platform (its commission). */}
+            <Dialog open={paidNowOpen} onOpenChange={(open) => !handingOver && setPaidNowOpen(open)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t('payment.paid_now_title', { platform: selectedOrder.customer })}</DialogTitle>
+                  <DialogDescription>{t('payment.paid_now_hint')}</DialogDescription>
+                </DialogHeader>
+                {(() => {
+                  const total = orderTotal(selectedOrder);
+                  // Rounded once, so the received row and the platform row always sum to the total.
+                  const received = Math.round(Number(paidNowAmount) * 100) / 100;
+                  const valid = Number.isFinite(received) && received > 0 && received <= total;
+                  const rest = valid ? Math.round((total - received) * 100) / 100 : 0;
+                  const tillModes = posStore.paymentModes.filter((mode) => mode !== paidNowPlatformMode);
+                  return (
+                    <>
+                      <div className="px-6 mb-3 space-y-3">
+                        <label className="block text-sm font-medium">
+                          {t('payment.paid_now_received', { total: formatCurrency(total) })}
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={paidNowAmount}
+                            onChange={(e) => setPaidNowAmount(e.target.value)}
+                            onFocus={(e) => {
+                              const input = e.currentTarget;
+                              requestAnimationFrame(() => input.select());
+                            }}
+                            className="mt-1"
+                            autoFocus
+                          />
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {tillModes.map((mode) => (
+                            <Button
+                              key={mode}
+                              type="button"
+                              variant={mode === paidNowMode ? 'default' : 'outline'}
+                              onClick={() => setPaidNowMode(mode)}
+                            >
+                              {mode}
+                            </Button>
+                          ))}
+                        </div>
+                        {!valid && paidNowAmount !== '' && (
+                          <p className="text-sm text-red-600">{t('payment.paid_now_invalid', { total: formatCurrency(total) })}</p>
+                        )}
+                        {valid && rest > 0 && (
+                          <p className="text-sm text-gray-600">
+                            {t('payment.paid_now_rest', { platform: selectedOrder.customer, amount: formatCurrency(rest) })}
+                          </p>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setPaidNowOpen(false)} disabled={handingOver}>
+                          {t('common.cancel')}
+                        </Button>
+                        <Button
+                          disabled={handingOver || !valid || !tillModes.includes(paidNowMode)}
+                          onClick={async () => {
+                            const done = await settleAggregatorOrder(selectedOrder, (platformMode) => [
+                              { mode_of_payment: paidNowMode, amount: received },
+                              ...(rest > 0 ? [{ mode_of_payment: platformMode, amount: rest }] : []),
+                            ]);
+                            if (done) {
+                              setPaidNowOpen(false);
+                              showToast.success(t('payment.paid_now_done', { amount: formatCurrency(received) }));
+                            }
+                          }}
+                        >
+                          {handingOver ? t('payment.processing') : t('payment.paid_now_confirm')}
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
             {/* Cancel Order Dialog */}
             <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
               <DialogContent>
@@ -781,35 +906,36 @@ export default function Orders() {
                         return;
                       }
                       setConfirmHandOver(false);
-                      setHandingOver(true);
-                      try {
-                        const mop = await call.get('ury.ury_pos.api.getAggregatorMOP', { aggregator: selectedOrder.customer });
-                        const mode = mop?.message?.[0]?.mode_of_payment;
-                        if (!mode) throw new Error(t('payment.no_platform_method'));
-                        const amount = Number(selectedOrder.rounded_total) || Number(selectedOrder.grand_total) || 0;
-                        await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-                          // Keep a discount already on the order (make_invoice resets it when null).
-                          additionalDiscount:
-                            Number(selectedOrder.additional_discount_percentage) > 0 ? selectedOrder.additional_discount_percentage : null,
-                          cashier: posStore.posProfile?.cashier || '',
-                          customer: selectedOrder.customer,
-                          invoice: selectedOrder.name,
-                          owner: posStore.posProfile?.cashier || '',
-                          payments: [{ mode_of_payment: mode, amount }],
-                          pos_profile: posStore.posProfile?.name || '',
-                          table: null,
-                        });
-                        showToast.success(t('payment.handed_over_done', { platform: selectedOrder.customer, amount: formatCurrency(amount) }));
-                        clearSelectedOrder();
-                        await fetchOrders();
-                      } catch (err) {
-                        showToast.error(parseFrappeError(err, t('errors.payment_failed')));
-                      } finally {
-                        setHandingOver(false);
-                      }
+                      const amount = orderTotal(selectedOrder);
+                      const done = await settleAggregatorOrder(selectedOrder, (platformMode) => [{ mode_of_payment: platformMode, amount }]);
+                      if (done) showToast.success(t('payment.handed_over_done', { platform: selectedOrder.customer, amount: formatCurrency(amount) }));
                     }}
                   >
                     {handingOver ? t('payment.processing') : confirmHandOver ? t('payment.handed_over_confirm') : t('payment.handed_over')}
+                  </Button>
+                )}
+                {isOrderEditable(selectedOrder.status) && selectedOrder.order_type === 'Aggregators' && !isMergedBill(selectedOrder) && (
+                  // Patch 33: paid at once at the counter instead of by the platform later.
+                  <Button
+                    variant="outline"
+                    disabled={handingOver}
+                    onClick={() => {
+                      if (String(selectedOrder.invoice_printed) === '0') {
+                        showToast.error(t('errors.please_print_first'));
+                        return;
+                      }
+                      void posStore.fetchPaymentModes();
+                      setPaidNowAmount(String(orderTotal(selectedOrder)));
+                      setPaidNowMode('');
+                      setPaidNowPlatformMode('');
+                      setPaidNowOpen(true);
+                      call
+                        .get('ury.ury_pos.api.getAggregatorMOP', { aggregator: selectedOrder.customer })
+                        .then((mop: any) => setPaidNowPlatformMode(mop?.message?.[0]?.mode_of_payment || ''))
+                        .catch(() => undefined);
+                    }}
+                  >
+                    {t('payment.paid_now')}
                   </Button>
                 )}
                 {isOrderEditable(selectedOrder.status) && (selectedOrder.order_type !== 'Aggregators' || isMergedBill(selectedOrder)) && (

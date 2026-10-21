@@ -94,7 +94,15 @@
     "handed_over": "Remis au livreur",
     "handed_over_confirm": "Touchez encore : la plateforme paiera plus tard",
     "handed_over_done": "Remis au livreur : {{platform}} nous doit {{amount}}.",
-    "no_platform_method": "Cette plateforme n'a pas de moyen de paiement dans cette succursale : configurez-la dans l'application du propriétaire."
+    "no_platform_method": "Cette plateforme n'a pas de moyen de paiement dans cette succursale : configurez-la dans l'application du propriétaire.",
+    "paid_now": "Payé sur place",
+    "paid_now_title": "Commande {{platform}} payée sur place",
+    "paid_now_hint": "Le client ou le livreur a payé au comptoir. Saisissez le montant reçu : le reste est noté comme dû par la plateforme (à régler comme sa commission dans le relevé de la plateforme).",
+    "paid_now_received": "Montant reçu (total de la commande {{total}})",
+    "paid_now_invalid": "Saisissez un montant supérieur à 0 et au plus {{total}}.",
+    "paid_now_rest": "{{platform}} devra {{amount}} (commission).",
+    "paid_now_confirm": "Enregistrer le paiement",
+    "paid_now_done": "Paiement enregistré : {{amount}} reçu."
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",

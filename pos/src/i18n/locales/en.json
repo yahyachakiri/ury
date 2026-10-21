@@ -94,7 +94,15 @@
     "handed_over": "Handed to the courier",
     "handed_over_confirm": "Tap again: the platform pays later",
     "handed_over_done": "Handed to the courier: {{platform}} owes {{amount}}.",
-    "no_platform_method": "This platform has no payment method in this branch: set it up in the owner app."
+    "no_platform_method": "This platform has no payment method in this branch: set it up in the owner app.",
+    "paid_now": "Paid now",
+    "paid_now_title": "{{platform}} order paid now",
+    "paid_now_hint": "The customer or the courier paid at the counter. Enter the amount received: the rest is recorded as owed by the platform (settle it as its commission in the platform statement).",
+    "paid_now_received": "Amount received (order total {{total}})",
+    "paid_now_invalid": "Enter an amount above 0 and at most {{total}}.",
+    "paid_now_rest": "{{platform}} will owe {{amount}} (commission).",
+    "paid_now_confirm": "Record the payment",
+    "paid_now_done": "Payment recorded: {{amount}} received."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
