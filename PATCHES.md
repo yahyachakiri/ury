@@ -1198,6 +1198,26 @@ Acceptance criteria:
 
 Risk profile: low. On a conflict keep upstream entries and move Aggregators third.
 
+### Patch 30 — Aggregator order opens in Orders, already selected (like Take Away)
+
+Feature (owner request 2026-10-21). Extends Patch 08.
+
+Files touched: `pos/src/components/OrderPanel.tsx` (Patch 08 condition only)
+
+What it does: after a successful `sync_order`, an Aggregators order goes to
+Orders, tab Draft, with the saved order selected, exactly like Take Away
+(Patch 08): the cashier prints and pays with the platform's method there.
+
+Why it can't be done in `erp_restaurant`: route and selected order are POS browser state.
+
+Acceptance criteria:
+1. New Aggregators order (Glovo), confirm: Orders, tab Draft, the order selected.
+2. Print, Payment: the platform's payment method is offered; paying works.
+3. Take Away still goes to Orders; Dine In, Delivery, Phone In stay on the POS page.
+
+Risk profile: medium (high-risk file). On a conflict keep Patch 08's block and
+add `|| selectedOrderType === 'Aggregators'` to its condition.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

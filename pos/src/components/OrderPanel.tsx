@@ -158,7 +158,8 @@ const OrderPanel = () => {
           showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
         });
       }
-      if (selectedOrderType === 'Take Away' && savedName) {
+      // Patch 30: an aggregator order (paid by the platform) goes the same way.
+      if ((selectedOrderType === 'Take Away' || selectedOrderType === 'Aggregators') && savedName) {
         const rootStore = useRootStore.getState();
         rootStore.setOrderSearchQuery('');
         await rootStore.setSelectedStatus('Draft');
