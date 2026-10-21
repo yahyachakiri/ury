@@ -1153,6 +1153,33 @@ Acceptance criteria:
 
 Risk profile: low. On a conflict keep the opening amount in `expected_amount`.
 
+### Patch 28 — New aggregator orders get their branch before the price list lookup
+
+Bug fix (owner report 2026-10-21, ticket 23d: "Price list for customer Glovo in branch None not found in Aggregator Settings").
+
+Files touched: `ury/ury/doctype/ury_order/ury_order.py` (`_resolve_or_create_pos_invoice`)
+
+What it does: for an order without a table (Take Away, Aggregators...), URY builds
+a new POS Invoice, computes the user's branch, but leaves `invoice.branch` empty
+until the insert. `sync_order` then looks up the aggregator's price list with
+`parent = invoice.branch`, i.e. `None`, and refuses every new aggregator order.
+The patch sets `invoice.branch` to that same branch when it is empty. Existing
+orders and table orders are unchanged.
+
+Why it can't be done in `erp_restaurant`: the invoice is a local object inside
+URY's `sync_order`, and the refusal happens before any document event
+(before_insert, validate) that erp_restaurant could hook; the only other ways
+are overriding all of `sync_order` or monkeypatching URY.
+
+Acceptance criteria:
+1. New Aggregators order for a platform set up on the branch (Glovo): saved,
+   with the platform price list, no error.
+2. New Take Away order: unchanged.
+3. Customer QR (self-ordering) pickup order: unchanged (its branch comes from `override_branch`).
+
+Risk profile: low. On a conflict keep `invoice.branch = branch` right after the
+branch is computed in the non-table path.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

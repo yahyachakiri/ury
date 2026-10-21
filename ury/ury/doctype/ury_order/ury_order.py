@@ -815,6 +815,10 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
 
         branch = override_branch or getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
+        # Patch 28: a new order without a table had no branch until insert, so sync_order's
+        # aggregator price list lookup ran with branch None and refused every new aggregator order.
+        if not invoice.branch:
+            invoice.branch = branch
 
         menu=get_menu_name(order_type)
 
