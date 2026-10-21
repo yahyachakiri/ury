@@ -1161,10 +1161,15 @@ Files touched: `ury/ury/doctype/ury_order/ury_order.py` (`_resolve_or_create_pos
 
 What it does: for an order without a table (Take Away, Aggregators...), URY builds
 a new POS Invoice, computes the user's branch, but leaves `invoice.branch` empty
-until the insert. `sync_order` then looks up the aggregator's price list with
+(it is only filled from the POS Profile at validate, `fetch_if_empty`). `sync_order` then looks up the aggregator's price list with
 `parent = invoice.branch`, i.e. `None`, and refuses every new aggregator order.
 The patch sets `invoice.branch` to that same branch when it is empty. Existing
-orders and table orders are unchanged.
+orders and table orders are unchanged. Side effects (review 2026-10-21): new
+non-table orders now get `custom_course` on their lines from the first send
+(the branch menu lookup used to find nothing until a later edit), and URY's
+multiple-cashier lookup gets a real branch (no effect while multiple cashier
+is off). The branch now comes from the user's URY User branch (`getBranch()`)
+instead of the POS Profile's; staff_access keeps them aligned.
 
 Why it can't be done in `erp_restaurant`: the invoice is a local object inside
 URY's `sync_order`, and the refusal happens before any document event
@@ -1176,6 +1181,7 @@ Acceptance criteria:
    with the platform price list, no error.
 2. New Take Away order: unchanged.
 3. Customer QR (self-ordering) pickup order: unchanged (its branch comes from `override_branch`).
+4. Emergency till /caisse sync and a Delivery order: unchanged.
 
 Risk profile: low. On a conflict keep `invoice.branch = branch` right after the
 branch is computed in the non-table path.
