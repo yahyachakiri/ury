@@ -268,6 +268,10 @@ export const generateCartHash = (state: Partial<POSState>) => {
   });
 };
 
+// Patch 35: what decides which menu is shown (order type, platform, room).
+const menuKey = (s: { selectedOrderType?: string | null; selectedAggregator?: { customer?: string } | null; selectedRoom?: string | null }) =>
+  `${s.selectedOrderType ?? ''}|${s.selectedAggregator?.customer ?? ''}|${s.selectedRoom ?? ''}`;
+
 const getInitialTabsState = () => {
   try {
     const saved = localStorage.getItem('posOrderTabsData');
@@ -431,8 +435,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   // Patch 25: silent = background refresh of sold-out meals (no spinner, errors ignored).
   fetchMenuItems: async (silent = false) => {
-    const { posProfile, selectedRoom, selectedOrderType } = get();
+    const { posProfile, selectedRoom, selectedOrderType, selectedAggregator } = get();
     if (!posProfile?.restaurant) return;
+    // Patch 35: a delivery-platform order (also a tab restored after a reload or a tab switch)
+    // shows the platform's menu and prices, never the restaurant menu (e2e test 2026-10-22).
+    if (selectedOrderType === 'Aggregators' && selectedAggregator?.customer) {
+      if (!silent) await get().fetchAggregatorMenu(selectedAggregator.customer);
+      return;
+    }
 
     try {
       if (!silent) set({ menuLoading: true, error: null });
@@ -639,7 +649,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       });
     }
     
-    if (type !== 'Aggregators') {
+    // Patch 35: back to Aggregators with a platform still chosen loads that platform's menu.
+    if (type !== 'Aggregators' || get().selectedAggregator?.customer) {
       fetchMenuItems();
     }
   },
@@ -984,6 +995,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     const newHeldTabs = { ...state.heldTabs, [state.activeTabId]: currentTabState };
     const targetTabState = newHeldTabs[tabId];
 
+    const previousMenu = menuKey(state);
     set({
       activeTabId: tabId,
       heldTabs: newHeldTabs,
@@ -999,6 +1011,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         originalCartHash: targetTabState.originalCartHash,
       lastModifiedTime: targetTabState.lastModifiedTime ?? null,
     });
+    // Patch 35: the menu follows the tab (platform menu, room menu).
+    if (menuKey(get()) !== previousMenu) get().fetchMenuItems();
   },
 
   closeTab: (tabId: string) => {
@@ -1041,6 +1055,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const targetIndex = Math.min(closedIndex, newTabOrder.length - 1);
       const targetTab = newTabOrder[targetIndex];
       const targetTabState = newHeldTabs[targetTab.id];
+      const previousMenu = menuKey(state);
 
       set({
         tabOrder: newTabOrder,
@@ -1061,6 +1076,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         orderLoading: false,
         error: null,
       });
+      // Patch 35: the menu follows the tab now shown.
+      if (menuKey(get()) !== previousMenu) get().fetchMenuItems();
     } else {
       // Closing an inactive tab — just remove it
       set({ tabOrder: newTabOrder, heldTabs: newHeldTabs });

@@ -1374,6 +1374,42 @@ Acceptance criteria:
 
 Patch file: `patches/34-reload-after-opening.patch`.
 
+### Patch 35 — A delivery-platform order always shows the platform's menu
+
+Fix (end-to-end test 2026-10-22). A tab restored after a page reload, or reached
+by switching tabs, kept the platform selected (Agrégateurs + Glovo) but showed
+the restaurant menu and prices: the cashier could add items at the wrong price.
+
+Files touched: `pos/src/store/pos-store.ts` (fetchMenuItems)
+
+What it does: when the current order type is Aggregators and a platform is
+chosen, fetchMenuItems loads that platform's menu (fetchAggregatorMenu) instead
+of the restaurant menu; a silent background refresh (Patch 25) does nothing.
+Callers: start-up, table change and order sent (as before); switchTab and the
+active-tab branch of closeTab now call it when the order type, platform or room
+differs from the previous tab (menuKey); setSelectedOrderType calls it when
+coming back to Aggregators with a platform still chosen.
+
+Known gap (unchanged): a platform draft opened from Orders gets no platform
+(openDraftOrderInNewTab sets selectedAggregator to null).
+
+Why it can't be done in `erp_restaurant`: which menu the POS shows is decided by
+the POS store in the browser.
+
+Risk profile: medium (pos-store.ts is a high-risk file, next to Patch 25's code).
+An early return at the top of fetchMenuItems plus three call sites; other order
+types are unchanged.
+
+Acceptance criteria:
+1. Glovo order with one item, reload the page: the restored tab shows Glovo's
+   menu and prices.
+2. Two tabs, one Glovo, one takeaway: switching between them, and closing the
+   active one, shows each tab's menu.
+2b. Agrégateurs + Glovo, then À emporter, then Agrégateurs again: Glovo's prices.
+3. Takeaway and dine-in orders: restaurant menu as before; sold-out refresh still works.
+
+Patch file: `patches/35-platform-menu-on-restore.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
