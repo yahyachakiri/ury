@@ -1,0 +1,87 @@
+diff --git a/pos/src/components/Header.tsx b/pos/src/components/Header.tsx
+index 0f1a1d32..f7316ede 100644
+--- a/pos/src/components/Header.tsx
++++ b/pos/src/components/Header.tsx
+@@ -9,12 +9,13 @@ import {
+   LogOut,
+   RefreshCw,
+   Lock,
++  Store,
+ } from 'lucide-react';
+ import { Button, Input } from '@ury/ui';
+ import { useRootStore } from '../store/root-store';
+ import { usePOSStore } from '../store/pos-store';
+ import type { RootState } from '../store/root-store';
+-import { logout } from '@ury/core';
++import { call, logout } from '@ury/core';
+ import { showToast } from '@ury/ui';
+ 
+ const Header = () => {
+@@ -26,6 +27,14 @@ const Header = () => {
+   const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
+   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
++  // Patch 34: staff in several branches pick one before the POS (erp_restaurant pos_branch.py,
++  // page /pos-branch); "Change branch" goes back there. Hidden with one usable branch.
++  const [branchCount, setBranchCount] = useState(0);
++  useEffect(() => {
++    call.get('erp_restaurant.erp_restaurant.pos_branch.get_pos_branches')
++      .then((res: any) => setBranchCount(res?.message?.branches?.length ?? 0))
++      .catch(() => setBranchCount(0));
++  }, []);
+ 
+   // Determine placeholder and handlers based on route
+   let searchPlaceholder = t('header.search_placeholder_default');
+@@ -175,6 +184,16 @@ const Header = () => {
+                     <Lock className="w-4 h-4 me-3" />
+                     {t('header.close_shift')}
+                   </Button>
++                  {branchCount > 1 && (
++                    <Button
++                      variant="ghost"
++                      className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
++                      onClick={() => (window.location.href = '/pos-branch?redirect-to=%2Fpos')}
++                    >
++                      <Store className="w-4 h-4 me-3" />
++                      {t('header.change_branch')}
++                    </Button>
++                  )}
+                   <Button
+                     variant="ghost"
+                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 93efc27f..1e64533d 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -42,6 +42,7 @@
+         "close_shift": "إغلاق الوردية",
+         "switch_to_desk": "التبديل إلى المكتب",
+         "clear_cache": "مسح ذاكرة التخزين المؤقت",
++        "change_branch": "تغيير الفرع",
+         "logout": "تسجيل الخروج"
+     },
+     "menu": {
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 8e7d20cc..3febf0f9 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -35,6 +35,7 @@
+     "close_shift": "Close Shift",
+     "switch_to_desk": "Switch To Desk",
+     "clear_cache": "Clear Cache",
++    "change_branch": "Change branch",
+     "logout": "Logout"
+   },
+   "menu": {
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 420717c0..c7f8e063 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -35,6 +35,7 @@
+     "close_shift": "Clôturer la session",
+     "switch_to_desk": "Accéder au bureau",
+     "clear_cache": "Vider le cache",
++    "change_branch": "Changer de succursale",
+     "logout": "Déconnexion"
+   },
+   "menu": {

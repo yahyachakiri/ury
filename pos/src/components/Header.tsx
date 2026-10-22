@@ -9,12 +9,13 @@ import {
   LogOut,
   RefreshCw,
   Lock,
+  Store,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout } from '@ury/core';
+import { call, logout } from '@ury/core';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
@@ -26,6 +27,14 @@ const Header = () => {
   const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
+  // Patch 34: staff in several branches pick one before the POS (erp_restaurant pos_branch.py,
+  // page /pos-branch); "Change branch" goes back there. Hidden with one usable branch.
+  const [branchCount, setBranchCount] = useState(0);
+  useEffect(() => {
+    call.get('erp_restaurant.erp_restaurant.pos_branch.get_pos_branches')
+      .then((res: any) => setBranchCount(res?.message?.branches?.length ?? 0))
+      .catch(() => setBranchCount(0));
+  }, []);
 
   // Determine placeholder and handlers based on route
   let searchPlaceholder = t('header.search_placeholder_default');
@@ -175,6 +184,16 @@ const Header = () => {
                     <Lock className="w-4 h-4 me-3" />
                     {t('header.close_shift')}
                   </Button>
+                  {branchCount > 1 && (
+                    <Button
+                      variant="ghost"
+                      className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => (window.location.href = '/pos-branch?redirect-to=%2Fpos')}
+                    >
+                      <Store className="w-4 h-4 me-3" />
+                      {t('header.change_branch')}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
