@@ -605,5 +605,9 @@
     "no_app_permission": "Vous n'avez pas le droit d'accéder à cette application.",
     "pos_profile_missing": "Profil PDV introuvable ou non configuré.",
     "required_roles": "Rôles requis : {{roles}}"
+  },
+  "aggregator": {
+    "loading": "Chargement des plateformes…",
+    "select": "Choisir une plateforme de livraison"
   }
 }

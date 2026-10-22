@@ -1090,6 +1090,9 @@ Commit: `ebe131d444aa3ffd9d86f1c7a9aa0befed59b278` (with erp_restaurant 47b1f9d)
 Risk profile: medium (pos-store.ts is high-risk). On a conflict keep the two
 mapped fields, the `silent` parameter and the MenuCard props.
 
+Fix 2026-10-22 (e2e test): the background refresh skips aggregator orders; it replaced
+the platform's menu and prices with the restaurant menu after the first item was added.
+
 ### Patch 26 — Kitchen screen (Mosaic) in the restaurant's language, "Kitchen" title
 
 Feature (owner request 2026-10-20).

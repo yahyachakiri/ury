@@ -9,6 +9,9 @@ export function useMenuStockRefresh() {
   const fetchMenuItems = usePOSStore((state) => state.fetchMenuItems);
   useEffect(() => {
     const refresh = () => {
+      // An aggregator order shows the platform's menu (fetchAggregatorMenu): never replace it
+      // with the restaurant menu (e2e test 2026-10-22).
+      if (usePOSStore.getState().selectedOrderType === 'Aggregators') return;
       if (document.visibilityState === 'visible') void fetchMenuItems(true);
     };
     const timer = window.setInterval(refresh, REFRESH_MS);

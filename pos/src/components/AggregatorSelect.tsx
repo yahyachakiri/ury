@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { Select, SelectItem } from '@ury/ui';
+import { t } from '../i18n';
 import { getAggregators, type Aggregator } from '../lib/aggregator-api';
 
 interface AggregatorSelectProps {
@@ -43,7 +44,7 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
         value={selectedAggregator?.customer || ''}
         onValueChange={handleAggregatorChange}
         disabled={disabled || loading}
-        placeholder={loading ? 'Loading aggregators...' : 'Select an aggregator'}
+        placeholder={loading ? t('aggregator.loading') : t('aggregator.select')}
       >
         {aggregators.map((aggregator) => (
           <SelectItem 

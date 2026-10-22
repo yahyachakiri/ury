@@ -605,5 +605,9 @@
     "no_app_permission": "You do not have permission to access this application.",
     "pos_profile_missing": "POS profile not found or not configured.",
     "required_roles": "Required roles: {{roles}}"
+  },
+  "aggregator": {
+    "loading": "Loading platforms...",
+    "select": "Choose a delivery platform"
   }
 }
