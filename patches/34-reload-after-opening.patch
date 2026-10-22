@@ -1,0 +1,16 @@
+diff --git a/pos/src/components/POSOpeningScreen.tsx b/pos/src/components/POSOpeningScreen.tsx
+index e6070846..5f85f558 100644
+--- a/pos/src/components/POSOpeningScreen.tsx
++++ b/pos/src/components/POSOpeningScreen.tsx
+@@ -169,6 +169,11 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
+       });
+ 
+       showToast.success(t('pos_opening.session_opened_success'));
++      // Patch 34: the POS Profile, menu and rooms cached in this tab were loaded before the
++      // shift existed; the server now answers with the shift's branch (erp_restaurant
++      // shift_branch.py). Drop the tab cache and reload so the POS sells in that branch.
++      sessionStorage.clear();
++      window.location.reload();
+       onSuccess?.();
+     } catch (err) {
+       const serverMessage = parseFrappeError(err);

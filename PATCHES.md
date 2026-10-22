@@ -1342,6 +1342,35 @@ Acceptance criteria:
    (Patch 32), no difference.
 6. "Remis au livreur" works as before (Patch 31). French and Arabic texts.
 
+### Patch 34 — Reload the POS after opening a shift
+
+Fix (end-to-end test 2026-10-22). A cashier who works in two branches opened a
+shift on her home till, but the POS kept the POS Profile, menu and rooms it had
+loaded before the shift existed (sessionStorage), so it sold the other branch's
+menu and showed every meal sold out from that branch's empty warehouse.
+
+Files touched: `pos/src/components/POSOpeningScreen.tsx` (handleSubmit success)
+
+What it does: after a successful opening, the tab cache (sessionStorage) is
+cleared and the page reloads. The server answers with the shift's branch
+(erp_restaurant shift_branch.py replaces URY's getBranch / getBranchRoom /
+getRoom with the open shift's branch).
+
+Why it can't be done in `erp_restaurant`: the stale data is in the POS bundle's
+browser storage; the server cannot clear it, and the opening success handler is
+POS code.
+
+Risk profile: low. One extra page load after opening; held order tabs are in
+localStorage and are kept. Single-branch staff see the same POS after the reload.
+
+Acceptance criteria:
+1. Cashier in branches A and B opens a shift on A's till: after the automatic
+   reload the POS shows A's menu (not sold out), A's tables and A's payment methods.
+2. Same cashier, shift on B's till: B's menu and tables.
+3. Single-branch cashier: opening works as before (one reload).
+
+Patch file: `patches/34-reload-after-opening.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
