@@ -1342,41 +1342,6 @@ Acceptance criteria:
    (Patch 32), no difference.
 6. "Remis au livreur" works as before (Patch 31). French and Arabic texts.
 
-### Patch 34 — "Change branch" in the POS user menu
-
-Feature (owner request 2026-10-22). Staff in several branches pick a branch
-before the POS; the rest lives in erp_restaurant (pos_branch.py: URY's
-getBranch / getBranchRoom / getRoom replaced from erp_restaurant, choice kept in
-the login session, page /pos-branch, /pos redirect in staff_routes.py).
-
-Files touched: `pos/src/components/Header.tsx` (menu item, one call),
-`pos/src/i18n/locales/{en,fr,ar}.json` (`header.change_branch`)
-
-What it does: on load the header asks erp_restaurant
-`pos_branch.get_pos_branches`; with two or more usable branches the user menu
-shows "Changer de succursale", which opens /pos-branch and comes back to /pos.
-One branch (or a failed call): no item, the menu is as before.
-
-Why it can't be done in `erp_restaurant`: the user menu is rendered by the POS
-bundle, with no runtime configuration point to add an item.
-
-Risk profile: low. One extra GET on header mount; the item only navigates. The
-waiter app (/pos/order) has no user menu and gets no item (waiters choose at
-login). `Header.tsx` is edited upstream and also patched by Patch 01: on a
-conflict, re-add the `branchCount` state and effect and the menu item after
-Close Shift.
-
-Acceptance criteria:
-1. Cashier in branches A and B (both with an enabled POS Profile): the user
-   menu shows "Changer de succursale"; it opens the picker, choosing B reloads
-   /pos on branch B (menu, payment methods, tables of B).
-2. Cashier in one branch: no item.
-3. French, Arabic (RTL) and English texts.
-
-Manual test steps: `../tasks/26-pos-branch-picker.md`.
-
-Patch file: `patches/34-change-branch-menu.patch`.
-
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
