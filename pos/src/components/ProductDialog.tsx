@@ -244,7 +244,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     }
 
     // Add main item as a cart line
-    const trimmedComment = comments.trim();
+    // Patch 38: the chosen extras are written into the meal's note ("+ Sauce algérienne"), so the kitchen
+    // ticket shows them under their meal and two meals with different extras stay separate lines.
+    // The note field holds 140 characters (POS Invoice Item / KOT): the cashier's text is shortened, not the extras.
+    const extrasNote = selectedAddons.length ? `+ ${selectedAddons.map(addon => addon.name).join(', ')}` : '';
+    const room = Math.max(0, 140 - (extrasNote ? extrasNote.length + 3 : 0));
+    const trimmedComment = [comments.trim().slice(0, room).trim(), extrasNote].filter(Boolean).join(' · ').slice(0, 140);
     const orderItem: OrderItem = {
       ...selectedItem,
       quantity: numericQuantity,

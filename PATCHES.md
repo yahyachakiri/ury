@@ -1487,6 +1487,57 @@ Acceptance criteria:
 
 Patch file: `patches/37-group-sizes-and-extras.patch`.
 
+### Patch 38 — Extras written into their meal's note
+
+Owner request (ticket 28, 2026-10-28). An extra is its own cart and invoice line
+with no link to the meal it was chosen for, and the cart merges identical items:
+"burger with sauce algérienne + plain tacos + plain burger" became Classic
+Burger x2, Sauce algérienne x1, Tacos x1, and the kitchen could not tell which
+meal gets the sauce.
+
+Files touched: `pos/src/components/ProductDialog.tsx` (handleAddToOrder)
+
+What it does: when extras are chosen in a meal's dialog, the meal line's note
+gets "+ <extra>, <extra>" (after the cashier's own note, joined by " · "). The
+note is part of the cart line identity, so a burger with sauce algérienne and a
+burger with sauce biggie stay two lines, and the kitchen ticket (erp_restaurant
+"Kitchen Ticket" format, item comments) and the receipt print it under the meal.
+The extra lines are unchanged (billed and deducted as before).
+
+The note field holds 140 characters (POS Invoice Item comment, URY KOT Items
+comments): the cashier's text is shortened to make room, the "+ …" part is kept.
+
+Companion fix in erp_restaurant (kot_diff.py): URY's kitchen ticket difference
+for an order already sent matched lines by item only, so a meal added with a
+different note was missed or cancelled; erp_restaurant replaces
+compare_two_array / get_removed_items to compare by item and note.
+
+Known limits: deleting an extra line afterwards leaves the "+ …" note on the
+meal (edit the note by hand); when a meal line is edited, the "+ …" text stays
+in the note field; choosing the same extra again adds it a second time (as
+upstream, where the extra line also doubles).
+
+Why it can't be done in `erp_restaurant`: the cart and its lines are built in the
+browser; the server only receives independent lines.
+
+Risk profile: low. One component, two lines; no change for a meal added without
+extras.
+
+Acceptance criteria:
+1. POS: Classic Burger with Sauce algérienne, then a plain Classic Burger: two
+   burger lines, the first with the note "+ Sauce algérienne", plus the sauce
+   line.
+2. A note typed by the cashier ("sans oignon") and an extra give "sans oignon ·
+   + Sauce algérienne".
+3. The kitchen ticket (print preview of the KOT) shows the note under the burger.
+4. Waiter app: the same.
+5. Dine-in order sent with 1 Classic Burger, then 1 Classic Burger + Sauce
+   algérienne added: the ADDED ITEMS ticket shows 1 Classic Burger » + Sauce
+   algérienne and 1 Sauce algérienne, no CANCELLED ticket (needs erp_restaurant
+   kot_diff.py).
+
+Patch file: `patches/38-extras-in-meal-note.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
