@@ -1538,6 +1538,34 @@ Acceptance criteria:
 
 Patch file: `patches/38-extras-in-meal-note.patch`.
 
+### Patch 39 — Extras of the previous size are dropped
+
+Fix (owner report, ticket 28, 2026-10-28). In a meal's dialog, choosing a size
+switches the dialog to the size's own item (handleVariantClick), but the extras
+ticked before stayed selected, even when the size does not offer them: they
+were added as lines, counted in the dialog total and, with Patch 38, written
+into the size's note ("Classic Burger XL » + Sauce algérienne" with a sauce the
+XL does not have). The hidden line and price are upstream behaviour.
+
+Files touched: `pos/src/components/ProductDialog.tsx` (offeredAddons: total,
+note, extra lines)
+
+What it does: only the ticked extras the item now shown offers (addonDetails)
+count; an extra also offered by the size stays ticked.
+
+Why it can't be done in `erp_restaurant`: the dialog state is in the browser.
+
+Risk profile: low. One component, one derived list.
+
+Acceptance criteria:
+1. Classic Burger: tick Sauce algérienne, then choose Classic Burger XL (no
+   extras): total 35, adding gives one line Classic Burger XL without a note
+   and no sauce line.
+2. A size that offers the same extra keeps it: line note and extra line as
+   Patch 38.
+
+Patch file: `patches/39-drop-extras-on-size-switch.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

@@ -1,0 +1,33 @@
+diff --git a/pos/src/components/ProductDialog.tsx b/pos/src/components/ProductDialog.tsx
+index 7901e27b..5233b1ab 100644
+--- a/pos/src/components/ProductDialog.tsx
++++ b/pos/src/components/ProductDialog.tsx
+@@ -202,7 +202,9 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+   // Always get price from menuItems for the main item
+   const basePrice = selectedItem?.price ? Number(selectedItem.price) : 0;
+   const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
+-  const addonsTotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
++  // Patch 39: only the extras the item now shown offers count (a size switch keeps the ticks of the previous item).
++  const offeredAddons = selectedAddons.filter(addon => addonDetails.some((detail: any) => detail.id === addon.id));
++  const addonsTotal = offeredAddons.reduce((sum, addon) => sum + addon.price, 0);
+   const total = (basePrice + addonsTotal) * numericQuantity;
+ 
+   const handleQuantityChange = (value: string) => {
+@@ -247,7 +249,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+     // Patch 38: the chosen extras are written into the meal's note ("+ Sauce algérienne"), so the kitchen
+     // ticket shows them under their meal and two meals with different extras stay separate lines.
+     // The note field holds 140 characters (POS Invoice Item / KOT): the cashier's text is shortened, not the extras.
+-    const extrasNote = selectedAddons.length ? `+ ${selectedAddons.map(addon => addon.name).join(', ')}` : '';
++    const extrasNote = offeredAddons.length ? `+ ${offeredAddons.map(addon => addon.name).join(', ')}` : '';
+     const room = Math.max(0, 140 - (extrasNote ? extrasNote.length + 3 : 0));
+     const trimmedComment = [comments.trim().slice(0, room).trim(), extrasNote].filter(Boolean).join(' · ').slice(0, 140);
+     const orderItem: OrderItem = {
+@@ -259,7 +261,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+     addToOrder(orderItem);
+ 
+     // Add each selected add-on as a separate cart line
+-    selectedAddons.forEach(addon => {
++    offeredAddons.forEach(addon => {
+       // Find the full menu item details for the add-on
+       const menuAddon = menuItems.find(item => item.item === addon.id);
+       const addonOrderItem: OrderItem = menuAddon
