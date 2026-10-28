@@ -38,7 +38,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
       const matchesFilter = quickFilter === 'all' || 
         (quickFilter === 'special' && item.special_dish === 1);
       
-      return matchesCategory && matchesSearch && matchesFilter;
+      // Patch 37: extras and sizes are picked in their meal's dialog, not from the grid.
+      return matchesCategory && matchesSearch && matchesFilter && !item.is_option;
     });
   }, [menuItems, selectedCategory, searchQuery, quickFilter]);
 

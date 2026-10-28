@@ -1445,6 +1445,48 @@ Acceptance criteria:
 
 Patch file: `patches/36-options-not-on-menu.patch`.
 
+### Patch 37 — Sizes and extras grouped under their meal
+
+Owner request (ticket 28, 2026-10-28). Sizes ("Tacos Poulet XL") and extras
+("Supplément fromage") are ordinary menu meals, so each was its own card on the
+grid: a crowded grid, and a single tap on the base meal added it without asking
+the size.
+
+Files touched: `pos/src/store/pos-store.ts` (MenuItem, fetchMenuItems mapping),
+`pos/src/components/MenuList.tsx` (filter), `pos/src/pages/POS.tsx`
+(handleItemClick), `pos/src/captain/components/CaptainMenu.tsx` (filter, tap,
+dialog)
+
+What it does: erp_restaurant's getRestaurantMenu wrapper flags each row
+(custom_is_option, custom_has_sizes, custom_has_extras; owner_menu.annotate_options).
+The store keeps them as is_option / has_sizes / has_extras. Both grids leave out
+option meals (they stay in menuItems, so the meal's dialog still prices them,
+Patch 36). POS: a single tap on a meal with sizes opens its dialog instead of
+adding it; a double tap still opens it for extras. Waiter app (no double tap): a
+tap on a meal with sizes or extras opens the same dialog. Platform menus
+(fetchAggregatorMenu) carry no flags and are unchanged.
+
+Why it can't be done in `erp_restaurant`: the grid and the tap behaviour are in
+the browser; erp_restaurant only supplies the flags.
+
+Risk profile: medium (pos-store.ts is a high-risk file; the change there is two
+interface fields and three mapped fields). Without the erp_restaurant flags
+every flag is false and the POS behaves as before.
+
+Acceptance criteria:
+1. Demo seed (Classic Burger with extras, Tacos Poulet with sizes L / XL; a
+   size of Classic Burger is added in the ticket 28 manual test): the POS and
+   waiter grids show neither the extras nor the sizes.
+2. POS: one tap on Tacos Poulet opens its dialog with the sizes; one tap on a
+   meal without sizes (Cheese Burger) adds it at once; a double tap on Classic
+   Burger opens the dialog with its extras.
+3. Waiter app: one tap on Classic Burger or Tacos Poulet opens the dialog; one
+   tap on Cheese Burger adds it.
+4. A size or extra chosen in the dialog is billed at its own price (as Patch 36).
+5. Platform order (Agrégateurs + a platform): menu unchanged.
+
+Patch file: `patches/37-group-sizes-and-extras.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

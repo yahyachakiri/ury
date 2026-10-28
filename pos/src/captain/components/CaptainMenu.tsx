@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner } from '@ury/ui';
 import MenuCard from '../../components/MenuCard';
+import ProductDialog from '../../components/ProductDialog';
 import { t } from '../../i18n';
 import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
 
@@ -32,8 +33,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     categories,
     fetchMenuItems,
     addToOrder,
+    setSelectedItem,
     isOrderInteractionDisabled,
   } = usePOSStore();
+  // Patch 37: a tap on a meal with sizes or extras opens its dialog (no double tap on touch).
+  const [choosing, setChoosing] = useState(false);
 
   useEffect(() => {
     fetchMenuItems();
@@ -49,7 +53,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
         !searchQuery ||
         item.name.toLowerCase().includes(term) ||
         item.item.toLowerCase().includes(term);
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSearch && !item.is_option;
     });
   }, [menuItems, selectedCategory, searchQuery]);
 
@@ -57,6 +61,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   const handleTap = (item: (typeof menuItems)[number]) => {
     if (disabled || item.sold_out) return;
+    if (item.has_sizes || item.has_extras) {
+      setSelectedItem(item);
+      setChoosing(true);
+      return;
+    }
     addToOrder({ ...item, quantity: 1 });
   };
 
@@ -133,6 +142,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
           </div>
         )}
       </div>
+      {choosing && (
+        <ProductDialog
+          onClose={() => {
+            setChoosing(false);
+            setSelectedItem(null);
+          }}
+        />
+      )}
     </div>
   );
 };

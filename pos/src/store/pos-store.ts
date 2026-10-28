@@ -41,6 +41,10 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
   portions_left?: number | null;
   sold_out?: boolean;
+  /** Patch 37: an extra or size of another meal (hidden from the grid), and whether this meal offers sizes / extras. */
+  is_option?: boolean;
+  has_sizes?: boolean;
+  has_extras?: boolean;
 }
 
 export interface Customer {
@@ -463,6 +467,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         tax_rate: 0,
         portions_left: item.custom_portions_left ?? null,
         sold_out: Boolean(item.custom_sold_out),
+        is_option: Boolean(item.custom_is_option),
+        has_sizes: Boolean(item.custom_has_sizes),
+        has_extras: Boolean(item.custom_has_extras),
       }));
 
       set({ menuItems });

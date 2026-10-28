@@ -1,0 +1,122 @@
+diff --git a/pos/src/captain/components/CaptainMenu.tsx b/pos/src/captain/components/CaptainMenu.tsx
+index f589bada..24210696 100644
+--- a/pos/src/captain/components/CaptainMenu.tsx
++++ b/pos/src/captain/components/CaptainMenu.tsx
+@@ -1,8 +1,9 @@
+-import { useEffect, useMemo } from 'react';
++import { useEffect, useMemo, useState } from 'react';
+ import { Search } from 'lucide-react';
+ import { usePOSStore } from '../../store/pos-store';
+ import { cn, Spinner } from '@ury/ui';
+ import MenuCard from '../../components/MenuCard';
++import ProductDialog from '../../components/ProductDialog';
+ import { t } from '../../i18n';
+ import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
+ 
+@@ -32,8 +33,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+     categories,
+     fetchMenuItems,
+     addToOrder,
++    setSelectedItem,
+     isOrderInteractionDisabled,
+   } = usePOSStore();
++  // Patch 37: a tap on a meal with sizes or extras opens its dialog (no double tap on touch).
++  const [choosing, setChoosing] = useState(false);
+ 
+   useEffect(() => {
+     fetchMenuItems();
+@@ -49,7 +53,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+         !searchQuery ||
+         item.name.toLowerCase().includes(term) ||
+         item.item.toLowerCase().includes(term);
+-      return matchesCategory && matchesSearch;
++      return matchesCategory && matchesSearch && !item.is_option;
+     });
+   }, [menuItems, selectedCategory, searchQuery]);
+ 
+@@ -57,6 +61,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+ 
+   const handleTap = (item: (typeof menuItems)[number]) => {
+     if (disabled || item.sold_out) return;
++    if (item.has_sizes || item.has_extras) {
++      setSelectedItem(item);
++      setChoosing(true);
++      return;
++    }
+     addToOrder({ ...item, quantity: 1 });
+   };
+ 
+@@ -133,6 +142,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+           </div>
+         )}
+       </div>
++      {choosing && (
++        <ProductDialog
++          onClose={() => {
++            setChoosing(false);
++            setSelectedItem(null);
++          }}
++        />
++      )}
+     </div>
+   );
+ };
+diff --git a/pos/src/components/MenuList.tsx b/pos/src/components/MenuList.tsx
+index 7fb05827..13f9bbc6 100644
+--- a/pos/src/components/MenuList.tsx
++++ b/pos/src/components/MenuList.tsx
+@@ -38,7 +38,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
+       const matchesFilter = quickFilter === 'all' || 
+         (quickFilter === 'special' && item.special_dish === 1);
+       
+-      return matchesCategory && matchesSearch && matchesFilter;
++      // Patch 37: extras and sizes are picked in their meal's dialog, not from the grid.
++      return matchesCategory && matchesSearch && matchesFilter && !item.is_option;
+     });
+   }, [menuItems, selectedCategory, searchQuery, quickFilter]);
+ 
+diff --git a/pos/src/pages/POS.tsx b/pos/src/pages/POS.tsx
+index 81412bec..556be552 100644
+--- a/pos/src/pages/POS.tsx
++++ b/pos/src/pages/POS.tsx
+@@ -45,11 +45,12 @@ export default function POS() {
+     }
+ 
+     clickTimerRef.current = setTimeout(() => {
+-      if (clickCountRef.current === 1) {
++      // Patch 37: a meal with sizes always asks which size (the size meals are not on the grid).
++      if (clickCountRef.current === 1 && !item.has_sizes) {
+         // Single click - add to cart
+         addToOrder({ ...item, quantity: 1 });
+-      } else if (clickCountRef.current >= 2) {
+-        // Double click - open dialog
++      } else if (clickCountRef.current >= 2 || item.has_sizes) {
++        // Double click (or Patch 37: one tap on a meal with sizes) - open dialog
+         setSelectedItem(item);
+         setIsDialogOpen(true);
+       }
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index 479767cc..8b57d3a9 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -41,6 +41,10 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
+   /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
+   portions_left?: number | null;
+   sold_out?: boolean;
++  /** Patch 37: an extra or size of another meal (hidden from the grid), and whether this meal offers sizes / extras. */
++  is_option?: boolean;
++  has_sizes?: boolean;
++  has_extras?: boolean;
+ }
+ 
+ export interface Customer {
+@@ -463,6 +467,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         tax_rate: 0,
+         portions_left: item.custom_portions_left ?? null,
+         sold_out: Boolean(item.custom_sold_out),
++        is_option: Boolean(item.custom_is_option),
++        has_sizes: Boolean(item.custom_has_sizes),
++        has_extras: Boolean(item.custom_has_extras),
+       }));
+ 
+       set({ menuItems });
