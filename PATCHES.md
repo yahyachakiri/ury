@@ -1410,6 +1410,41 @@ Acceptance criteria:
 
 Patch file: `patches/35-platform-menu-on-restore.patch`.
 
+### Patch 36 — Extras and sizes not on the menu are not offered
+
+Fix (ticket 28, 2026-10-28). The meal dialog reads a meal's extras and sizes
+from its Item (custom_pos_add_on_items / custom_pos_item_variants) and prices
+them from the loaded menu. Upstream showed an extra or size missing from that
+menu at price 0 under its item code: such an extra could be added for free (its
+recipe still deducted at closing); such a size was a dead button priced 0
+(handleVariantClick already ignores sizes missing from the menu). It happens when the extra or size is
+switched off on the menu (getRestaurantMenu leaves disabled rows out), deleted
+from it in the desk, or on another branch's menu only (the Item is shared).
+
+Files touched: `pos/src/components/ProductDialog.tsx` (addonDetails, variantDetails)
+
+What it does: an extra or size not found in the loaded menu maps to null and is
+dropped by the existing `.filter(Boolean)`; found ones are unchanged.
+
+Why it can't be done in `erp_restaurant`: the POS reads the extras straight from
+the Item document and builds the price-0 fallback in the browser; no server
+hook filters that read. erp_restaurant already keeps the links clean on delete
+and refuses switched-off meals as new extras (owner_menu.py, ticket 28).
+
+Risk profile: low. Two ternaries in one component; the selected-item and
+cart logic are untouched.
+
+Acceptance criteria:
+1. Classic Burger with extras Supplément fromage (5) and Supplément sauce (3):
+   the dialog lists both with their prices.
+2. Switch Supplément sauce off in /admin/menu, reload the POS: the dialog lists
+   only Supplément fromage; no 0-price line can be added.
+3. A meal whose only extras are all off the menu shows no extras section.
+4. Sizes: the same with Tacos Poulet L / XL.
+5. The same in the waiter app (CaptainOrder uses the same dialog).
+
+Patch file: `patches/36-options-not-on-menu.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

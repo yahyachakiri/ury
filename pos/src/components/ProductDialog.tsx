@@ -81,17 +81,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     ? itemDoc.custom_pos_add_on_items
         .map((entry: any) => {
           const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+          // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
+          // branch's) is not offered; upstream showed it at price 0 under its code.
           return menuAddon
             ? {
                 id: menuAddon.item,
                 name: menuAddon.item_name,
                 price: Number(menuAddon.price)
               }
-            : {
-                id: entry.item,
-                name: entry.item,
-                price: 0
-              };
+            : null;
         })
         .filter(Boolean)
     : [];
@@ -100,17 +98,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     ? itemDoc.custom_pos_item_variants
         .map((entry: any) => {
           const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+          // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
+          // branch's) is not offered; upstream showed it at price 0 under its code.
           return menuVariant
             ? {
                 id: menuVariant.item,
                 name: menuVariant.item_name,
                 price: Number(menuVariant.price)
               }
-            : {
-                id: entry.item,
-                name: entry.item,
-                price: 0
-              };
+            : null;
         })
         .filter(Boolean)
     : [];
