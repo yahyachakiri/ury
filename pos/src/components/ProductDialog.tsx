@@ -41,6 +41,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     selectedItem, 
     addToOrder, 
     removeFromOrder, 
+    updateQuantity,
     setSelectedItem, 
     getItemQuantityFromCart,
     activeOrders,
@@ -112,8 +113,13 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     : [];
 
   const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>(initialAddons);
+  // Patch 40: the option chosen in each choice group of a menu (group name -> item code).
+  const [selectedChoices, setSelectedChoices] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
-  const [comments, setComments] = useState<string>(itemToReplace?.comment || '');
+  // Patch 40: editing a menu with choices starts from the cashier's own note (the "+ choices" part is rebuilt).
+  const [comments, setComments] = useState<string>(
+    editMode && itemToReplace?.has_choices ? stripChosenNote(itemToReplace?.comment) : itemToReplace?.comment || ''
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Find existing item in cart based on current selections and comments
@@ -204,7 +210,31 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
   // Patch 39: only the extras the item now shown offers count (a size switch keeps the ticks of the previous item).
   const offeredAddons = selectedAddons.filter(addon => addonDetails.some((detail: any) => detail.id === addon.id));
-  const addonsTotal = offeredAddons.reduce((sum, addon) => sum + addon.price, 0);
+  // Patch 40: choice groups of a menu (erp_restaurant Item.custom_meal_choices): exactly one option per group,
+  // billed at its extra price; the server prices the chosen line (erp_restaurant combo_pricing.py).
+  const choiceGroups: Array<{ group: string; options: Array<{ id: string; name: string; price: number; soldOut?: boolean }> }> = [];
+  // Only the shown item's own document counts (not the previous item's while a size switch loads).
+  const docReady = Boolean(itemDoc) && itemDoc.name === selectedItem?.item;
+  (docReady && Array.isArray(itemDoc.custom_meal_choices) ? itemDoc.custom_meal_choices : []).forEach((row: any) => {
+    let entry = choiceGroups.find(g => g.group === row.choice_group);
+    if (!entry) {
+      entry = { group: row.choice_group, options: [] };
+      choiceGroups.push(entry);
+    }
+    const menuOption = menuItems.find((m: any) => m.item === row.item);
+    entry.options.push({
+      id: row.item,
+      name: menuOption?.item_name || row.item_name || row.item,
+      price: Number(row.extra_price) || 0,
+      soldOut: Boolean(menuOption?.sold_out)
+    });
+  });
+  const chosenOptions = choiceGroups
+    .map(g => g.options.find(o => o.id === selectedChoices[g.group]))
+    .filter((o): o is { id: string; name: string; price: number } => Boolean(o));
+  // A menu with choices cannot be added before its choices have loaded.
+  const choicesMissing = (Boolean(selectedItem?.has_choices) && !docReady) || chosenOptions.length < choiceGroups.length;
+  const addonsTotal = [...offeredAddons, ...chosenOptions].reduce((sum, addon) => sum + addon.price, 0);
   const total = (basePrice + addonsTotal) * numericQuantity;
 
   const handleQuantityChange = (value: string) => {
@@ -239,17 +269,31 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     if (isNaN(numericQuantity) || numericQuantity <= 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
+    if (choicesMissing) return; // Patch 40: one option per choice group
 
     if (editMode && itemToReplace?.uniqueId) {
       // Remove the old item first
       removeFromOrder(itemToReplace.uniqueId);
+      // Patch 40: and the options chosen for it (named in its note), so the new choices replace them.
+      if (itemToReplace.has_choices) {
+        const oldNames = chosenNames(itemToReplace.comment);
+        const oldQty = Number(itemToReplace.quantity) || 0;
+        activeOrders
+          .filter(o => o.comment === `↳ ${itemToReplace.item}` && oldNames.includes(o.item_name || o.name))
+          .forEach(o => {
+            const left = o.quantity - oldQty;
+            if (left > 0) updateQuantity(o.uniqueId!, left);
+            else removeFromOrder(o.uniqueId!);
+          });
+      }
     }
 
     // Add main item as a cart line
     // Patch 38: the chosen extras are written into the meal's note ("+ Sauce algérienne"), so the kitchen
     // ticket shows them under their meal and two meals with different extras stay separate lines.
     // The note field holds 140 characters (POS Invoice Item / KOT): the cashier's text is shortened, not the extras.
-    const extrasNote = offeredAddons.length ? `+ ${offeredAddons.map(addon => addon.name).join(', ')}` : '';
+    const noted = [...chosenOptions, ...offeredAddons];
+    const extrasNote = noted.length ? `+ ${noted.map(addon => addon.name).join(', ')}` : '';
     const room = Math.max(0, 140 - (extrasNote ? extrasNote.length + 3 : 0));
     const trimmedComment = [comments.trim().slice(0, room).trim(), extrasNote].filter(Boolean).join(' · ').slice(0, 140);
     const orderItem: OrderItem = {
@@ -284,6 +328,29 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             tax_rate: 0
           } as OrderItem;
       addToOrder(addonOrderItem);
+    });
+
+    // Patch 40: each chosen option is its own line, marked with the menu it belongs to (server pricing, cart
+    // identity, kitchen ticket).
+    chosenOptions.forEach(option => {
+      const menuOption = menuItems.find(item => item.item === option.id);
+      const choiceItem: OrderItem = menuOption
+        ? { ...menuOption, quantity: numericQuantity, price: option.price, comment: `↳ ${selectedItem.item}` }
+        : ({
+            id: option.id,
+            name: option.name,
+            price: option.price,
+            quantity: numericQuantity,
+            image: null,
+            item: option.id,
+            item_name: option.name,
+            course: '',
+            description: '',
+            special_dish: 0 as 0 | 1,
+            tax_rate: 0,
+            comment: `↳ ${selectedItem.item}`
+          } as OrderItem);
+      addToOrder(choiceItem);
     });
 
     handleClose();
@@ -445,6 +512,35 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         {/* Right Column - Add-ons and Order Button */}
         <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
           <div className="overflow-y-auto mb-6">
+            {choiceGroups.map(group => (
+              <div key={group.group} className="mb-6">
+                <h3 className="text-lg font-semibold mb-1">{group.group}</h3>
+                <p className="text-xs text-gray-500 mb-2">{t('product_dialog.choose_one')}</p>
+                <div className="space-y-2">
+                  {group.options.map(option => (
+                    <button
+                      key={option.id}
+                      disabled={option.soldOut}
+                      onClick={() => setSelectedChoices(current => ({ ...current, [group.group]: option.id }))}
+                      className={cn(
+                        'w-full p-3 rounded-lg border text-left',
+                        selectedChoices[group.group] === option.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-200',
+                        option.soldOut && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{option.name}</span>
+                        {option.soldOut ? (
+                          <span className="text-xs font-semibold text-red-600">{t('menu.sold_out')}</span>
+                        ) : (
+                          option.price > 0 && <span className="text-sm text-gray-500">+{formatCurrency(option.price)}</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
             {isAddonLoading ? (
               <div className="mb-6 flex items-center justify-center text-gray-500">{t('product_dialog.loading_addons')}</div>
             ) : addonError ? (
@@ -486,7 +582,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               onClick={handleAddToOrder}
               className="w-full mt-4"
               size="lg"
-              disabled={numericQuantity === 0}
+              disabled={numericQuantity === 0 || choicesMissing}
             >
               {editMode || existingCartItem ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
             </Button>
@@ -496,5 +592,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     </Dialog>
   );
 };
+
+// Patch 40: the "+ a, b" part a meal's note gets from its choices and extras (Patch 38), and the note without it.
+function chosenNames(comment?: string): string[] {
+  const match = (comment || '').match(/(?:^|\s·\s)\+ ([^·]*)$/);
+  return match ? match[1].split(', ').map(name => name.trim()).filter(Boolean) : [];
+}
+
+function stripChosenNote(comment?: string): string {
+  return (comment || '').replace(/(?:^|\s·\s)\+ [^·]*$/, '').trim();
+}
 
 export default ProductDialog; 

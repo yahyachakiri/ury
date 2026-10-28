@@ -45,6 +45,8 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   is_option?: boolean;
   has_sizes?: boolean;
   has_extras?: boolean;
+  /** Patch 40: a menu with choice groups (the till asks one option per group). */
+  has_choices?: boolean;
 }
 
 export interface Customer {
@@ -470,6 +472,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         is_option: Boolean(item.custom_is_option),
         has_sizes: Boolean(item.custom_has_sizes),
         has_extras: Boolean(item.custom_has_extras),
+        has_choices: Boolean(item.custom_has_choices),
       }));
 
       set({ menuItems });

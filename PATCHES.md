@@ -1566,6 +1566,62 @@ Acceptance criteria:
 
 Patch file: `patches/39-drop-extras-on-size-switch.patch`.
 
+### Patch 40 — Choice groups of a menu (drink, sauce)
+
+Owner request (ticket 32, 2026-10-28). A menu ("Menu Burger") must ask which
+drink and which sauce, among options the owner set up in the owner app
+(erp_restaurant Item.custom_meal_choices, child table Meal Choice: group, item,
+extra_price).
+
+Files touched: `pos/src/components/ProductDialog.tsx` (choiceGroups,
+selectedChoices, total, note, option lines, render, add button),
+`pos/src/store/pos-store.ts` (has_choices), `pos/src/pages/POS.tsx` (tap),
+`pos/src/captain/components/CaptainMenu.tsx` (tap), `pos/src/i18n/locales/*.json`
+(product_dialog.choose_one)
+
+What it does: the dialog shows one single-select section per group; "Ajouter"
+stays disabled until every group has an option. Adding gives the menu line (its
+note lists the choices first, then the extras, Patch 38) and one line per chosen
+option at its extra price with the note "↳ <menu item code>". That note keeps a
+chosen Fanta apart from a Fanta sold alone (cart line identity), survives an
+order being reloaded, and is what erp_restaurant combo_pricing.py reads to bill
+the line at its extra price on the server (URY re-prices every line). One tap on
+a menu with choices opens its dialog in the POS and the waiter app
+(custom_has_choices from erp_restaurant owner_menu.annotate_options).
+
+A menu with choices cannot be added before its own Item has loaded (a fast tap,
+or a size switch, would otherwise add it without choices). Sold-out options are
+greyed. Editing a menu line in the cart removes the option lines named in its
+note (by its quantity) and starts from the cashier's own note, so the choices
+are asked again and replace the old ones.
+
+Known limits: the cart +/- on a menu line does not move its option lines, and
+editing an option line's note removes its "↳" mark (the server then bills it
+at its normal price): change a menu through its dialog. The offline till
+(/caisse) and the customer QR app do not ask choices. Supplements are fixed
+amounts (a platform price list's markup does not apply to them).
+
+Why it can't be done in `erp_restaurant`: the dialog, the cart lines and the tap
+are in the browser; erp_restaurant supplies the choices, the flags and the
+server prices.
+
+Risk profile: medium (pos-store.ts high-risk file: one field and one mapping;
+the dialog's add path changes for menus with choices only).
+
+Acceptance criteria:
+1. Menu Burger with groups Boisson (Coca-Cola, Fanta, Eau at 0, Jus d'orange
+   pressé +5) and Sauce: one tap opens the dialog; Ajouter disabled until a
+   drink and a sauce are chosen.
+2. Fanta + Sauce algérienne: lines Menu Burger 55 (note "+ Fanta 33 cl, Sauce
+   algérienne"), Fanta 33 cl 0 (note "↳ Menu Burger"), Sauce algérienne 0.
+5. Edit the menu line and choose Coca-Cola: the Fanta line goes, a Coca-Cola
+   line at 0 comes, the note reads "+ Coca-Cola 33 cl, Sauce algérienne".
+3. Jus d'orange: total 60. A Fanta sold alone on the same order stays 8 and is
+   its own line.
+4. Waiter app: the same.
+
+Patch file: `patches/40-menu-choices.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

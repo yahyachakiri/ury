@@ -464,7 +464,8 @@
     "no_addons": "Aucun supplément",
     "total": "Total",
     "update_order": "Mettre à jour la commande",
-    "add_to_order": "Ajouter à la commande"
+    "add_to_order": "Ajouter à la commande",
+    "choose_one": "Choisissez-en un"
   },
   "order_types": {
     "dine_in": "Sur place",

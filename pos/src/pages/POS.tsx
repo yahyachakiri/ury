@@ -46,10 +46,10 @@ export default function POS() {
 
     clickTimerRef.current = setTimeout(() => {
       // Patch 37: a meal with sizes always asks which size (the size meals are not on the grid).
-      if (clickCountRef.current === 1 && !item.has_sizes) {
+      if (clickCountRef.current === 1 && !item.has_sizes && !item.has_choices) {
         // Single click - add to cart
         addToOrder({ ...item, quantity: 1 });
-      } else if (clickCountRef.current >= 2 || item.has_sizes) {
+      } else if (clickCountRef.current >= 2 || item.has_sizes || item.has_choices) {
         // Double click (or Patch 37: one tap on a meal with sizes) - open dialog
         setSelectedItem(item);
         setIsDialogOpen(true);

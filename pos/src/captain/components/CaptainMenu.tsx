@@ -61,7 +61,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   const handleTap = (item: (typeof menuItems)[number]) => {
     if (disabled || item.sold_out) return;
-    if (item.has_sizes || item.has_extras) {
+    if (item.has_sizes || item.has_extras || item.has_choices) {
       setSelectedItem(item);
       setChoosing(true);
       return;

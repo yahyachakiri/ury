@@ -464,7 +464,8 @@
     "no_addons": "No add ons",
     "total": "Total",
     "update_order": "Update Order",
-    "add_to_order": "Add to Order"
+    "add_to_order": "Add to Order",
+    "choose_one": "Choose one"
   },
   "order_types": {
     "dine_in": "Dine In",
