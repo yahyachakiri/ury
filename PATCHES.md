@@ -1622,6 +1622,40 @@ Acceptance criteria:
 
 Patch file: `patches/40-menu-choices.patch`.
 
+### Patch 41 — QZ Tray requests unsigned (no certificate)
+
+Fix (ticket 04, 2026-11-02). Printing through QZ Tray could not work: the POS passed
+an empty signing key (`initPrinting({ signKey: '' })` in `pos/src/main.tsx`), so
+`printWithQz` threw before reaching QZ Tray, and the certificate it fetched
+(`/assets/ury/files/cert.pem`) was never shipped. Upstream also expected the private
+key inside the browser bundle.
+
+Files touched: `packages/core/src/print/qz.ts` (security setup only)
+
+What it does: QZ Tray requests are sent unsigned (empty certificate and signature,
+QZ Tray's anonymous mode), owner choice 2026-11-02: nothing to install on the till
+PC besides QZ Tray. QZ Tray then asks the till user to allow the site; whether it
+can remember that answer for an unsigned site is to be checked on a real PC. If it
+cannot, the signed version (server-side key and certificate, saved in the workspace
+`tasks/04-qz-certificate-version/`) replaces this patch. `initPrinting` stays as a
+no-op for the apps that call it at startup. Upstream `packages/core/AGENTS.MD`
+(initPrinting with a sign key) is outdated after this patch.
+
+Why it can't be done in `erp_restaurant`: the certificate and signature callbacks run
+inside the POS bundle (`@ury/core` QZ transport).
+
+Risk profile: low. Only the security setup changes; the print calls (Patch 10) are
+unchanged. No key or certificate anywhere.
+
+Acceptance criteria:
+1. Till PC with QZ Tray running, POS Profile with QZ printing on: a new takeaway
+   order reaches QZ Tray (its Allow dialog appears) instead of failing in the POS.
+2. After "Allow" (with "Remember" if offered): the kitchen ticket prints; a second
+   order prints without a dialog if QZ Tray remembered the site (record what it does).
+3. No private key in the POS bundle (`grep -r "PRIVATE KEY" ury/public/pos` finds nothing).
+
+Patch file: `patches/41-qz-unsigned.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

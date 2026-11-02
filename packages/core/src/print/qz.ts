@@ -1,29 +1,23 @@
 import qz from 'qz-tray';
-import axios from 'axios';
-import { KEYUTIL, KJUR, stob64, hextorstr } from 'jsrsasign';
 
-let injectedSignKey: string | null = null;
+// Patch 41: unsigned (anonymous) QZ Tray requests, owner choice 2026-11-02: no certificate to install
+// on the till PC. Upstream required a private key in this bundle (never set, so every print threw)
+// and a cert.pem that was never shipped. QZ Tray asks the till user to allow an unsigned site.
 let connecting: Promise<void> | null = null;
+let securitySet = false;
 
-export function initPrinting(opts: { signKey: string }) {
-  injectedSignKey = opts.signKey;
-}
+// Kept for the apps that still call it at startup; nothing is signed.
+export function initPrinting(_opts?: { signKey?: string }) {}
 
-function ensureSignKey(): string {
-  if (!injectedSignKey) {
-    throw new Error(
-      'QZ printing has not been initialized. Call initPrinting({ signKey: ... }) before using printWithQz.'
-    );
-  }
-  return injectedSignKey;
+function setQzSecurity(): void {
+  if (securitySet) return;
+  securitySet = true;
+  qz.security.setCertificatePromise((resolve: (data?: string) => void) => resolve());
+  qz.security.setSignaturePromise(() => (resolve: (sig?: string) => void) => resolve());
 }
 
 export async function loadQzPrinter(host: string): Promise<void> {
-  qz.security.setCertificatePromise((resolve: (data: string) => void, reject: (err?: string) => void) => {
-    axios.get('/assets/ury/files/cert.pem')
-      .then(({ data }) => resolve(data))
-      .catch((err) => reject('Error fetching certificate: ' + String(err)));
-  });
+  setQzSecurity();
   if (!qz.websocket.isActive()) {
     // Patch 10: kitchen and bill prints can start together; QZ refuses a
     // second connect while one is pending, so they share the same attempt.
@@ -43,21 +37,7 @@ export function disconnectQzPrinter(): void {
 // Patch 10: printerName picks a printer installed on the QZ Tray machine;
 // empty keeps upstream behavior (the machine's default printer).
 export async function printWithQz(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
-  const signKey = ensureSignKey();
-
-  qz.security.setSignatureAlgorithm('SHA512');
-  qz.security.setSignaturePromise((toSign: string) => (resolve: (sig: string) => void, reject: (err?: string) => void) => {
-    try {
-      const pk = KEYUTIL.getKey(signKey);
-      const sig = new KJUR.crypto.Signature({ alg: 'SHA512withRSA' });
-      sig.init(pk);
-      sig.updateString(toSign);
-      const hex = sig.sign();
-      resolve(stob64(hextorstr(hex)));
-    } catch (err) {
-      reject(String(err));
-    }
-  });
+  setQzSecurity();
 
   const printing = async () => {
     const wanted = printerName?.trim();
