@@ -1,0 +1,60 @@
+diff --git a/pos/src/lib/invoice-api.ts b/pos/src/lib/invoice-api.ts
+index 5b2d02f6..df1d479b 100644
+--- a/pos/src/lib/invoice-api.ts
++++ b/pos/src/lib/invoice-api.ts
+@@ -1,3 +1,4 @@
++import { getActiveLanguage } from '../i18n';
+ import { DOCTYPES } from '../data/doctypes';
+ import { call, db } from '@ury/core';
+ import { OrderStatusType, OrderType } from '../data/order-types';
+@@ -217,7 +218,8 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
+         doc: 'POS Invoice',
+         name: invoiceId,
+         print_format: printFormat,
+-        _lang: 'en',
++        // Patch 42: the cashier's language, French instead of Arabic (was always English).
++        _lang: printLanguage(),
+         no_letterhead: 1,
+         letterhead: "No Letterhead",
+         settings: {}
+@@ -430,4 +432,10 @@ export async function mergeBills(
+     throw new Error(result.message || 'Failed to merge bills');
+   }
+   return result;
+-} 
+\ No newline at end of file
++} 
++
++// Patch 42: no Arabic printing for now (owner 2026-11-02): bills print in French for an Arabic cashier.
++export function printLanguage(): string {
++  const lang = getActiveLanguage();
++  return lang === 'ar' ? 'fr' : lang;
++}
+diff --git a/pos/src/lib/print.ts b/pos/src/lib/print.ts
+index 9511e8d5..405e0d23 100644
+--- a/pos/src/lib/print.ts
++++ b/pos/src/lib/print.ts
+@@ -1,12 +1,13 @@
+ import { call, printWithQz } from '@ury/core';
+ import {
+   getInvoicePrintHtml,
++  printLanguage,
+   networkPrint,
+   selectNetworkPrinter,
+   updatePrintStatus
+ } from './invoice-api';
+ import { PosProfileCombined } from './pos-profile-api';
+-import { getActiveLanguage, t } from '../i18n';
++import { t } from '../i18n';
+ 
+ interface PrintOrderParams {
+   orderId: string;
+@@ -45,7 +46,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
+       settings: '{}',
+       letterhead: 'No Letterhead',
+       trigger_print: '1',
+-      _lang: getActiveLanguage(),
++      _lang: printLanguage(), // Patch 42: French instead of Arabic
+     });
+     if (format) params.set('format', format);
+     const url = `/printview?${params.toString()}`;

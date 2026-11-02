@@ -1,12 +1,13 @@
 import { call, printWithQz } from '@ury/core';
 import {
   getInvoicePrintHtml,
+  printLanguage,
   networkPrint,
   selectNetworkPrinter,
   updatePrintStatus
 } from './invoice-api';
 import { PosProfileCombined } from './pos-profile-api';
-import { getActiveLanguage, t } from '../i18n';
+import { t } from '../i18n';
 
 interface PrintOrderParams {
   orderId: string;
@@ -45,7 +46,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
       settings: '{}',
       letterhead: 'No Letterhead',
       trigger_print: '1',
-      _lang: getActiveLanguage(),
+      _lang: printLanguage(), // Patch 42: French instead of Arabic
     });
     if (format) params.set('format', format);
     const url = `/printview?${params.toString()}`;

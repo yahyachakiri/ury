@@ -1,3 +1,4 @@
+import { getActiveLanguage } from '../i18n';
 import { DOCTYPES } from '../data/doctypes';
 import { call, db } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
@@ -217,7 +218,8 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
         doc: 'POS Invoice',
         name: invoiceId,
         print_format: printFormat,
-        _lang: 'en',
+        // Patch 42: the cashier's language, French instead of Arabic (was always English).
+        _lang: printLanguage(),
         no_letterhead: 1,
         letterhead: "No Letterhead",
         settings: {}
@@ -431,3 +433,9 @@ export async function mergeBills(
   }
   return result;
 } 
+
+// Patch 42: no Arabic printing for now (owner 2026-11-02): bills print in French for an Arabic cashier.
+export function printLanguage(): string {
+  const lang = getActiveLanguage();
+  return lang === 'ar' ? 'fr' : lang;
+}

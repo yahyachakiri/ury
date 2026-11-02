@@ -1656,6 +1656,31 @@ Acceptance criteria:
 
 Patch file: `patches/41-qz-unsigned.patch`.
 
+### Patch 42 — Bills print in French instead of Arabic
+
+Owner choice (ticket 04, 2026-11-02): no Arabic printing for now. Extends Patch 21.
+
+Files touched: `pos/src/lib/invoice-api.ts` (getInvoicePrintHtml `_lang`, new
+`printLanguage()`), `pos/src/lib/print.ts` (printview `_lang`)
+
+What it does: a bill is rendered in the cashier's language, French when the POS is in
+Arabic, on both paths: QZ Tray (`getInvoicePrintHtml`, upstream always asked for
+English) and the browser print view (Patch 21 used the cashier's language, Arabic
+included). Kitchen tickets do the same on the server (erp_restaurant
+`kitchen_print._render`).
+
+Why it can't be done in `erp_restaurant`: the print language is a parameter the POS
+bundle sends with each print request.
+
+Risk profile: low. Only the `_lang` of the two bill print calls changes.
+
+Acceptance criteria:
+1. POS in Arabic: the bill prints in French (labels "Total", "Merci de votre visite").
+2. POS in French or English: the bill prints in that language (QZ Tray path no longer
+   always English).
+
+Patch file: `patches/42-print-french-not-arabic.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
