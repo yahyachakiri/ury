@@ -1,0 +1,183 @@
+diff --git a/pos/src/App.tsx b/pos/src/App.tsx
+index ed084641..75931d89 100644
+--- a/pos/src/App.tsx
++++ b/pos/src/App.tsx
+@@ -9,6 +9,7 @@ import AuthGuard from './components/AuthGuard';
+ import POSOpeningProvider from './components/POSOpeningProvider';
+ import ScreenSizeProvider from './components/ScreenSizeProvider';
+ import KotAlertListener from './components/KotAlertListener';
++import SelfOrderListener from './components/SelfOrderListener';
+ import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
+ import CaptainTables from './captain/pages/CaptainTables';
+ import CaptainOrder from './captain/pages/CaptainOrder';
+@@ -36,6 +37,7 @@ function App() {
+     <>
+       <ToastProvider />
+       <KotAlertListener />
++      <SelfOrderListener />
+       <ScreenSizeProvider>
+         <AuthGuard>
+           <POSOpeningProvider>
+diff --git a/pos/src/components/SelfOrderListener.tsx b/pos/src/components/SelfOrderListener.tsx
+new file mode 100644
+index 00000000..975e27ca
+--- /dev/null
++++ b/pos/src/components/SelfOrderListener.tsx
+@@ -0,0 +1,112 @@
++import { useEffect } from 'react';
++import { toast } from 'react-toastify';
++import type { Socket } from 'socket.io-client';
++import { getRealtimeSocket } from '../lib/realtime';
++import { usePOSStore } from '../store/pos-store';
++import { useRootStore } from '../store/root-store';
++import { getActiveDirection, t } from '../i18n';
++
++// Patch 43: alerts the till when a customer orders or asks for the bill from the
++// QR app. erp_restaurant (self_order_alerts.py) publishes erp_self_order_<branch>
++// after the order is saved.
++
++interface SelfOrderEvent {
++  kind: 'order' | 'bill';
++  invoice: string;
++  order_number?: string | number;
++  table?: string;
++  qty?: number;
++}
++
++// One context, unlocked by the first tap: iPad Safari keeps a context made outside a tap suspended.
++let audioCtx: AudioContext | null = null;
++
++function unlockAudio() {
++  try {
++    audioCtx = audioCtx || new AudioContext();
++    audioCtx.resume().catch(() => undefined);
++  } catch {
++    audioCtx = null;
++  }
++}
++
++function beep() {
++  const ctx = audioCtx;
++  if (!ctx) return; // Not tapped yet, or no audio on this device: the toast is enough.
++  ctx.resume().catch(() => undefined);
++  [880, 1175].forEach((freq, i) => {
++    const osc = ctx.createOscillator();
++    const gain = ctx.createGain();
++    osc.frequency.value = freq;
++    gain.gain.value = 0.2;
++    osc.connect(gain).connect(ctx.destination);
++    osc.start(ctx.currentTime + i * 0.25);
++    osc.stop(ctx.currentTime + i * 0.25 + 0.2);
++  });
++}
++
++function refreshOrdersPage() {
++  // Only where the list is shown, keeping the page the cashier is on.
++  if (!window.location.pathname.startsWith('/pos/orders')) return;
++  const { fetchOrders, pagination } = useRootStore.getState();
++  fetchOrders(pagination.currentPage).catch(() => undefined);
++}
++
++function message(e: SelfOrderEvent): string {
++  const number = String(e.order_number || e.invoice);
++  if (e.kind === 'bill') {
++    return t('self_order.bill_requested', { table: e.table || '', number });
++  }
++  const qty = e.qty || 0;
++  return e.table
++    ? t('self_order.new_order_table', { table: e.table, number, qty })
++    : t('self_order.new_order_pickup', { number, qty });
++}
++
++const SelfOrderListener: React.FC = () => {
++  const { posProfile } = usePOSStore();
++  const branch = posProfile?.branch || '';
++
++  useEffect(() => {
++    window.addEventListener('pointerdown', unlockAudio);
++    return () => window.removeEventListener('pointerdown', unlockAudio);
++  }, []);
++
++  useEffect(() => {
++    if (!branch) return;
++    const channel = `erp_self_order_${branch}`;
++    let activeSocket: Socket | null = null;
++    let cancelled = false;
++
++    const onEvent = (e: SelfOrderEvent) => {
++      if (!e?.invoice) return;
++      // One toast per order and kind: a customer adding more replaces the earlier one.
++      const toastId = `${e.kind}-${e.invoice}`;
++      const content = <div dir={getActiveDirection()}>{message(e)}</div>;
++      if (toast.isActive(toastId)) {
++        toast.update(toastId, { render: content });
++      } else {
++        toast.info(content, { toastId, position: 'top-right', autoClose: false, closeOnClick: true, theme: 'colored' });
++      }
++      beep();
++      refreshOrdersPage();
++    };
++
++    getRealtimeSocket()
++      .then((s) => {
++        if (cancelled) return;
++        activeSocket = s;
++        s.on(channel, onEvent);
++      })
++      .catch((error) => console.error('SelfOrderListener: realtime unavailable:', error));
++
++    return () => {
++      cancelled = true;
++      activeSocket?.off(channel, onEvent);
++    };
++  }, [branch]);
++
++  return null;
++};
++
++export default SelfOrderListener;
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 06e7c3f3..4816f937 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -617,5 +617,10 @@
+     "aggregator": {
+         "loading": "جارٍ تحميل المنصات…",
+         "select": "اختر منصة التوصيل"
++    },
++    "self_order": {
++        "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
++        "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
++        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
+     }
+ }
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index bcc0ecce..c0863cb5 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -610,5 +610,10 @@
+   "aggregator": {
+     "loading": "Loading platforms...",
+     "select": "Choose a delivery platform"
++  },
++  "self_order": {
++    "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
++    "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
++    "bill_requested": "{{table}} asks for the bill (no. {{number}})"
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 87fb6a31..6e219a59 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -610,5 +610,10 @@
+   "aggregator": {
+     "loading": "Chargement des plateformes…",
+     "select": "Choisir une plateforme de livraison"
++  },
++  "self_order": {
++    "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
++    "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
++    "bill_requested": "{{table}} demande l'addition (n° {{number}})"
+   }
+ }

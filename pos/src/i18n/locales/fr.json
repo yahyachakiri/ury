@@ -610,5 +610,10 @@
   "aggregator": {
     "loading": "Chargement des plateformes…",
     "select": "Choisir une plateforme de livraison"
+  },
+  "self_order": {
+    "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
+    "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
+    "bill_requested": "{{table}} demande l'addition (n° {{number}})"
   }
 }

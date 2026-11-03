@@ -617,5 +617,10 @@
     "aggregator": {
         "loading": "جارٍ تحميل المنصات…",
         "select": "اختر منصة التوصيل"
+    },
+    "self_order": {
+        "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
+        "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
+        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
     }
 }

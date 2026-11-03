@@ -9,6 +9,7 @@ import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import KotAlertListener from './components/KotAlertListener';
+import SelfOrderListener from './components/SelfOrderListener';
 import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
 import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
@@ -36,6 +37,7 @@ function App() {
     <>
       <ToastProvider />
       <KotAlertListener />
+      <SelfOrderListener />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>

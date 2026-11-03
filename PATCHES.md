@@ -1681,6 +1681,41 @@ Acceptance criteria:
 
 Patch file: `patches/42-print-french-not-arabic.patch`.
 
+### Patch 43 — Till alert for a QR order and a bill request
+
+Ticket 18, open item 2 (2026-11-03). Works with erp_restaurant `self_order_alerts.py`.
+
+Files touched: `pos/src/components/SelfOrderListener.tsx` (new), `pos/src/App.tsx`
+(mounted next to `KotAlertListener`), `pos/src/i18n/locales/{en,fr,ar}.json`
+(`self_order.*`)
+
+What it does: listens on the realtime event `erp_self_order_<branch>` that
+erp_restaurant publishes after a customer QR order (or addition) is saved and after a
+new "request the bill". Shows a toast that stays until closed ("Commande QR : Table 4
+(n° 12), 2 article(s)", "Commande QR à emporter …", "Table 4 demande l'addition"),
+plays two short tones (one WebAudio context unlocked by the first tap, so iPad Safari
+plays it; no file) and reloads the Orders list when it is on screen, keeping its page.
+One toast per order and kind (an addition replaces it); text in the POS direction (RTL
+in Arabic). Same app for the waiter screens (/pos/order).
+
+Why it can't be done in `erp_restaurant`: the server can publish the event, but only
+the POS bundle can show a toast, play a sound or reload its order list.
+
+Risk profile: low. New component on the shared socket of `lib/realtime.ts`; no store
+or order-flow change (calls the existing `fetchOrders`).
+
+Acceptance criteria:
+1. Till open on /pos and waiter app on /pos/order: a QR table order shows the toast
+   with table, order number and item count, with a sound; with Orders open, the order
+   is listed without a manual refresh.
+2. Pickup code order: "Commande QR à emporter" toast.
+3. "Demander l'addition" in the QR app: "<table> demande l'addition" toast, once (a
+   second tap does not alert again).
+4. Texts in fr, ar (RTL) and en.
+5. iPad till: after one tap anywhere, the sound plays on the next alert.
+
+Patch file: `patches/43-self-order-alerts.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

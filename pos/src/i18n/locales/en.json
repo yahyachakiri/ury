@@ -610,5 +610,10 @@
   "aggregator": {
     "loading": "Loading platforms...",
     "select": "Choose a delivery platform"
+  },
+  "self_order": {
+    "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
+    "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
+    "bill_requested": "{{table}} asks for the bill (no. {{number}})"
   }
 }
