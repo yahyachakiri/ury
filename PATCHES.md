@@ -1716,6 +1716,32 @@ Acceptance criteria:
 
 Patch file: `patches/43-self-order-alerts.patch`.
 
+### Patch 44 — Orders footer wraps on a narrow screen
+
+Owner report (2026-11-03): on a platform order (Glovo, …) the total was not visible.
+Applies on top of Patches 31 and 33.
+
+Files touched: `pos/src/pages/Orders.tsx` (sticky footer of the selected order)
+
+What it does: the footer row (print, "Remis au livreur", "Payé sur place", total) wraps
+onto a second line when it does not fit, instead of pushing the total out of view. The
+two platform buttons grow from their text width (`flex-auto`) so the row can break; the
+total keeps `ms-auto` and sits at the end of its line. Other orders (one Payment
+button, `flex-1`) are unchanged.
+
+Why it can't be done in `erp_restaurant`: layout of the POS bundle's Orders screen.
+
+Risk profile: low logic risk (three Tailwind classes, no logic); medium conflict risk
+(Orders.tsx is a busy upstream file, as in Patch 33).
+
+Acceptance criteria:
+1. Platform order on a narrow till (iPad portrait, small window): the total is visible,
+   on a second line when needed; wide screen: one row as before.
+2. Dine-in / takeaway order: footer unchanged (print, Payment, total).
+3. Arabic: same, mirrored (total at the left end).
+
+Patch file: `patches/44-orders-footer-wrap.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

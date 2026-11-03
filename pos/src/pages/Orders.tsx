@@ -875,7 +875,8 @@ export default function Orders() {
 
             {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
-              <div className="flex items-center gap-3 w-full">
+              {/* Patch 44: wraps when the buttons and the total do not fit (platform orders on a narrow screen). */}
+              <div className="flex flex-wrap items-center gap-3 w-full">
                 {/* Print Icon Button */}
                 <Button
                   variant="outline"
@@ -892,7 +893,7 @@ export default function Orders() {
                   // Patch 31: the platform pays later (weekly or monthly statement): the order is
                   // settled with the platform's payment method for its total, no cash dialog.
                   <Button
-                    className="flex-1"
+                    className="flex-auto"
                     variant={confirmHandOver ? 'destructive' : 'default'}
                     disabled={handingOver}
                     onBlur={() => setConfirmHandOver(false)}
@@ -917,6 +918,7 @@ export default function Orders() {
                 {isOrderEditable(selectedOrder.status) && selectedOrder.order_type === 'Aggregators' && !isMergedBill(selectedOrder) && (
                   // Patch 33: paid at once at the counter instead of by the platform later.
                   <Button
+                    className="flex-auto"
                     variant="outline"
                     disabled={handingOver}
                     onClick={() => {
