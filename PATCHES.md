@@ -440,7 +440,8 @@ Files touched:
 - `pos/src/lib/pos-profile-api.ts` (types for the erp_restaurant fields)
 - `pos/src/components/OrderPanel.tsx` (auto print after a successful `sync_order`)
 - `pos/src/components/OrderActionsMenu.tsx`, `pos/src/pages/Orders.tsx`
-  ("Reprint kitchen ticket" action)
+  ("Reprint kitchen ticket" action; auto print after a successful
+  `cancel_order`, ticket 37)
 - `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`kitchen.*` keys)
 
 What it does: URY creates URY KOTs in `sync_order` (`kot_execute`: new
@@ -454,7 +455,12 @@ prints each through QZ Tray on "Kitchen Printer" (empty = the PC's default),
 then calls `mark_kitchen_tickets_printed`. It runs in the background: the
 cashier is not blocked, a failure shows a toast and leaves the KOT unprinted.
 Orders gets "Reprint kitchen ticket" (all KOTs of the order, marked REPRINT on
-paper). Bills printed through QZ now go to "Bill Printer" (empty = default).
+paper). Cancelling a whole order from Orders (ticket 37): `cancel_order`
+creates a "Cancelled" KOT (URY `cancel_kot`) that nothing printed; with
+auto-print on, the POS now prints it the same way, in the background, right
+after the cancel succeeds. A cancel ticket also prints for an order whose
+earlier tickets never printed (accepted). Bills printed through QZ now go to
+"Bill Printer" (empty = default).
 `printWithQz` without a printer name behaves as upstream. The `qz.ts` change
 lives in `@ury/core`, so it also reaches the management frontend (same
 behavior there; rebuild both apps). `loadQzPrinter` now shares one pending
@@ -498,6 +504,9 @@ Acceptance criteria:
 8. French and Arabic: menu label and toasts; Arabic ticket right to left.
 9. Bill print and kitchen auto print right after each other (takeaway: confirm,
    then Print at once in Orders): both print, no QZ connection error.
+10. Cancel a whole order (draft or paid) from Orders with auto-print on: a
+    "CANCELLED" ticket with every item as -qty prints; auto-print off: nothing
+    prints; printer off: order still cancelled, print error toast (ticket 37).
 
 Commit: `a8489c4fcb58d1002a139de3e1496fd50f6ad8f8`
 
@@ -505,7 +514,8 @@ Risk profile: medium. Small additions in OrderPanel.tsx (high-risk file,
 also changed by Patches 04 and 08) and Orders.tsx; the shared `qz.ts`
 change is backward compatible. On a conflict, keep the Patch 10 block after
 the Patch 08 `savedName` line, `printKitchenTickets` and the `printerName`
-argument.
+argument. In `handleCancelOrder` (Orders.tsx) keep `invoiceId` captured before
+`clearSelectedOrder()` and the print block after the success toast.
 
 ### Patch 11 — Close Shift accepts an all-zero shift with no activity
 
