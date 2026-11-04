@@ -2,12 +2,20 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { initI18n } from './i18n'
-import { initPrinting } from '@ury/core'
+import { initI18n, t } from './i18n'
+import { initPrinting, setErrorMessages } from '@ury/core'
 
 initPrinting({ signKey: '' })
 
 initI18n().then(() => {
+  // Patch 46: technical errors (network, deadlock, expired session...) in the till's language.
+  setErrorMessages({
+    network: t('errors.network'),
+    busy: t('errors.busy'),
+    session: t('errors.session_expired'),
+    unavailable: t('errors.server_unavailable'),
+    unexpected: t('errors.unexpected'),
+  })
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

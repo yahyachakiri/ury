@@ -159,7 +159,7 @@ export default function CaptainTables() {
     }
 
     const ownerName = order ? ownerNames.get(order.waiter) ?? order.waiter : null;
-    showToast.error(ownerName ? `Assigned to ${ownerName}` : 'This table is occupied');
+    showToast.error(ownerName ? t('errors.table_assigned', { name: ownerName }) : t('errors.table_occupied'));
   };
 
   const isLoading = contextLoading || (roomsLoading && branchRooms.length === 0);

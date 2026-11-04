@@ -3,6 +3,7 @@ import { useKotErrorChannels } from '../lib/realtime';
 import { showToast } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
 import { getProductionUnitsForBranch } from '../lib/production-api';
+import { t } from '../i18n';
 
 /**
  * KotAlertListener: A headless component that subscribes to all KOT error channels
@@ -61,10 +62,12 @@ const KotAlertListener: React.FC = () => {
   // Memoize error handler to avoid unnecessary re-subscriptions
   const handleKotError = useCallback((payload: Record<string, unknown>) => {
     // Extract error message from payload
+    // Patch 46: URY's payload has no message (ury_kot_validation.create_kot_log): the
+    // scheduler has just created a kitchen ticket that the order was missing.
     const message =
       (payload?.message as string) ||
       (payload?.error as string) ||
-      'An unknown KOT error occurred';
+      t('errors.kitchen_ticket_late', { invoice: String(payload?.invoice ?? '') });
 
     showToast.error(message);
   }, []);

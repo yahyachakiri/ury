@@ -1,0 +1,922 @@
+diff --git a/packages/core/src/frappe/errors.ts b/packages/core/src/frappe/errors.ts
+index 1a07b3d3..c5442601 100644
+--- a/packages/core/src/frappe/errors.ts
++++ b/packages/core/src/frappe/errors.ts
+@@ -11,8 +11,54 @@
+  * This function extracts and surfaces ALL validation messages from Frappe so no error details
+  * are hidden from the user.
+  */
+-export function parseFrappeError(err: unknown, fallback = 'An unexpected error occurred.'): string {
++// Patch 46: technical failures get a short message the cashier can act on instead of the raw
++// text (MariaDB deadlock, axios "Network Error", Python TypeError...). English defaults; an app
++// passes its translations once with setErrorMessages.
++export interface ErrorMessages {
++  network: string;
++  busy: string;
++  session: string;
++  unavailable: string;
++  unexpected: string;
++}
++
++const errorMessages: ErrorMessages = {
++  network: 'No connection to the server. Check the internet connection and try again.',
++  busy: 'The system was busy for a moment and nothing was saved. Try again.',
++  session: 'Your session has expired. Reload the page and log in again.',
++  unavailable: 'The server is not responding. Wait a moment and try again.',
++  unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
++};
++
++export function setErrorMessages(messages: Partial<ErrorMessages>): void {
++  Object.assign(errorMessages, messages);
++}
++
++const LOCK_ERROR = /QueryDeadlockError|QueryTimeoutError|Deadlock found when trying to get lock|Lock wait timeout exceeded/;
++const SESSION_ERROR = /CSRFTokenError|SessionExpired|AuthenticationError/;
++
++// JavaScript runtime errors are bugs, never a message for the cashier.
++const isRuntimeError = (err: unknown): boolean =>
++  err instanceof TypeError || err instanceof ReferenceError || err instanceof RangeError || err instanceof SyntaxError;
++
++function technicalMessage(e: Record<string, unknown>): string | null {
++  const status = typeof e.httpStatus === 'number' ? e.httpStatus : undefined;
++  if (status === 0) return errorMessages.network;
++  const text = [e.exc_type, e.exception, e._server_messages, e.message]
++    .filter((v) => typeof v === 'string')
++    .join(' ');
++  if (LOCK_ERROR.test(text)) return errorMessages.busy;
++  if (SESSION_ERROR.test(String(e.exc_type ?? '')) || SESSION_ERROR.test(String(e.exception ?? ''))) {
++    return errorMessages.session;
++  }
++  if (status === 502 || status === 503 || status === 504) return errorMessages.unavailable;
++  return null;
++}
++
++export function parseFrappeError(err: unknown, fallback?: string): string {
++  fallback = fallback || errorMessages.unexpected;
+   if (!err) return fallback;
++  if (isRuntimeError(err)) return fallback; // Patch 46
+ 
+   // Direct string errors
+   if (typeof err === 'string') {
+@@ -23,6 +69,8 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+   if (typeof err !== 'object') return fallback;
+ 
+   const e = err as Record<string, unknown>;
++  const technical = technicalMessage(e); // Patch 46
++  if (technical) return technical;
+   const parsedMessages: string[] = [];
+   const seenMessages = new Set<string>(); // Patch 13
+ 
+@@ -110,9 +158,9 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+         : '';
+ 
+   if (exceptionStr) {
+-    const match =
+-      exceptionStr.match(/frappe\.exceptions\.\w+Error:\s*(.+)/s) ||
+-      exceptionStr.match(/^\w+Error:\s*(.+)/s);
++    // Patch 46: only Frappe's own exceptions carry a message for the user; a bare Python
++    // error ("TypeError: ...", "KeyError: ...") falls through to the fallback.
++    const match = exceptionStr.match(/frappe\.exceptions\.\w+Error:\s*(.+)/s);
+ 
+     if (match && match[1]) {
+       const firstLine = match[1].split('\n')[0].trim();
+@@ -142,13 +190,6 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
+     if (cleaned && cleaned !== 'There was an error.') return cleaned;
+   }
+ 
+-  // Strategy 6: Fall back to formatted exc_type (e.g. "MandatoryError" -> "Mandatory Error")
+-  if (typeof e.exc_type === 'string' && e.exc_type) {
+-    const parts = e.exc_type.split('.');
+-    const lastPart = parts[parts.length - 1] ?? '';
+-    const formatted = lastPart.replace(/([A-Z])/g, ' $1').trim();
+-    if (formatted) return formatted;
+-  }
+-
++  // Patch 46: no Strategy 6 (exc_type spelled out, e.g. "Type Error"): it told the cashier nothing.
+   return fallback;
+ }
+diff --git a/packages/core/src/index.ts b/packages/core/src/index.ts
+index 29caa1fd..8354b276 100644
+--- a/packages/core/src/index.ts
++++ b/packages/core/src/index.ts
+@@ -2,7 +2,8 @@ export { createFrappeClient, call, db, auth } from './frappe/client';
+ export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
+ export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+ export type { POSCapabilities } from './frappe/roles';
+-export { parseFrappeError } from './frappe/errors';
++export { parseFrappeError, setErrorMessages } from './frappe/errors';
++export type { ErrorMessages } from './frappe/errors';
+ export type { User, PosProfileCombined } from './types';
+ export { storage } from './storage';
+ export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt } from './format';
+diff --git a/pos/src/captain/hooks/useCaptainContext.ts b/pos/src/captain/hooks/useCaptainContext.ts
+index 7b342451..78cff540 100644
+--- a/pos/src/captain/hooks/useCaptainContext.ts
++++ b/pos/src/captain/hooks/useCaptainContext.ts
+@@ -1,5 +1,6 @@
+ import { useCallback, useEffect, useState } from 'react';
+-import { derivePOSCapabilities } from '@ury/core';
++import { derivePOSCapabilities, parseFrappeError } from '@ury/core';
++import { t } from '../../i18n';
+ import type { POSCapabilities, PosProfileCombined, User } from '@ury/core';
+ import {
+   getCaptainContext,
+@@ -117,7 +118,7 @@ export const useCaptainContext = (): UseCaptainContextResult => {
+       const result = await getCaptainContext();
+       setContext(result);
+     } catch (err) {
+-      setError((err as Error).message || 'Failed to load captain context.');
++      setError(parseFrappeError(err, t('errors.load_waiter_context')));
+       setContext(null);
+     } finally {
+       setIsLoading(false);
+diff --git a/pos/src/captain/hooks/useTableOrderContext.ts b/pos/src/captain/hooks/useTableOrderContext.ts
+index a1877bbc..ea19785d 100644
+--- a/pos/src/captain/hooks/useTableOrderContext.ts
++++ b/pos/src/captain/hooks/useTableOrderContext.ts
+@@ -1,5 +1,7 @@
+ import { useCallback, useEffect, useRef, useState } from 'react';
+ import { usePOSStore, OrderItem } from '../../store/pos-store';
++import { parseFrappeError } from '@ury/core';
++import { t } from '../../i18n';
+ import {
+   getTableOrderContext,
+   TableOrderContext,
+@@ -90,7 +92,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
+       const result = await getTableOrderContext(table);
+       setContext(result);
+     } catch (err) {
+-      setContextError((err as Error).message || 'Failed to load table order context.');
++      setContextError(parseFrappeError(err, t('errors.load_table_context')));
+       setContext(null);
+     } finally {
+       setIsContextLoading(false);
+@@ -120,7 +122,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
+         }
+       } catch (err) {
+         if (cancelled) return;
+-        setContextError((err as Error).message || 'Failed to load table order context.');
++        setContextError(parseFrappeError(err, t('errors.load_table_context')));
+         setContext(null);
+       } finally {
+         if (!cancelled) setIsContextLoading(false);
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index 57f37382..40a139b1 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
+ import { useNavigate, useParams } from 'react-router-dom';
+ import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react';
+ import { Button, Spinner, cn, showToast } from '@ury/ui';
+-import { formatCurrency } from '@ury/core';
++import { formatCurrency, parseFrappeError } from '@ury/core';
+ import { usePOSStore } from '../../store/pos-store';
+ import { useRootStore, RootState } from '../../store/root-store';
+ import {
+@@ -239,23 +239,7 @@ export default function CaptainOrder() {
+       navigate('/order');
+     } catch (error) {
+       console.error('Failed to sync order:', error);
+-      const serverMessages =
+-        error && typeof error === 'object' && '_server_messages' in error
+-          ? (error as { _server_messages?: unknown })._server_messages
+-          : undefined;
+-      if (typeof serverMessages === 'string') {
+-        try {
+-          const messages = JSON.parse(serverMessages);
+-          const messageObj = JSON.parse(messages[0]);
+-          showToast.error(messageObj.message || t('errors.api_error'));
+-        } catch {
+-          showToast.error(t('errors.api_error'));
+-        }
+-      } else if (error instanceof Error) {
+-        showToast.error(error.message);
+-      } else {
+-        showToast.error(t('captain.send_failed'));
+-      }
++      showToast.error(parseFrappeError(error, t('captain.send_failed'))); // Patch 46
+     } finally {
+       setIsSubmitting(false);
+     }
+@@ -281,7 +265,7 @@ export default function CaptainOrder() {
+       await reprintKot(invoiceId);
+       showToast.success(t('captain.kot_reprinted'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('captain.reprint_failed'));
++      showToast.error(parseFrappeError(error, t('captain.reprint_failed')));
+     } finally {
+       setIsReprintingKot(false);
+     }
+@@ -305,7 +289,7 @@ export default function CaptainOrder() {
+       });
+       showToast.success(t('success.printed'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('captain.print_bill_failed'));
++      showToast.error(parseFrappeError(error, t('captain.print_bill_failed')));
+     } finally {
+       setIsPrintingBill(false);
+     }
+@@ -329,7 +313,7 @@ export default function CaptainOrder() {
+       setTransferDestinations(destinations);
+     } catch (error) {
+       setIsTransferTableOpen(false);
+-      showToast.error(error instanceof Error ? error.message : t('captain.load_destinations_failed'));
++      showToast.error(parseFrappeError(error, t('captain.load_destinations_failed')));
+     } finally {
+       setIsTransferDestinationsLoading(false);
+     }
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index 712341ae..2dcb0573 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -159,7 +159,7 @@ export default function CaptainTables() {
+     }
+ 
+     const ownerName = order ? ownerNames.get(order.waiter) ?? order.waiter : null;
+-    showToast.error(ownerName ? `Assigned to ${ownerName}` : 'This table is occupied');
++    showToast.error(ownerName ? t('errors.table_assigned', { name: ownerName }) : t('errors.table_occupied'));
+   };
+ 
+   const isLoading = contextLoading || (roomsLoading && branchRooms.length === 0);
+diff --git a/pos/src/components/BillMergeDialog.tsx b/pos/src/components/BillMergeDialog.tsx
+index 89f09416..1e4fef73 100644
+--- a/pos/src/components/BillMergeDialog.tsx
++++ b/pos/src/components/BillMergeDialog.tsx
+@@ -9,7 +9,7 @@ import {
+ } from '@ury/ui';
+ import { Button } from '@ury/ui';
+ import { cn } from '@ury/ui';
+-import { formatCurrency } from '@ury/core';
++import { formatCurrency, parseFrappeError } from '@ury/core';
+ import { t } from '../i18n';
+ import { showToast } from '@ury/ui';
+ import { Spinner } from '@ury/ui';
+@@ -77,7 +77,7 @@ const BillMergeDialog = ({
+         if (!append) {
+           setCandidates([]);
+         }
+-        setLoadError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
++        setLoadError(parseFrappeError(err, t('bill_merge.merge_failed')));
+       } finally {
+         setBusy(false);
+       }
+@@ -124,7 +124,7 @@ const BillMergeDialog = ({
+         setPage(1);
+       } catch (err) {
+         if (!cancelled) {
+-          setLoadError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
++          setLoadError(parseFrappeError(err, t('bill_merge.merge_failed')));
+         }
+       } finally {
+         if (!cancelled) {
+@@ -168,7 +168,7 @@ const BillMergeDialog = ({
+       await onConfirm(selected);
+       onOpenChange(false);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
++      setError(parseFrappeError(err, t('bill_merge.merge_failed')));
+     } finally {
+       setIsSubmitting(false);
+     }
+diff --git a/pos/src/components/BillSplitDialog.tsx b/pos/src/components/BillSplitDialog.tsx
+index 81ab2c64..baf1bae9 100644
+--- a/pos/src/components/BillSplitDialog.tsx
++++ b/pos/src/components/BillSplitDialog.tsx
+@@ -10,7 +10,7 @@ import {
+ } from '@ury/ui';
+ import { Button } from '@ury/ui';
+ import { cn } from '@ury/ui';
+-import { formatCurrency } from '@ury/core';
++import { formatCurrency, parseFrappeError } from '@ury/core';
+ import { t } from '../i18n';
+ import { CustomerPicker } from './CustomerPicker';
+ import type { Customer } from '../store/pos-store';
+@@ -134,7 +134,7 @@ const BillSplitDialog = ({
+       resetState();
+       onOpenChange(false);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : t('bill_split.split_failed'));
++      setError(parseFrappeError(err, t('bill_split.split_failed')));
+     } finally {
+       setIsSubmitting(false);
+     }
+diff --git a/pos/src/components/CaptainTransferDialog.tsx b/pos/src/components/CaptainTransferDialog.tsx
+index 7a66cd4a..d655b7b1 100644
+--- a/pos/src/components/CaptainTransferDialog.tsx
++++ b/pos/src/components/CaptainTransferDialog.tsx
+@@ -11,7 +11,7 @@ import { Button } from '@ury/ui';
+ import { cn } from '@ury/ui';
+ import { t } from '../i18n';
+ import { Spinner } from '@ury/ui';
+-import { db } from '@ury/core';
++import { db, parseFrappeError } from '@ury/core';
+ 
+ interface CaptainTransferDialogProps {
+   open: boolean;
+@@ -87,7 +87,7 @@ const CaptainTransferDialog = ({
+       })
+       .catch((err) => {
+         if (!cancelled) {
+-          setLoadError(err instanceof Error ? err.message : t('tables.transfer_failed'));
++          setLoadError(parseFrappeError(err, t('tables.transfer_failed')));
+           setCandidates([]);
+         }
+       })
+@@ -115,7 +115,7 @@ const CaptainTransferDialog = ({
+       await onConfirm(selected);
+       onOpenChange(false);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : t('tables.transfer_failed'));
++      setError(parseFrappeError(err, t('tables.transfer_failed')));
+     } finally {
+       setIsSubmitting(false);
+     }
+diff --git a/pos/src/components/ChecklistGateDialog.tsx b/pos/src/components/ChecklistGateDialog.tsx
+index 525d55a0..2a9826c3 100644
+--- a/pos/src/components/ChecklistGateDialog.tsx
++++ b/pos/src/components/ChecklistGateDialog.tsx
+@@ -1,4 +1,5 @@
+ import { useCallback, useEffect, useMemo, useState } from 'react';
++import { parseFrappeError } from '@ury/core';
+ import { Button, Input, Spinner, cn } from '@ury/ui';
+ import { t } from '../i18n';
+ import {
+@@ -27,20 +28,7 @@ interface ChecklistRowState {
+  * then to a generic string. Mirrors the helper in POSClosingDialog.tsx.
+  */
+ function extractServerErrorMessage(error: unknown, fallback: string): string {
+-  if (error && typeof error === 'object' && '_server_messages' in error) {
+-    const raw = (error as { _server_messages?: unknown })._server_messages;
+-    if (typeof raw === 'string') {
+-      try {
+-        const messages = JSON.parse(raw);
+-        const first = JSON.parse(messages[0]);
+-        if (first?.message) return first.message as string;
+-      } catch {
+-        // fall through to other extraction strategies
+-      }
+-    }
+-  }
+-  if (error instanceof Error && error.message) return error.message;
+-  return fallback;
++  return parseFrappeError(error, fallback); // Patch 46: same rules as the rest of the till
+ }
+ 
+ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
+diff --git a/pos/src/components/CustomerPicker.tsx b/pos/src/components/CustomerPicker.tsx
+index bfe081c6..2615e87a 100644
+--- a/pos/src/components/CustomerPicker.tsx
++++ b/pos/src/components/CustomerPicker.tsx
+@@ -1,4 +1,5 @@
+ import { useState, useEffect } from 'react';
++import { parseFrappeError } from '@ury/core';
+ import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
+ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+ 
+@@ -91,7 +92,7 @@ function NewCustomerForm({
+       onSuccess?.();
+       onClose();
+     } catch (error: unknown) {
+-      setApiError(error instanceof Error ? error.message : t('customer.failed_create'));
++      setApiError(parseFrappeError(error, t('customer.failed_create')));
+     } finally {
+       setIsCreatingCustomer(false);
+     }
+diff --git a/pos/src/components/KotAlertListener.tsx b/pos/src/components/KotAlertListener.tsx
+index eeeb3104..c721ac14 100644
+--- a/pos/src/components/KotAlertListener.tsx
++++ b/pos/src/components/KotAlertListener.tsx
+@@ -3,6 +3,7 @@ import { useKotErrorChannels } from '../lib/realtime';
+ import { showToast } from '@ury/ui';
+ import { usePOSStore } from '../store/pos-store';
+ import { getProductionUnitsForBranch } from '../lib/production-api';
++import { t } from '../i18n';
+ 
+ /**
+  * KotAlertListener: A headless component that subscribes to all KOT error channels
+@@ -61,10 +62,12 @@ const KotAlertListener: React.FC = () => {
+   // Memoize error handler to avoid unnecessary re-subscriptions
+   const handleKotError = useCallback((payload: Record<string, unknown>) => {
+     // Extract error message from payload
++    // Patch 46: URY's payload has no message (ury_kot_validation.create_kot_log): the
++    // scheduler has just created a kitchen ticket that the order was missing.
+     const message =
+       (payload?.message as string) ||
+       (payload?.error as string) ||
+-      'An unknown KOT error occurred';
++      t('errors.kitchen_ticket_late', { invoice: String(payload?.invoice ?? '') });
+ 
+     showToast.error(message);
+   }, []);
+diff --git a/pos/src/components/POSClosingDialog.tsx b/pos/src/components/POSClosingDialog.tsx
+index d00aa892..0777ed70 100644
+--- a/pos/src/components/POSClosingDialog.tsx
++++ b/pos/src/components/POSClosingDialog.tsx
+@@ -9,7 +9,7 @@ import {
+ } from '@ury/ui';
+ import { Button } from '@ury/ui';
+ import { Spinner } from '@ury/ui';
+-import { call, db, formatCurrency } from '@ury/core';
++import { call, db, formatCurrency, parseFrappeError } from '@ury/core';
+ import { t } from '../i18n';
+ import { usePOSStore } from '../store/pos-store';
+ import { useRootStore } from '../store/root-store';
+@@ -94,20 +94,7 @@ function formatTime(date: Date): string {
+  * own message, then to a generic string.
+  */
+ function extractServerErrorMessage(error: unknown, fallback: string): string {
+-  if (error && typeof error === 'object' && '_server_messages' in error) {
+-    const raw = (error as { _server_messages?: unknown })._server_messages;
+-    if (typeof raw === 'string') {
+-      try {
+-        const messages = JSON.parse(raw);
+-        const first = JSON.parse(messages[0]);
+-        if (first?.message) return first.message as string;
+-      } catch {
+-        // fall through to other extraction strategies
+-      }
+-    }
+-  }
+-  if (error instanceof Error && error.message) return error.message;
+-  return fallback;
++  return parseFrappeError(error, fallback); // Patch 46: same rules as the rest of the till
+ }
+ 
+ interface AggregatedTotals {
+diff --git a/pos/src/components/POSOpeningProvider.tsx b/pos/src/components/POSOpeningProvider.tsx
+index 179e5503..9d79594f 100644
+--- a/pos/src/components/POSOpeningProvider.tsx
++++ b/pos/src/components/POSOpeningProvider.tsx
+@@ -1,3 +1,4 @@
++import { parseFrappeError as parseFrappeErrorCore } from '@ury/core';
+ import {
+   POSOpeningEntryRef,
+   checkPOSOpening,
+@@ -195,7 +196,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
+       const serverMessage = parseFrappeError(error);
+       const status = getHttpStatus(error);
+       const fallbackMessage =
+-        error instanceof Error ? error.message : t('errors.posOpening.load_failed');
++        parseFrappeErrorCore(error, t('errors.posOpening.load_failed')); // Patch 46
+       const message = translateOpeningMessage(serverMessage || fallbackMessage);
+ 
+       if (status === 403 || /permission/i.test(message)) {
+diff --git a/pos/src/components/ProductDialog.tsx b/pos/src/components/ProductDialog.tsx
+index aa55e16b..14ec30ea 100644
+--- a/pos/src/components/ProductDialog.tsx
++++ b/pos/src/components/ProductDialog.tsx
+@@ -69,7 +69,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+         setItemDoc(doc);
+       })
+       .catch(() => {
+-        setItemError('Failed to fetch item details');
++        setItemError(t('errors.load_item'));
+         setItemDoc(null);
+       })
+       .finally(() => {
+@@ -166,7 +166,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+         }
+       })
+       .catch((_err: any) => {
+-        setAddonError('Failed to fetch add-ons');
++        setAddonError(t('errors.load_addons'));
+         setAddonItemCodes([]);
+       })
+       .finally(() => {
+diff --git a/pos/src/components/TableTransferDialog.tsx b/pos/src/components/TableTransferDialog.tsx
+index fbd21c4e..d74638af 100644
+--- a/pos/src/components/TableTransferDialog.tsx
++++ b/pos/src/components/TableTransferDialog.tsx
+@@ -1,4 +1,5 @@
+ import { useEffect, useMemo, useState } from 'react';
++import { parseFrappeError } from '@ury/core';
+ import {
+   Dialog,
+   DialogContent,
+@@ -89,7 +90,7 @@ const TableTransferDialog = ({
+       await onConfirm(selected);
+       onOpenChange(false);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : t('tables.transfer_failed'));
++      setError(parseFrappeError(err, t('tables.transfer_failed')));
+     } finally {
+       setIsSubmitting(false);
+     }
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 4816f937..7725c93a 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -296,7 +296,29 @@
+         "update_invoice_status": "فشل تحديث حالة الطلب",
+         "fetch_print": "فشل تحميل الفاتورة للطباعة",
+         "branch_not_in_profile": "لا يوجد فرع في ملف نقطة البيع",
+-        "create_customer_failed": "فشل إنشاء الزبون"
++        "create_customer_failed": "فشل إنشاء الزبون",
++        "network": "لا يوجد اتصال بالخادم. تحقق من اتصال الإنترنت ثم أعد المحاولة.",
++        "busy": "كان النظام مشغولاً للحظة ولم يتم حفظ أي شيء. أعد المحاولة.",
++        "session_expired": "انتهت صلاحية جلستك. أعد تحميل الصفحة وسجّل الدخول من جديد.",
++        "server_unavailable": "الخادم لا يستجيب. انتظر لحظة ثم أعد المحاولة.",
++        "unexpected": "حدث خطأ. أعد المحاولة؛ وإذا تكرر ذلك، أخبر المسؤول.",
++        "load_app": "تعذر تحميل الصندوق. أعد تحميل الصفحة.",
++        "load_profile": "تعذر تحميل إعدادات الصندوق. أعد تحميل الصفحة.",
++        "load_menu": "تعذر تحميل القائمة. أعد تحميل الصفحة.",
++        "load_platform_menu": "تعذر تحميل قائمة المنصة. أعد المحاولة.",
++        "load_categories": "تعذر تحميل أصناف القائمة. أعد تحميل الصفحة.",
++        "load_table_order": "تعذر تحميل طلب هذه الطاولة. أعد المحاولة.",
++        "cart_update": "تعذر تعديل الطلب. أعد المحاولة.",
++        "cart_qty_range": "يجب أن تكون الكمية بين {{min}} و {{max}}.",
++        "cart_qty_exceeds": "لا يمكن أن تتجاوز الكمية {{max}}.",
++        "load_item": "تعذر تحميل تفاصيل هذا الطبق. أغلق النافذة وأعد المحاولة.",
++        "load_addons": "تعذر تحميل الإضافات. أغلق النافذة وأعد المحاولة.",
++        "load_waiter_context": "تعذر تحميل صلاحياتك. أعد تحميل الصفحة.",
++        "load_table_context": "تعذر تحميل هذه الطاولة. ارجع وأعد المحاولة.",
++        "load_orders": "تعذر تحميل الطلبات. أعد المحاولة.",
++        "table_assigned": "هذه الطاولة يخدمها {{name}}.",
++        "table_occupied": "هذه الطاولة مشغولة.",
++        "kitchen_ticket_late": "كانت تذكرة المطبخ للفاتورة {{invoice}} مفقودة وتم إنشاؤها الآن. تأكد من أن المطبخ استلمها."
+     },
+     "success": {
+         "order_cancelled": "تم إلغاء الطلب بنجاح",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index c0863cb5..498a9b44 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -289,7 +289,29 @@
+     "update_invoice_status": "Failed to update the order status",
+     "fetch_print": "Failed to load the bill for printing",
+     "branch_not_in_profile": "No branch on the POS profile",
+-    "create_customer_failed": "Failed to create the customer"
++    "create_customer_failed": "Failed to create the customer",
++    "network": "No connection to the server. Check the internet connection and try again.",
++    "busy": "The system was busy for a moment and nothing was saved. Try again.",
++    "session_expired": "Your session has expired. Reload the page and log in again.",
++    "server_unavailable": "The server is not responding. Wait a moment and try again.",
++    "unexpected": "Something went wrong. Try again; if it happens again, tell your manager.",
++    "load_app": "The till could not load. Reload the page.",
++    "load_profile": "The till settings could not load. Reload the page.",
++    "load_menu": "The menu could not load. Reload the page.",
++    "load_platform_menu": "The platform menu could not load. Try again.",
++    "load_categories": "The menu categories could not load. Reload the page.",
++    "load_table_order": "This table's order could not load. Try again.",
++    "cart_update": "The order could not be changed. Try again.",
++    "cart_qty_range": "The quantity must be between {{min}} and {{max}}.",
++    "cart_qty_exceeds": "The quantity cannot go above {{max}}.",
++    "load_item": "This meal's details could not load. Close and try again.",
++    "load_addons": "The extras could not load. Close and try again.",
++    "load_waiter_context": "Your access could not load. Reload the page.",
++    "load_table_context": "This table could not load. Go back and try again.",
++    "load_orders": "The orders could not load. Try again.",
++    "table_assigned": "This table is served by {{name}}.",
++    "table_occupied": "This table is occupied.",
++    "kitchen_ticket_late": "The kitchen ticket for invoice {{invoice}} was missing and has just been created. Check that the kitchen has it."
+   },
+   "success": {
+     "order_cancelled": "Order cancelled successfully",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 6e219a59..5bc9a232 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -289,7 +289,29 @@
+     "update_invoice_status": "Échec de la mise à jour du statut de la commande",
+     "fetch_print": "Échec du chargement de la note à imprimer",
+     "branch_not_in_profile": "Aucune succursale sur le profil PDV",
+-    "create_customer_failed": "Échec de la création du client"
++    "create_customer_failed": "Échec de la création du client",
++    "network": "Pas de connexion au serveur. Vérifiez la connexion internet et réessayez.",
++    "busy": "Le système était occupé un instant et rien n'a été enregistré. Réessayez.",
++    "session_expired": "Votre session a expiré. Rechargez la page et reconnectez-vous.",
++    "server_unavailable": "Le serveur ne répond pas. Patientez un instant et réessayez.",
++    "unexpected": "Une erreur est survenue. Réessayez ; si cela se reproduit, prévenez votre responsable.",
++    "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
++    "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
++    "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",
++    "load_platform_menu": "Le menu de la plateforme n'a pas pu se charger. Réessayez.",
++    "load_categories": "Les catégories du menu n'ont pas pu se charger. Rechargez la page.",
++    "load_table_order": "La commande de cette table n'a pas pu se charger. Réessayez.",
++    "cart_update": "La commande n'a pas pu être modifiée. Réessayez.",
++    "cart_qty_range": "La quantité doit être comprise entre {{min}} et {{max}}.",
++    "cart_qty_exceeds": "La quantité ne peut pas dépasser {{max}}.",
++    "load_item": "Les détails de ce plat n'ont pas pu se charger. Fermez et réessayez.",
++    "load_addons": "Les suppléments n'ont pas pu se charger. Fermez et réessayez.",
++    "load_waiter_context": "Vos accès n'ont pas pu se charger. Rechargez la page.",
++    "load_table_context": "Cette table n'a pas pu se charger. Revenez en arrière et réessayez.",
++    "load_orders": "Les commandes n'ont pas pu se charger. Réessayez.",
++    "table_assigned": "Cette table est servie par {{name}}.",
++    "table_occupied": "Cette table est occupée.",
++    "kitchen_ticket_late": "Le ticket cuisine de la facture {{invoice}} manquait et vient d'être créé. Vérifiez que la cuisine l'a reçu."
+   },
+   "success": {
+     "order_cancelled": "Commande annulée avec succès",
+diff --git a/pos/src/lib/invoice-api.ts b/pos/src/lib/invoice-api.ts
+index df1d479b..4e8362fd 100644
+--- a/pos/src/lib/invoice-api.ts
++++ b/pos/src/lib/invoice-api.ts
+@@ -429,7 +429,7 @@ export async function mergeBills(
+   );
+   const result = response.message;
+   if (result.status === 'error') {
+-    throw new Error(result.message || 'Failed to merge bills');
++    throw new Error(result.message || t('bill_merge.merge_failed'));
+   }
+   return result;
+ } 
+diff --git a/pos/src/main.tsx b/pos/src/main.tsx
+index 59846bab..6f9958dc 100644
+--- a/pos/src/main.tsx
++++ b/pos/src/main.tsx
+@@ -2,12 +2,20 @@ import { StrictMode } from 'react'
+ import { createRoot } from 'react-dom/client'
+ import './index.css'
+ import App from './App.tsx'
+-import { initI18n } from './i18n'
+-import { initPrinting } from '@ury/core'
++import { initI18n, t } from './i18n'
++import { initPrinting, setErrorMessages } from '@ury/core'
+ 
+ initPrinting({ signKey: '' })
+ 
+ initI18n().then(() => {
++  // Patch 46: technical errors (network, deadlock, expired session...) in the till's language.
++  setErrorMessages({
++    network: t('errors.network'),
++    busy: t('errors.busy'),
++    session: t('errors.session_expired'),
++    unavailable: t('errors.server_unavailable'),
++    unexpected: t('errors.unexpected'),
++  })
+   createRoot(document.getElementById('root')!).render(
+     <StrictMode>
+       <App />
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 7bd13fbe..e213d0d6 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -12,7 +12,7 @@ import { DINE_IN } from '../data/order-types';
+ import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
+ import { printOrder } from '../lib/print';
+ import { resolvePrintFormat } from '../lib/invoice-api';
+-import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
++import { canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
+ import { showToast } from '@ury/ui';
+ import { t } from '../i18n';
+ import LayoutView from '../components/LayoutView';
+@@ -212,7 +212,7 @@ const TableView = () => {
+       showToast.success(t('success.printed'));
+       await loadTables(table.restaurant_room, { useCache: false });
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
++      showToast.error(parseFrappeError(error, t('errors.failed_print')));
+     } finally {
+       setPrintingTable(null);
+     }
+@@ -230,7 +230,7 @@ const TableView = () => {
+       }
+       showToast.success(t('tables.merge_success'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('tables.merge_failed'));
++      showToast.error(parseFrappeError(error, t('tables.merge_failed')));
+       throw error;
+     }
+   };
+@@ -245,7 +245,7 @@ const TableView = () => {
+       }
+       showToast.success(t('tables.unmerge_success'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
++      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
+       throw error;
+     }
+   };
+@@ -289,7 +289,7 @@ const TableView = () => {
+       setTransferSourceTable(null);
+       setTransferInvoiceName(null);
+       setTransferDestinationTables([]);
+-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
++      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
+     } finally {
+       setTransferDestinationsLoading(false);
+     }
+@@ -307,7 +307,7 @@ const TableView = () => {
+         currentCaptain: invoice.waiter,
+       });
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
++      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
+     }
+   };
+ 
+@@ -321,7 +321,7 @@ const TableView = () => {
+       }
+       showToast.success(t('tables.transfer_success'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
++      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
+       throw error;
+     }
+   };
+@@ -338,7 +338,7 @@ const TableView = () => {
+       }
+       showToast.success(t('tables.captain_transfer_success'));
+     } catch (error) {
+-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
++      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
+       throw error;
+     }
+   };
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index 6dd220b4..fea8a932 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -8,6 +8,7 @@ import { create } from 'zustand';
+ import { getMenuCourses } from '../lib/menu-course-api';
+ import { getPaymentModes } from '../lib/payment-api';
+ import { storage } from '@ury/core';
++import { t } from '../i18n';
+ import { v4 as uuidv4 } from 'uuid';
+ 
+ // Constants
+@@ -369,7 +370,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+           categoriesResult.status === 'rejected' ||
+           paymentModesResult.status === 'rejected') {
+         set({ 
+-          error: 'Failed to initialize app. Please refresh the page.',
++          error: t('errors.load_app'),
+           isInitializing: false 
+         });
+         return;
+@@ -378,7 +379,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       set({ isInitializing: false });
+     } catch (error) {
+       set({ 
+-        error: 'Failed to initialize app. Please refresh the page.',
++        error: t('errors.load_app'),
+         isInitializing: false 
+       });
+     }
+@@ -418,7 +419,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+     } catch (error) {
+       console.error('Error fetching POS profile:', error);
+       set({ 
+-        error: 'Failed to fetch POS profile',
++        error: t('errors.load_profile'),
+         profileLoading: false 
+       });
+     }
+@@ -477,7 +478,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+ 
+       set({ menuItems });
+     } catch (error) {
+-      if (!silent) set({ error: 'Failed to load menu items' });
++      if (!silent) set({ error: t('errors.load_menu') });
+       console.error('Error loading menu items:', error);
+     } finally {
+       if (!silent) set({ menuLoading: false });
+@@ -500,7 +501,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+ 
+       set({ menuItems, menuLoading: false });
+     } catch (error) {
+-      set({ error: 'Failed to load aggregator menu', menuLoading: false });
++      set({ error: t('errors.load_platform_menu'), menuLoading: false });
+       console.error('Error loading aggregator menu:', error);
+     }
+   },
+@@ -518,7 +519,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       sessionStorage.setItem('menuCategories', JSON.stringify(courses));
+       set({ categories: courses });
+     } catch (error) {
+-      set({ error: 'Failed to load menu categories' });
++      set({ error: t('errors.load_categories') });
+       throw error;
+     }
+   },
+@@ -539,7 +540,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+   addToOrder: async (item: OrderItem) => {
+     try {
+       if (!get().validateQuantity(item.quantity)) {
+-        throw new CartError(`Quantity must be between ${MIN_QUANTITY} and ${MAX_QUANTITY}`);
++        throw new CartError(t('errors.cart_qty_range', { min: MIN_QUANTITY, max: MAX_QUANTITY }));
+       }
+ 
+       const uniqueId = generateUniqueId(item);
+@@ -551,7 +552,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         const newComment = item.comment !== undefined ? item.comment : existingItem?.comment || "";
+ 
+         if (!get().validateQuantity(newQuantity)) {
+-          throw new CartError(`Cannot add item. Total quantity would exceed ${MAX_QUANTITY}`);
++          throw new CartError(t('errors.cart_qty_exceeds', { max: MAX_QUANTITY }));
+         }
+ 
+         const newOrders = [...get().activeOrders];
+@@ -570,7 +571,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       if (error instanceof CartError) {
+         set({ error: error.message });
+       } else {
+-        set({ error: 'Failed to add item to cart' });
++        set({ error: t('errors.cart_update') });
+       }
+     }
+   },
+@@ -580,14 +581,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       const newOrders = get().activeOrders.filter(item => item.uniqueId !== uniqueId);
+       set({ activeOrders: newOrders });
+     } catch (error) {
+-      set({ error: 'Failed to remove item from cart' });
++      set({ error: t('errors.cart_update') });
+     }
+   },
+ 
+   updateQuantity: async (uniqueId: string, quantity: number) => {
+     try {
+       if (!get().validateQuantity(quantity)) {
+-        throw new CartError(`Quantity must be between ${MIN_QUANTITY} and ${MAX_QUANTITY}`);
++        throw new CartError(t('errors.cart_qty_range', { min: MIN_QUANTITY, max: MAX_QUANTITY }));
+       }
+ 
+       const newOrders = get().activeOrders.map(item =>
+@@ -598,7 +599,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       if (error instanceof CartError) {
+         set({ error: error.message });
+       } else {
+-        set({ error: 'Failed to update quantity' });
++        set({ error: t('errors.cart_update') });
+       }
+     }
+   },
+@@ -614,7 +615,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+     try {
+       set({ activeOrders: [] });
+     } catch (error) {
+-      set({ error: 'Failed to clear cart' });
++      set({ error: t('errors.cart_update') });
+     }
+   },
+ 
+@@ -834,7 +835,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       }
+     } catch (error) {
+       set({
+-        error: 'Failed to load table order',
++        error: t('errors.load_table_order'),
+         tableOrder: null,
+         activeOrders: [],
+         selectedCustomer: getDefaultCustomer(get().posProfile, get().selectedOrderType),
+diff --git a/pos/src/store/slices/config-slice.ts b/pos/src/store/slices/config-slice.ts
+index 909a3833..831af3af 100644
+--- a/pos/src/store/slices/config-slice.ts
++++ b/pos/src/store/slices/config-slice.ts
+@@ -1,5 +1,6 @@
+ import { StateCreator } from 'zustand';
+ import { AuthSlice } from './auth-slice';
++import { t } from '../../i18n';
+ import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
+ 
+ interface RolePermission {
+@@ -144,7 +145,7 @@ export const createConfigSlice: StateCreator<
+ 
+     // If no access, we could redirect or show an error message
+     if (!hasAccess) {
+-      set({ error: 'You do not have permission to access this application.' });
++      set({ error: t('auth.no_app_permission') });
+     }
+   },
+ 
+diff --git a/pos/src/store/slices/orders-slice.ts b/pos/src/store/slices/orders-slice.ts
+index e0c53583..a27714e0 100644
+--- a/pos/src/store/slices/orders-slice.ts
++++ b/pos/src/store/slices/orders-slice.ts
+@@ -1,6 +1,7 @@
+ import { StateCreator } from 'zustand';
+ import { OrderType } from '../../data/order-types';
+-import { call } from '@ury/core';
++import { call, parseFrappeError } from '@ury/core';
++import { t } from '../../i18n';
+ import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
+ import { searchPosInvoice } from '../../lib/invoice-api';
+ 
+@@ -133,7 +134,7 @@ export const createOrdersSlice: StateCreator<
+       });
+     } catch (error) {
+       set({ 
+-        error: error instanceof Error ? error.message : 'Failed to fetch orders',
++        error: parseFrappeError(error, t('errors.load_orders')),
+         orderLoading: false 
+       });
+     }
+@@ -189,7 +190,7 @@ export const createOrdersSlice: StateCreator<
+       }));
+     } catch (error) {
+       set({ 
+-        selectedOrderError: error instanceof Error ? error.message : 'Failed to fetch order details',
++        selectedOrderError: parseFrappeError(error, t('errors.failed_fetch_order')),
+         selectedOrderLoading: false 
+       });
+     }
+@@ -219,7 +220,7 @@ export const createOrdersSlice: StateCreator<
+       set({ orderLoading: false });
+     } catch (error) {
+       set({ 
+-        error: error instanceof Error ? error.message : 'Failed to update order status',
++        error: parseFrappeError(error, t('errors.update_invoice_status')),
+         orderLoading: false 
+       });
+     }

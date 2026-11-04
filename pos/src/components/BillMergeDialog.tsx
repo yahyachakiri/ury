@@ -9,7 +9,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { cn } from '@ury/ui';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { t } from '../i18n';
 import { showToast } from '@ury/ui';
 import { Spinner } from '@ury/ui';
@@ -77,7 +77,7 @@ const BillMergeDialog = ({
         if (!append) {
           setCandidates([]);
         }
-        setLoadError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
+        setLoadError(parseFrappeError(err, t('bill_merge.merge_failed')));
       } finally {
         setBusy(false);
       }
@@ -124,7 +124,7 @@ const BillMergeDialog = ({
         setPage(1);
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
+          setLoadError(parseFrappeError(err, t('bill_merge.merge_failed')));
         }
       } finally {
         if (!cancelled) {
@@ -168,7 +168,7 @@ const BillMergeDialog = ({
       await onConfirm(selected);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('bill_merge.merge_failed'));
+      setError(parseFrappeError(err, t('bill_merge.merge_failed')));
     } finally {
       setIsSubmitting(false);
     }

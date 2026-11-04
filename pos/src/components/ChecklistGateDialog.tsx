@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { parseFrappeError } from '@ury/core';
 import { Button, Input, Spinner, cn } from '@ury/ui';
 import { t } from '../i18n';
 import {
@@ -27,20 +28,7 @@ interface ChecklistRowState {
  * then to a generic string. Mirrors the helper in POSClosingDialog.tsx.
  */
 function extractServerErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object' && '_server_messages' in error) {
-    const raw = (error as { _server_messages?: unknown })._server_messages;
-    if (typeof raw === 'string') {
-      try {
-        const messages = JSON.parse(raw);
-        const first = JSON.parse(messages[0]);
-        if (first?.message) return first.message as string;
-      } catch {
-        // fall through to other extraction strategies
-      }
-    }
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
+  return parseFrappeError(error, fallback); // Patch 46: same rules as the rest of the till
 }
 
 const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>

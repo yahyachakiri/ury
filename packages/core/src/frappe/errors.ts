@@ -11,8 +11,54 @@
  * This function extracts and surfaces ALL validation messages from Frappe so no error details
  * are hidden from the user.
  */
-export function parseFrappeError(err: unknown, fallback = 'An unexpected error occurred.'): string {
+// Patch 46: technical failures get a short message the cashier can act on instead of the raw
+// text (MariaDB deadlock, axios "Network Error", Python TypeError...). English defaults; an app
+// passes its translations once with setErrorMessages.
+export interface ErrorMessages {
+  network: string;
+  busy: string;
+  session: string;
+  unavailable: string;
+  unexpected: string;
+}
+
+const errorMessages: ErrorMessages = {
+  network: 'No connection to the server. Check the internet connection and try again.',
+  busy: 'The system was busy for a moment and nothing was saved. Try again.',
+  session: 'Your session has expired. Reload the page and log in again.',
+  unavailable: 'The server is not responding. Wait a moment and try again.',
+  unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
+};
+
+export function setErrorMessages(messages: Partial<ErrorMessages>): void {
+  Object.assign(errorMessages, messages);
+}
+
+const LOCK_ERROR = /QueryDeadlockError|QueryTimeoutError|Deadlock found when trying to get lock|Lock wait timeout exceeded/;
+const SESSION_ERROR = /CSRFTokenError|SessionExpired|AuthenticationError/;
+
+// JavaScript runtime errors are bugs, never a message for the cashier.
+const isRuntimeError = (err: unknown): boolean =>
+  err instanceof TypeError || err instanceof ReferenceError || err instanceof RangeError || err instanceof SyntaxError;
+
+function technicalMessage(e: Record<string, unknown>): string | null {
+  const status = typeof e.httpStatus === 'number' ? e.httpStatus : undefined;
+  if (status === 0) return errorMessages.network;
+  const text = [e.exc_type, e.exception, e._server_messages, e.message]
+    .filter((v) => typeof v === 'string')
+    .join(' ');
+  if (LOCK_ERROR.test(text)) return errorMessages.busy;
+  if (SESSION_ERROR.test(String(e.exc_type ?? '')) || SESSION_ERROR.test(String(e.exception ?? ''))) {
+    return errorMessages.session;
+  }
+  if (status === 502 || status === 503 || status === 504) return errorMessages.unavailable;
+  return null;
+}
+
+export function parseFrappeError(err: unknown, fallback?: string): string {
+  fallback = fallback || errorMessages.unexpected;
   if (!err) return fallback;
+  if (isRuntimeError(err)) return fallback; // Patch 46
 
   // Direct string errors
   if (typeof err === 'string') {
@@ -23,6 +69,8 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
   if (typeof err !== 'object') return fallback;
 
   const e = err as Record<string, unknown>;
+  const technical = technicalMessage(e); // Patch 46
+  if (technical) return technical;
   const parsedMessages: string[] = [];
   const seenMessages = new Set<string>(); // Patch 13
 
@@ -110,9 +158,9 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
         : '';
 
   if (exceptionStr) {
-    const match =
-      exceptionStr.match(/frappe\.exceptions\.\w+Error:\s*(.+)/s) ||
-      exceptionStr.match(/^\w+Error:\s*(.+)/s);
+    // Patch 46: only Frappe's own exceptions carry a message for the user; a bare Python
+    // error ("TypeError: ...", "KeyError: ...") falls through to the fallback.
+    const match = exceptionStr.match(/frappe\.exceptions\.\w+Error:\s*(.+)/s);
 
     if (match && match[1]) {
       const firstLine = match[1].split('\n')[0].trim();
@@ -142,13 +190,6 @@ export function parseFrappeError(err: unknown, fallback = 'An unexpected error o
     if (cleaned && cleaned !== 'There was an error.') return cleaned;
   }
 
-  // Strategy 6: Fall back to formatted exc_type (e.g. "MandatoryError" -> "Mandatory Error")
-  if (typeof e.exc_type === 'string' && e.exc_type) {
-    const parts = e.exc_type.split('.');
-    const lastPart = parts[parts.length - 1] ?? '';
-    const formatted = lastPart.replace(/([A-Z])/g, ' $1').trim();
-    if (formatted) return formatted;
-  }
-
+  // Patch 46: no Strategy 6 (exc_type spelled out, e.g. "Type Error"): it told the cashier nothing.
   return fallback;
 }

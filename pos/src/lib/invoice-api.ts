@@ -429,7 +429,7 @@ export async function mergeBills(
   );
   const result = response.message;
   if (result.status === 'error') {
-    throw new Error(result.message || 'Failed to merge bills');
+    throw new Error(result.message || t('bill_merge.merge_failed'));
   }
   return result;
 } 

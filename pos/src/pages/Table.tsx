@@ -12,7 +12,7 @@ import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
-import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
+import { canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -212,7 +212,7 @@ const TableView = () => {
       showToast.success(t('success.printed'));
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('errors.failed_print'));
+      showToast.error(parseFrappeError(error, t('errors.failed_print')));
     } finally {
       setPrintingTable(null);
     }
@@ -230,7 +230,7 @@ const TableView = () => {
       }
       showToast.success(t('tables.merge_success'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.merge_failed'));
+      showToast.error(parseFrappeError(error, t('tables.merge_failed')));
       throw error;
     }
   };
@@ -245,7 +245,7 @@ const TableView = () => {
       }
       showToast.success(t('tables.unmerge_success'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
+      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
       throw error;
     }
   };
@@ -289,7 +289,7 @@ const TableView = () => {
       setTransferSourceTable(null);
       setTransferInvoiceName(null);
       setTransferDestinationTables([]);
-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
     } finally {
       setTransferDestinationsLoading(false);
     }
@@ -307,7 +307,7 @@ const TableView = () => {
         currentCaptain: invoice.waiter,
       });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
     }
   };
 
@@ -321,7 +321,7 @@ const TableView = () => {
       }
       showToast.success(t('tables.transfer_success'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
       throw error;
     }
   };
@@ -338,7 +338,7 @@ const TableView = () => {
       }
       showToast.success(t('tables.captain_transfer_success'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      showToast.error(parseFrappeError(error, t('tables.transfer_failed')));
       throw error;
     }
   };

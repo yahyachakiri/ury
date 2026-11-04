@@ -1,3 +1,4 @@
+import { parseFrappeError as parseFrappeErrorCore } from '@ury/core';
 import {
   POSOpeningEntryRef,
   checkPOSOpening,
@@ -195,7 +196,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       const serverMessage = parseFrappeError(error);
       const status = getHttpStatus(error);
       const fallbackMessage =
-        error instanceof Error ? error.message : t('errors.posOpening.load_failed');
+        parseFrappeErrorCore(error, t('errors.posOpening.load_failed')); // Patch 46
       const message = translateOpeningMessage(serverMessage || fallbackMessage);
 
       if (status === 403 || /permission/i.test(message)) {

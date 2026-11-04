@@ -11,7 +11,7 @@ import { Button } from '@ury/ui';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
 import { Spinner } from '@ury/ui';
-import { db } from '@ury/core';
+import { db, parseFrappeError } from '@ury/core';
 
 interface CaptainTransferDialogProps {
   open: boolean;
@@ -87,7 +87,7 @@ const CaptainTransferDialog = ({
       })
       .catch((err) => {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : t('tables.transfer_failed'));
+          setLoadError(parseFrappeError(err, t('tables.transfer_failed')));
           setCandidates([]);
         }
       })
@@ -115,7 +115,7 @@ const CaptainTransferDialog = ({
       await onConfirm(selected);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('tables.transfer_failed'));
+      setError(parseFrappeError(err, t('tables.transfer_failed')));
     } finally {
       setIsSubmitting(false);
     }

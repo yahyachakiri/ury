@@ -10,7 +10,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { cn } from '@ury/ui';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { t } from '../i18n';
 import { CustomerPicker } from './CustomerPicker';
 import type { Customer } from '../store/pos-store';
@@ -134,7 +134,7 @@ const BillSplitDialog = ({
       resetState();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('bill_split.split_failed'));
+      setError(parseFrappeError(err, t('bill_split.split_failed')));
     } finally {
       setIsSubmitting(false);
     }

@@ -1796,6 +1796,75 @@ Acceptance criteria:
 
 Patch file: `patches/45-hide-company-account-for-walk-in.patch`.
 
+### Patch 46 — Till error messages translated and actionable
+
+Owner request (2026-11-04): a deadlock while sending an order showed the raw database error;
+every till error should be translated and tell the cashier what to do.
+
+Files touched: `packages/core/src/frappe/errors.ts`, `packages/core/src/index.ts`,
+`pos/src/main.tsx`, `pos/src/store/pos-store.ts`, `pos/src/store/slices/orders-slice.ts`,
+`pos/src/store/slices/config-slice.ts`, `pos/src/lib/invoice-api.ts`,
+`pos/src/captain/hooks/useCaptainContext.ts`, `pos/src/captain/hooks/useTableOrderContext.ts`,
+`pos/src/captain/pages/CaptainOrder.tsx`, `pos/src/captain/pages/CaptainTables.tsx`,
+`pos/src/components/` (BillMergeDialog, BillSplitDialog, CaptainTransferDialog,
+ChecklistGateDialog, CustomerPicker, KotAlertListener, POSClosingDialog, POSOpeningProvider,
+ProductDialog, TableSelectionDialog, TableTransferDialog), `pos/src/pages/Table.tsx`, locales.
+
+What it does:
+1. `parseFrappeError` recognises technical failures before reading server messages: no
+   response (httpStatus 0, offline or server unreachable), MariaDB deadlock / lock timeout
+   (QueryDeadlockError, QueryTimeoutError, "Deadlock found", "Lock wait timeout"), expired
+   session (CSRFTokenError, SessionExpired, AuthenticationError), gateway 502 / 503 / 504. Each
+   gets one short message. A bare Python error ("TypeError: ...") and a JavaScript runtime
+   error (TypeError, ReferenceError, RangeError, SyntaxError) give the caller's fallback, never
+   their text; the "exc_type spelled out" strategy is gone. `setErrorMessages` lets an app pass
+   its translations; the POS does it in `main.tsx` after `initI18n` (keys `errors.network`,
+   `busy`, `session_expired`, `server_unavailable`, `unexpected`).
+2. Dialogs and pages that showed `err instanceof Error ? err.message : t(...)` use
+   `parseFrappeError(err, t(...))`: server validation messages now reach the cashier (they were
+   replaced by the generic text, frappe-js-sdk errors are not Error instances) and raw JS errors
+   no longer do. The closing and checklist dialogs' local parsers delegate to it.
+3. Hardcoded English errors moved to `t()` with en / fr / ar keys: store errors shown in the
+   menu panel (load app / profile / menu / categories / platform menu / table order, cart),
+   orders list, product dialog, waiter app contexts, table taken by another waiter, bill merge,
+   app access. The waiter app's send error uses `parseFrappeError` instead of its own first
+   message only parser.
+4. The kitchen-ticket alert (KotAlertListener) said "An unknown KOT error occurred" in English:
+   URY's payload has no message, it means the scheduler created a kitchen ticket the order was
+   missing. It now says so with the order number.
+
+Why it can't be done in `erp_restaurant`: these texts are built in the browser (no server
+response at all when offline; fallbacks and store errors are in the bundle). Server messages
+are handled in erp_restaurant: `api/ury_compat.sync_order` / `make_invoice` turn a deadlock or
+a Python error inside URY's "Error while updating / settling order: {e}" into a translated
+message, and the fr / ar CSVs cover URY's and erp_restaurant's `_()` messages.
+
+Risk profile: low to medium. The parser is in `packages/core` but only `pos/src` calls it today
+(`frontend`, `self-order` and `mosaic` do not); an app that does without `setErrorMessages`
+gets the English defaults. `pos-store.ts` (high-conflict file) changes only string literals to
+`t()` plus one import. Server messages that used to be replaced by the caller's generic text
+are now shown, so a Frappe core message without fr / ar stays English. A deliberately thrown
+`new Error(...)` keeps its text. Known gaps: kitchen print failures keep QZ Tray's reason in
+the translated sentence (useful for setup); ERPNext / Frappe core messages rely on their own
+fr / ar translations.
+
+Acceptance criteria:
+1. Devtools offline, send an order: "Pas de connexion au serveur..." (fr) / Arabic RTL, no
+   "Network Error".
+2. Server message still shown: order a sold-out meal, the stock message appears as before.
+3. Edit an order modified elsewhere: "Order has been modified" text unchanged.
+4. Log out in another tab, then send an order: the server's "Not permitted" text (a Guest
+   request is a PermissionError, not a session error; the session message is for a CSRF or
+   expired-session answer, which cannot be produced by hand reliably).
+5. Waiter app: tap a table of another waiter: "Cette table est servie par <name>."
+6. Kitchen-ticket alert: leave a draft order without a kitchen ticket 1 to 5 minutes (scheduler
+   kotValidationThread): "Le ticket cuisine de la facture ... manquait et vient d'être créé."
+7. Arabic: every message above right to left.
+8. Not testable by hand: the deadlock ("Réessayez") and Python-error paths; they were checked
+   locally with a stub only.
+
+Patch file: `patches/46-till-error-messages.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

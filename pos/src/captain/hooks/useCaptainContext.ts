@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { derivePOSCapabilities } from '@ury/core';
+import { derivePOSCapabilities, parseFrappeError } from '@ury/core';
+import { t } from '../../i18n';
 import type { POSCapabilities, PosProfileCombined, User } from '@ury/core';
 import {
   getCaptainContext,
@@ -117,7 +118,7 @@ export const useCaptainContext = (): UseCaptainContextResult => {
       const result = await getCaptainContext();
       setContext(result);
     } catch (err) {
-      setError((err as Error).message || 'Failed to load captain context.');
+      setError(parseFrappeError(err, t('errors.load_waiter_context')));
       setContext(null);
     } finally {
       setIsLoading(false);

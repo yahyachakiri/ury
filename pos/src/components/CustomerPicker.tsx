@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseFrappeError } from '@ury/core';
 import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 
@@ -91,7 +92,7 @@ function NewCustomerForm({
       onSuccess?.();
       onClose();
     } catch (error: unknown) {
-      setApiError(error instanceof Error ? error.message : t('customer.failed_create'));
+      setApiError(parseFrappeError(error, t('customer.failed_create')));
     } finally {
       setIsCreatingCustomer(false);
     }

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePOSStore, OrderItem } from '../../store/pos-store';
+import { parseFrappeError } from '@ury/core';
+import { t } from '../../i18n';
 import {
   getTableOrderContext,
   TableOrderContext,
@@ -90,7 +92,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
       const result = await getTableOrderContext(table);
       setContext(result);
     } catch (err) {
-      setContextError((err as Error).message || 'Failed to load table order context.');
+      setContextError(parseFrappeError(err, t('errors.load_table_context')));
       setContext(null);
     } finally {
       setIsContextLoading(false);
@@ -120,7 +122,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
         }
       } catch (err) {
         if (cancelled) return;
-        setContextError((err as Error).message || 'Failed to load table order context.');
+        setContextError(parseFrappeError(err, t('errors.load_table_context')));
         setContext(null);
       } finally {
         if (!cancelled) setIsContextLoading(false);

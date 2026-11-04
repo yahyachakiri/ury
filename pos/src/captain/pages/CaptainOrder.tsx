@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react';
 import { Button, Spinner, cn, showToast } from '@ury/ui';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { usePOSStore } from '../../store/pos-store';
 import { useRootStore, RootState } from '../../store/root-store';
 import {
@@ -239,23 +239,7 @@ export default function CaptainOrder() {
       navigate('/order');
     } catch (error) {
       console.error('Failed to sync order:', error);
-      const serverMessages =
-        error && typeof error === 'object' && '_server_messages' in error
-          ? (error as { _server_messages?: unknown })._server_messages
-          : undefined;
-      if (typeof serverMessages === 'string') {
-        try {
-          const messages = JSON.parse(serverMessages);
-          const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || t('errors.api_error'));
-        } catch {
-          showToast.error(t('errors.api_error'));
-        }
-      } else if (error instanceof Error) {
-        showToast.error(error.message);
-      } else {
-        showToast.error(t('captain.send_failed'));
-      }
+      showToast.error(parseFrappeError(error, t('captain.send_failed'))); // Patch 46
     } finally {
       setIsSubmitting(false);
     }
@@ -281,7 +265,7 @@ export default function CaptainOrder() {
       await reprintKot(invoiceId);
       showToast.success(t('captain.kot_reprinted'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('captain.reprint_failed'));
+      showToast.error(parseFrappeError(error, t('captain.reprint_failed')));
     } finally {
       setIsReprintingKot(false);
     }
@@ -305,7 +289,7 @@ export default function CaptainOrder() {
       });
       showToast.success(t('success.printed'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('captain.print_bill_failed'));
+      showToast.error(parseFrappeError(error, t('captain.print_bill_failed')));
     } finally {
       setIsPrintingBill(false);
     }
@@ -329,7 +313,7 @@ export default function CaptainOrder() {
       setTransferDestinations(destinations);
     } catch (error) {
       setIsTransferTableOpen(false);
-      showToast.error(error instanceof Error ? error.message : t('captain.load_destinations_failed'));
+      showToast.error(parseFrappeError(error, t('captain.load_destinations_failed')));
     } finally {
       setIsTransferDestinationsLoading(false);
     }

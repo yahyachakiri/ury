@@ -9,7 +9,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
-import { call, db, formatCurrency } from '@ury/core';
+import { call, db, formatCurrency, parseFrappeError } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -94,20 +94,7 @@ function formatTime(date: Date): string {
  * own message, then to a generic string.
  */
 function extractServerErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object' && '_server_messages' in error) {
-    const raw = (error as { _server_messages?: unknown })._server_messages;
-    if (typeof raw === 'string') {
-      try {
-        const messages = JSON.parse(raw);
-        const first = JSON.parse(messages[0]);
-        if (first?.message) return first.message as string;
-      } catch {
-        // fall through to other extraction strategies
-      }
-    }
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
+  return parseFrappeError(error, fallback); // Patch 46: same rules as the rest of the till
 }
 
 interface AggregatedTotals {

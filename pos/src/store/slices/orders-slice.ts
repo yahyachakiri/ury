@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
-import { call } from '@ury/core';
+import { call, parseFrappeError } from '@ury/core';
+import { t } from '../../i18n';
 import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 
@@ -133,7 +134,7 @@ export const createOrdersSlice: StateCreator<
       });
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch orders',
+        error: parseFrappeError(error, t('errors.load_orders')),
         orderLoading: false 
       });
     }
@@ -189,7 +190,7 @@ export const createOrdersSlice: StateCreator<
       }));
     } catch (error) {
       set({ 
-        selectedOrderError: error instanceof Error ? error.message : 'Failed to fetch order details',
+        selectedOrderError: parseFrappeError(error, t('errors.failed_fetch_order')),
         selectedOrderLoading: false 
       });
     }
@@ -219,7 +220,7 @@ export const createOrdersSlice: StateCreator<
       set({ orderLoading: false });
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to update order status',
+        error: parseFrappeError(error, t('errors.update_invoice_status')),
         orderLoading: false 
       });
     }

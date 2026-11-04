@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { parseFrappeError } from '@ury/core';
 import {
   Dialog,
   DialogContent,
@@ -89,7 +90,7 @@ const TableTransferDialog = ({
       await onConfirm(selected);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('tables.transfer_failed'));
+      setError(parseFrappeError(err, t('tables.transfer_failed')));
     } finally {
       setIsSubmitting(false);
     }
