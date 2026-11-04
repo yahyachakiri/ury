@@ -508,7 +508,8 @@ Acceptance criteria:
     "CANCELLED" ticket with every item as -qty prints; auto-print off: nothing
     prints; printer off: order still cancelled, print error toast (ticket 37).
 
-Commit: `a8489c4fcb58d1002a139de3e1496fd50f6ad8f8`
+Commit: `a8489c4fcb58d1002a139de3e1496fd50f6ad8f8`, `b3022ee2` (cancel ticket, ticket 37;
+its Orders.tsx diff is appended to the patch file)
 
 Risk profile: medium. Small additions in OrderPanel.tsx (high-risk file,
 also changed by Patches 04 and 08) and Orders.tsx; the shared `qz.ts`

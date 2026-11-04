@@ -326,3 +326,30 @@ index 4a2762a2..a6b4d9ed 100644
                        />
                        <button
                          type="button"
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 7a7016ab..2946863d 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -242,12 +242,21 @@ export default function Orders() {
+       return;
+     }
+     setCancelLoading(true);
++    const invoiceId = selectedOrder.name;
+     try {
+       await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+-        invoice_id: selectedOrder.name,
++        invoice_id: invoiceId,
+         reason: cancelReason
+       })
+       showToast.success(t('success.order_cancelled'));
++      // Patch 10: print the "Cancelled" kitchen ticket cancel_order just created,
++      // without blocking the cashier. A failed ticket stays unprinted.
++      const posProfile = posStore.posProfile;
++      if (posProfile?.custom_auto_print_kitchen_ticket) {
++        printKitchenTickets({ invoice: invoiceId, posProfile }).catch((err) => {
++          showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
++        });
++      }
+       setCancelDialogOpen(false);
+       setCancelReason('');
+       clearSelectedOrder();
