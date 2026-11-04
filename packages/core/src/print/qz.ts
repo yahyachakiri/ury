@@ -1,19 +1,33 @@
 import qz from 'qz-tray';
+import { call } from '../frappe/client';
 
-// Patch 41: unsigned (anonymous) QZ Tray requests, owner choice 2026-11-02: no certificate to install
-// on the till PC. Upstream required a private key in this bundle (never set, so every print threw)
-// and a cert.pem that was never shipped. QZ Tray asks the till user to allow an unsigned site.
+// Patch 41: QZ Tray trusts a site by its certificate and the signature of each request.
+// Both come from the server (erp_restaurant kitchen_print), which keeps the private key:
+// upstream expected the key inside this bundle and a static cert.pem that was never shipped.
+// Unsigned requests (2026-11-02) made QZ Tray ask "Allow" on every print (owner test 2026-11-04).
+const QZ_API = 'erp_restaurant.erp_restaurant.api.kitchen_print';
 let connecting: Promise<void> | null = null;
 let securitySet = false;
 
-// Kept for the apps that still call it at startup; nothing is signed.
+// Kept for the apps that still call it at startup; the key no longer lives in the browser.
 export function initPrinting(_opts?: { signKey?: string }) {}
 
 function setQzSecurity(): void {
   if (securitySet) return;
   securitySet = true;
-  qz.security.setCertificatePromise((resolve: (data?: string) => void) => resolve());
-  qz.security.setSignaturePromise(() => (resolve: (sig?: string) => void) => resolve());
+  qz.security.setCertificatePromise((resolve: (data: string) => void, reject: (err?: string) => void) => {
+    call
+      .get<{ message: string }>(`${QZ_API}.qz_certificate`)
+      .then((r) => resolve(r.message))
+      .catch((err) => reject('Error fetching certificate: ' + String(err)));
+  });
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise((toSign: string) => (resolve: (sig: string) => void, reject: (err?: string) => void) => {
+    call
+      .post<{ message: string }>(`${QZ_API}.qz_sign`, { request: toSign })
+      .then((r) => resolve(r.message))
+      .catch((err) => reject(String(err)));
+  });
 }
 
 export async function loadQzPrinter(host: string): Promise<void> {

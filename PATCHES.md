@@ -1622,39 +1622,56 @@ Acceptance criteria:
 
 Patch file: `patches/40-menu-choices.patch`.
 
-### Patch 41 — QZ Tray requests unsigned (no certificate)
+### Patch 41 — QZ Tray certificate and signatures from the server
 
-Fix (ticket 04, 2026-11-02). Printing through QZ Tray could not work: the POS passed
-an empty signing key (`initPrinting({ signKey: '' })` in `pos/src/main.tsx`), so
-`printWithQz` threw before reaching QZ Tray, and the certificate it fetched
-(`/assets/ury/files/cert.pem`) was never shipped. Upstream also expected the private
-key inside the browser bundle.
+Fix (ticket 04, 2026-11-02, signed 2026-11-04). Printing through QZ Tray could not
+work: the POS passed an empty signing key (`initPrinting({ signKey: '' })` in
+`pos/src/main.tsx`), so `printWithQz` threw before reaching QZ Tray, and the
+certificate it fetched (`/assets/ury/files/cert.pem`) was never shipped. Upstream
+also expected the private key inside the browser bundle, where anyone opening the
+POS could read it. A first version sent requests unsigned; owner test 2026-11-04 on
+a Windows till: QZ Tray asked "Allow" on every print, so auto print could not work.
 
 Files touched: `packages/core/src/print/qz.ts` (security setup only)
 
-What it does: QZ Tray requests are sent unsigned (empty certificate and signature,
-QZ Tray's anonymous mode), owner choice 2026-11-02: nothing to install on the till
-PC besides QZ Tray. QZ Tray then asks the till user to allow the site; whether it
-can remember that answer for an unsigned site is to be checked on a real PC. If it
-cannot, the signed version (server-side key and certificate, saved in the workspace
-`tasks/04-qz-certificate-version/`) replaces this patch. `initPrinting` stays as a
-no-op for the apps that call it at startup. Upstream `packages/core/AGENTS.MD`
-(initPrinting with a sign key) is outdated after this patch.
+What it does: the certificate comes from erp_restaurant
+`api.kitchen_print.qz_certificate` and each QZ request is signed by
+`api.kitchen_print.qz_sign` (SHA512 with RSA, base64). erp_restaurant creates one
+key and self-signed certificate for the whole bench on the first migrate and keeps
+them in `common_site_config.json` (owner choice 2026-11-04: one certificate for
+every client; a site's own site_config value overrides it). Only till users (users
+of an enabled POS Profile with QZ printing on, or System Managers) get signatures,
+rate limited. The owner downloads the certificate from Settings > Tills
+(`qz_certificate_file`, saved as `override.crt`) and puts it in the QZ Tray folder
+of the till PC, then restarts QZ Tray: a self-signed certificate is not trusted
+otherwise. `initPrinting` stays as a no-op for the apps that call it at startup.
+Upstream `packages/core/AGENTS.MD` (initPrinting with a sign key) is outdated
+after this patch.
 
-Why it can't be done in `erp_restaurant`: the certificate and signature callbacks run
-inside the POS bundle (`@ury/core` QZ transport).
+Why it can't be done in `erp_restaurant`: the certificate and signature callbacks
+run inside the POS bundle (`@ury/core` QZ transport); erp_restaurant supplies the
+key, the certificate and the signatures.
 
-Risk profile: low. Only the security setup changes; the print calls (Patch 10) are
-unchanged. No key or certificate anywhere.
+Risk profile: medium. Security path: anyone holding the shared key can sign for
+every client's tills, and replacing it means a new `override.crt` on every till. The key is in
+`common_site_config.json`, which site backups do not include: keep a copy, or a
+lost server means a new `override.crt` on every till.
+Needs the key (migrate), and shared `@ury/core` now names an erp_restaurant
+method. The print calls (Patch 10) are unchanged. If the endpoints fail, QZ Tray
+refuses the request and the POS shows its existing print error.
 
 Acceptance criteria:
-1. Till PC with QZ Tray running, POS Profile with QZ printing on: a new takeaway
-   order reaches QZ Tray (its Allow dialog appears) instead of failing in the POS.
-2. After "Allow" (with "Remember" if offered): the kitchen ticket prints; a second
-   order prints without a dialog if QZ Tray remembered the site (record what it does).
-3. No private key in the POS bundle (`grep -r "PRIVATE KEY" ury/public/pos` finds nothing).
+1. Till PC with QZ Tray, the certificate from Settings > Tills installed as
+   `override.crt`, QZ Tray restarted, POS Profile with QZ printing on and the
+   cashier listed: two orders in a row print with no QZ Tray dialog.
+2. Without `override.crt`, QZ Tray shows its untrusted-site dialog; no private key
+   is in the POS bundle (`grep -r "PRIVATE KEY" ury/public/pos` finds nothing).
+3. A desk user who is on no till (e.g. Accounts User only) calling
+   `/api/method/erp_restaurant.erp_restaurant.api.kitchen_print.qz_sign` gets
+   "Not allowed to print from the POS."
+4. Two sites of the same bench serve the same certificate.
 
-Patch file: `patches/41-qz-unsigned.patch`.
+Patch file: `patches/41-qz-signing-from-server.patch`.
 
 ### Patch 42 — Bills print in French instead of Arabic
 
