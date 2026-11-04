@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
@@ -44,7 +44,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   discountAmount,
   allowDiscount = true
 }) => {
-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile, currencySymbol, currency } = usePOSStore();
+  const { paymentModes: allPaymentModes, fetchPaymentModes, posProfile: storePosProfile, currencySymbol, currency } = usePOSStore();
+  // Patch 45: methods this customer may not use (the company account method for a customer
+  // without an active account, erp_restaurant pos_invoice_company_account). If the call fails
+  // every method stays visible and the server still refuses the payment.
+  const [hiddenModes, setHiddenModes] = useState<string[]>([]);
+  useEffect(() => {
+    call
+      .get<{ message: string[] }>('erp_restaurant.erp_restaurant.pos_invoice_company_account.hidden_payment_modes', { customer })
+      .then((r) => setHiddenModes(r.message || []))
+      .catch(() => setHiddenModes([]));
+  }, [customer]);
+  // Memoized: the cash autofill effect below depends on this list.
+  const paymentModes = useMemo(
+    () => allPaymentModes.filter((mode: any) => !hiddenModes.includes(typeof mode === 'string' ? mode : mode.id)),
+    [allPaymentModes, hiddenModes]
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Patch 07: the cashier enters either a percentage or a fixed amount (two
@@ -66,6 +81,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
   const [prefilledId, setPrefilledId] = useState<string | null>(null);
+  // Patch 45: an amount typed in a row before it was hidden must not skew the cash prefill.
+  useEffect(() => {
+    if (!hiddenModes.length) return;
+    setPaymentInputs((prev) => {
+      const next = { ...prev };
+      hiddenModes.forEach((id) => delete next[id]);
+      return next;
+    });
+  }, [hiddenModes]);
 
   useEffect(() => {
     fetchPaymentModes();

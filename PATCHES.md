@@ -1759,6 +1759,43 @@ Acceptance criteria:
 
 Patch file: `patches/44-orders-footer-wrap.patch`.
 
+### Patch 45 — Company account method hidden for a walk-in customer
+
+Owner request (2026-11-04, ticket 33 follow-up): the payment dialog showed "En compte
+société" for every order; for "Client comptoir" or any customer without an active
+company account the server refused it only on confirm.
+
+Files touched: `pos/src/components/PaymentDialog.tsx` (list of payment rows)
+
+What it does: when the dialog opens it asks erp_restaurant
+`pos_invoice_company_account.hidden_payment_modes(customer)` and leaves those methods
+out of the rows and of the payments sent. The server returns the company account
+method(s) unless the customer's account is Active, the same rule as its POS Invoice
+guard. The filtered list is memoized (the cash autofill effect depends on it). If the
+call fails every row stays visible and the server guard still refuses the payment.
+
+Why it can't be done in `erp_restaurant`: the POS loads the till's methods once per
+session (`getModeOfPayment`, cached in sessionStorage), not per customer; only the
+dialog knows the order's customer.
+
+Risk profile: low. One extra GET when the dialog opens; the row may show for a moment
+before the answer, and an amount typed in it then is dropped when it hides. Payment
+logic unchanged. Known gaps: the Patch 33 "Payé sur place" dialog (Orders.tsx) still
+offers the method for platform orders (the server refuses it); a merged bill decides
+with the primary order's customer only. The endpoint tells any logged-in user whether
+a customer has an active company account (accepted: a yes / no, no amounts).
+
+Acceptance criteria:
+1. Order for "Client comptoir": no "En compte société" row; cash and card as before.
+2. Order for a company with an Active account: the row is there and the payment goes
+   through on account.
+3. Company turned Off: no row.
+4. Arabic: same rows, right to left.
+5. Call blocked (e.g. offline devtools rule on the endpoint): every row shows, and paying
+   a walk-in order on account is still refused by the server.
+
+Patch file: `patches/45-hide-company-account-for-walk-in.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
