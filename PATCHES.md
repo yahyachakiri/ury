@@ -2338,7 +2338,7 @@ Manual test (test-dev, PC with QZ Tray, Bill Printer set to the printer's IP):
    criterion 6.
 6. Repeat step 1's message check in Arabic and English. Cancel or refund the test orders.
 
-Patch file: `patches/53-pay-after-failed-print.patch`. Commit: (not committed yet).
+Patch file: `patches/53-pay-after-failed-print.patch`. Commit: 58994fbd.
 
 ## Build and deploy
 

@@ -1,0 +1,141 @@
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 8d47b98a..f6842b68 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -268,6 +268,7 @@
+         "no_active_order": "لم يتم العثور على طلب نشط لهذه الطاولة",
+         "qz_host_not_set": "مضيف QZ غير محدد",
+         "print_failed": "فشلت الطباعة: {{reason}}",
++        "print_failed_pay_anyway": "لم تُطبع الفاتورة: {{reason}}. يمكنك مع ذلك تحصيل الدفع.",
+         "invalid_discount": "يرجى إدخال قيمة خصم صحيحة",
+         "discount_exceeds_max": "لا يمكن أن تتجاوز نسبة الخصم 100٪",
+         "discount_exceeds_total": "لا يمكن أن يتجاوز الخصم إجمالي الطلب",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 21cd1c31..15e24232 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -261,6 +261,7 @@
+     "no_active_order": "No active order found for this table",
+     "qz_host_not_set": "QZ host is not set",
+     "print_failed": "Print failed: {{reason}}",
++    "print_failed_pay_anyway": "Bill not printed: {{reason}}. You can still take the payment.",
+     "invalid_discount": "Please enter a valid discount value",
+     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
+     "discount_exceeds_total": "Discount cannot exceed the order total",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index e12d5b04..0a8c9ee2 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -261,6 +261,7 @@
+     "no_active_order": "Aucune commande active trouvée pour cette table",
+     "qz_host_not_set": "L'hôte QZ n'est pas configuré",
+     "print_failed": "Échec d'impression : {{reason}}",
++    "print_failed_pay_anyway": "Addition non imprimée : {{reason}}. Vous pouvez quand même encaisser.",
+     "invalid_discount": "Veuillez entrer une valeur de remise valide",
+     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
+     "discount_exceeds_total": "La remise ne peut pas dépasser le total de la commande",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 2946863d..0e4060b0 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -28,6 +28,7 @@ import {
+   mapSplitGroupInvoiceToPOSInvoice,
+   type POSInvoice,
+   type SplitGroupInvoice,
++  updatePrintStatus,
+ } from '../lib/invoice-api';
+ import { formatMergedTableLabel } from '../lib/table-utils';
+ import { t } from '../i18n';
+@@ -320,6 +321,7 @@ export default function Orders() {
+   async function handlePrintOrder() {
+     if (!selectedOrder || !posStore.posProfile) return;
+     setIsPrinting(true);
++    let printed = false;
+     try {
+       await printOrder({
+         orderId: selectedOrder.name,
+@@ -327,21 +329,27 @@ export default function Orders() {
+         printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
+       });
+       showToast.success(t('success.printed'));
+-      // Locally update selectedOrder.invoice_printed to 1
+-      if (selectedOrder && typeof selectedOrder === 'object') {
+-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
+-      }
+-      // If order was Unbilled, set to Draft and reload draft orders
+-      if (selectedStatus === 'Unbilled') {
+-        showToast.info(t('success.order_moved_to_draft'));
+-        setSelectedStatus('Draft');
+-        fetchOrders();
+-      }
++      printed = true;
+     } catch (err: any) {
+-      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
++      // Patch 53: a failed print still counts as the print, so the cashier can take the payment
++      // with the printer off. If the server cannot be reached either, Payment stays blocked.
++      printed = await updatePrintStatus(selectedOrder.name).then(() => true, () => false);
++      const reason = err?.message || String(err);
++      showToast.error(t(printed ? 'errors.print_failed_pay_anyway' : 'errors.print_failed', { reason }));
+     } finally {
+       setIsPrinting(false);
+     }
++    if (!printed) return;
++    // Locally update selectedOrder.invoice_printed to 1
++    if (selectedOrder && typeof selectedOrder === 'object') {
++      selectOrder({ ...selectedOrder, invoice_printed: 1 });
++    }
++    // If order was Unbilled, set to Draft and reload draft orders
++    if (selectedStatus === 'Unbilled') {
++      showToast.info(t('success.order_moved_to_draft'));
++      setSelectedStatus('Draft');
++      fetchOrders();
++    }
+   }
+ 
+   // Patch 10: reprint every kitchen ticket of the selected order.
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index e213d0d6..20c044ea 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -11,7 +11,7 @@ import { Badge } from '@ury/ui';
+ import { DINE_IN } from '../data/order-types';
+ import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
+ import { printOrder } from '../lib/print';
+-import { resolvePrintFormat } from '../lib/invoice-api';
++import { resolvePrintFormat, updatePrintStatus } from '../lib/invoice-api';
+ import { canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
+ import { showToast } from '@ury/ui';
+ import { t } from '../i18n';
+@@ -201,15 +201,23 @@ const TableView = () => {
+         return;
+       }
+ 
+-      await printOrder({
+-        orderId: invoiceId,
+-        posProfile,
+-        printFormat: resolvePrintFormat(
+-          orderResponse.message ?? {},
+-          posProfile.print_format
+-        ),
+-      });
+-      showToast.success(t('success.printed'));
++      try {
++        await printOrder({
++          orderId: invoiceId,
++          posProfile,
++          printFormat: resolvePrintFormat(
++            orderResponse.message ?? {},
++            posProfile.print_format
++          ),
++        });
++        showToast.success(t('success.printed'));
++      } catch (printError) {
++        // Patch 53: a failed print still counts as the print, so the order can be paid.
++        await updatePrintStatus(invoiceId).catch(() => {
++          throw printError;
++        });
++        showToast.error(t('errors.print_failed_pay_anyway', { reason: parseFrappeError(printError, t('errors.failed_print')) }));
++      }
+       await loadTables(table.restaurant_room, { useCache: false });
+     } catch (error) {
+       showToast.error(parseFrappeError(error, t('errors.failed_print')));
