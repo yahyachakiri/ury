@@ -2218,6 +2218,9 @@ Manual test (test-dev, on a PC with QZ Tray):
 6. With auto kitchen print on, send an order and print its bill straight away: both print.
    Cancel the test orders.
 
+Owner test 2026-11-05 (test-dev): printing to the printer's IP works and the printer-off error
+shows. Not recorded: QZ's exact error text and how long the error takes.
+
 Patch file: `patches/51-network-printer-ip.patch`. Commit: f9b05da1.
 
 ### Patch 52 — Reflowgo in the tab titles
