@@ -1996,7 +1996,7 @@ Acceptance criteria:
     sheet (WhatsApp).
 19. Box ticked without a loyalty program set up: the server's message, no customer created.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: not committed yet.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 
