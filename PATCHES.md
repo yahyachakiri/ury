@@ -2005,7 +2005,7 @@ Acceptance criteria:
 
 Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9; box hidden when the program is off: a96bfdd7.
 
-### Patch 48 — QZ Tray prints on 80 mm paper at 203 dpi
+### Patch 48 — QZ Tray prints on 80 mm paper, laid out for the SPRT driver
 
 Fix (ticket 04, owner printer tests 2026-11-05, SPRT POS8811 80 mm, printable 72 mm, 203 dpi).
 QZ Tray got no paper settings from the POS, so they came from the driver or Java:
@@ -2013,14 +2013,16 @@ QZ Tray got no paper settings from the POS, so they came from the driver or Java
   so the bill printed about 3x zoomed and cut (QZ log: "Print resolution = 600dpi").
 - macOS (CUPS): Java ignored the CUPS default (80 x 210 mm) and used A4 (595 pt): a blank
   short ticket.
-First versions laid the page out 96 mm (0f65e85b), then 250 mm (15d93fd5) wide: 250 hid
-the Windows zoom but made macOS print about a third of the size.
+Tried: 96 mm (0f65e85b, still zoomed), 250 mm (15d93fd5, correct on Windows), then the real
+80 mm with `density: 8` (e4e9ce5c): both drivers kept their resolution (QZ applies no
+density to HTML, "Zooming in by x1.0"), so Windows printed 3x zoomed again and macOS stayed
+blank. Back to 250 mm, keeping the 80 mm paper size.
 
 Files touched: `packages/core/src/print/qz.ts` (`printWithQz` config and data options only)
 
 What it does: every QZ Tray print (bill and kitchen tickets, Patch 10) asks for 80 x 297 mm
-paper (`size`, units mm), 8 dots per mm (`density`, 203 dpi) and lays the HTML out at the
-paper width (`pageWidth: 80`), so CSS mm print at real size. erp_restaurant's "Restaurant
+paper (`size`, units mm) and lays the HTML out 250 mm wide (`pageWidth: 250`), scaled to the
+paper: that cancels the Windows driver's 600 dpi for a 203 dpi head (measured on paper). erp_restaurant's "Restaurant
 Receipt" and "Kitchen Ticket" are 68 mm wide, 5 mm from the left (erp_restaurant 1393382),
 inside the 72 mm the head prints.
 
@@ -2028,12 +2030,13 @@ Why it can't be done in `erp_restaurant`: the QZ Tray page settings are built in
 browser by the shared `@ury/core` print transport; erp_restaurant only supplies the HTML,
 and QZ's HTML renderer ignores CSS `@page`.
 
-Risk profile: medium. Every QZ print in pos changes (frontend does not print). Unknown: a
-driver that refuses 203 dpi (then set it in the driver), and whether a CUPS driver feeds
-the whole 297 mm page. Only 80 mm printers are supported; re-test any other model.
+Risk profile: medium. Every QZ print in pos changes (frontend does not print). Calibrated on the SPRT Windows
+driver: a driver reporting its real resolution would print about a third of the size.
+macOS: still a blank short ticket with correct 80 mm paper in the QZ log; Unknown whether
+the macOS SPRT driver prints at all (check with TextEdit). Re-test any other model or driver.
 
 Acceptance criteria:
-1. Windows and macOS, SPRT 80 mm: a bill prints at real size, whole width ("18.00 DH" and
+1. Windows, SPRT 80 mm: a bill prints at real size, whole width ("18.00 DH" and
    the full IF number), centered, logo above the name.
 2. Auto-printed and reprinted kitchen tickets: same.
 3. The ticket is cut after its content, not after 29.7 cm of blank paper.
@@ -2046,7 +2049,7 @@ Manual test (test-dev, on each computer with QZ Tray and the SPRT printer):
    if anything is off.
 5. Reprint the kitchen ticket from Orders; cancel the test order.
 
-Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5, e4e9ce5c.
+Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5, e4e9ce5c, c257f989.
 
 ## Build and deploy
 
