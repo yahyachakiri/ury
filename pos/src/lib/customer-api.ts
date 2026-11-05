@@ -37,6 +37,11 @@ export interface CreateCustomerData {
   customer_group?: string;
   territory?: string;
   name?: string;
+  // Patch 47 (ticket 39): erp_restaurant's create_customer enrolls the customer when ticked.
+  loyalty_card?: number;
+  consent?: number;
+  pos_profile?: string;
+  loyalty_code?: string | null;
 }
 
 export interface CreateCustomerResponse {
@@ -80,6 +85,9 @@ export async function addCustomer(
     }
     return {
       data: {
+        // Patch 47: the customer's id (a homonym gets a suffix) and the new card's code.
+        name: msg.name,
+        loyalty_code: msg.loyalty_code,
         customer_name: msg.customer_name,
         mobile_number: msg.mobile_number,
         customer_group: msg.customer_group,

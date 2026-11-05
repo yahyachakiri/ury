@@ -18,6 +18,302 @@ index 75931d89..1c4e6b6e 100644
        <ScreenSizeProvider>
          <AuthGuard>
            <POSOpeningProvider>
+diff --git a/pos/src/components/CustomerPicker.tsx b/pos/src/components/CustomerPicker.tsx
+index 2615e87a..46c463f8 100644
+--- a/pos/src/components/CustomerPicker.tsx
++++ b/pos/src/components/CustomerPicker.tsx
+@@ -6,6 +6,7 @@ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+ import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
+ import { usePOSStore, type Customer } from '../store/pos-store';
+ import { t } from '../i18n';
++import LoyaltyCardDialog from './LoyaltyCardDialog';
+ 
+ export interface CustomerPickerProps {
+   value: Customer | null;
+@@ -21,16 +22,20 @@ function NewCustomerForm({
+   setIsCreatingCustomer: setParentIsCreatingCustomer,
+   prefillName = '',
+   prefillPhone = '',
++  onCardCreated,
+ }: {
+   onClose: () => void;
+   onSuccess?: () => void;
+   onCustomerCreated: (customer: Customer) => void;
++  onCardCreated?: (customer: string) => void;
+   isCreatingCustomer?: boolean;
+   setIsCreatingCustomer?: React.Dispatch<React.SetStateAction<boolean>>;
+   prefillName?: string;
+   prefillPhone?: string;
+ }) {
+-  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories } = usePOSStore();
++  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories, posProfile } = usePOSStore();
++  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list.
++  const [loyaltyCard, setLoyaltyCard] = useState(false);
+   const [newCustomerName, setNewCustomerName] = useState('');
+   const [newCustomerPhone, setNewCustomerPhone] = useState('');
+   const [newCustomerGroup, setNewCustomerGroup] = useState('');
+@@ -77,6 +82,11 @@ function NewCustomerForm({
+       };
+       if (newCustomerGroup) customerData.customer_group = newCustomerGroup;
+       if (newCustomerTerritory) customerData.territory = newCustomerTerritory;
++      if (loyaltyCard) {
++        customerData.loyalty_card = 1;
++        customerData.consent = 1;
++        if (posProfile?.name) customerData.pos_profile = posProfile.name;
++      }
+ 
+       const response = await addCustomer(customerData);
+       const created = response.data;
+@@ -89,8 +99,10 @@ function NewCustomerForm({
+       setNewCustomerPhone('');
+       setNewCustomerGroup('');
+       setNewCustomerTerritory('');
++      setLoyaltyCard(false);
+       onSuccess?.();
+       onClose();
++      if (created.loyalty_code && created.name) onCardCreated?.(created.name);
+     } catch (error: unknown) {
+       setApiError(parseFrappeError(error, t('customer.failed_create')));
+     } finally {
+@@ -135,6 +147,16 @@ function NewCustomerForm({
+           <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+         </div>
+       </div>
++      <label className="flex items-start gap-2 text-sm text-gray-700">
++        <input
++          type="checkbox"
++          className="mt-0.5 h-4 w-4"
++          checked={loyaltyCard}
++          onChange={(e) => setLoyaltyCard(e.target.checked)}
++          disabled={isCreatingCustomer}
++        />
++        <span>{t('loyalty.card_checkbox')}</span>
++      </label>
+       <div className="flex gap-3 mt-6">
+         <Button type="submit" variant="default" className="flex-1" disabled={isCreatingCustomer}>
+           {isCreatingCustomer ? (
+@@ -165,6 +187,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+   const [searchError, setSearchError] = useState<string | null>(null);
+   const [prefillName, setPrefillName] = useState('');
+   const [prefillPhone, setPrefillPhone] = useState('');
++  const [cardFor, setCardFor] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     if (!isOpen || !searchTerm.trim()) {
+@@ -317,10 +340,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+               setIsCreatingCustomer={setIsCreatingCustomer}
+               prefillName={prefillName}
+               prefillPhone={prefillPhone}
++              onCardCreated={setCardFor}
+             />
+           </DialogContent>
+         </Dialog>
+       )}
++      {cardFor && <LoyaltyCardDialog customer={cardFor} onClose={() => setCardFor(null)} />}
+     </div>
+   );
+ }
+diff --git a/pos/src/components/LoyaltyCardDialog.tsx b/pos/src/components/LoyaltyCardDialog.tsx
+new file mode 100644
+index 00000000..f6297d21
+--- /dev/null
++++ b/pos/src/components/LoyaltyCardDialog.tsx
+@@ -0,0 +1,195 @@
++import { useEffect, useState } from 'react';
++import { Download, Loader, Printer, Share2, X } from 'lucide-react';
++import { call, parseFrappeError, printWithQz } from '@ury/core';
++import { Button, Dialog, DialogContent, showToast } from '@ury/ui';
++import { usePOSStore } from '../store/pos-store';
++import { printLanguage } from '../lib/invoice-api';
++import { t } from '../i18n';
++
++// Patch 47 (ticket 39): the card of a customer enrolled from the till's "New customer" form.
++// erp_restaurant draws the QR (loyalty.get_card) and the ticket (print format "Loyalty Card"),
++// so the screen, the paper and the picture all hold the same code.
++const CARD_FORMAT = 'Loyalty Card';
++
++interface Card {
++  customer: string;
++  customer_name: string;
++  code: string;
++  qr: string;
++  restaurant: string;
++}
++
++function loadImage(src: string) {
++  return new Promise<HTMLImageElement>((resolve, reject) => {
++    const img = new Image();
++    // decode(): some Safari versions draw an SVG blank right after onload.
++    img.onload = () => Promise.resolve(img.decode?.()).catch(() => undefined).then(() => resolve(img));
++    img.onerror = reject;
++    img.src = src;
++  });
++}
++
++/** The card as a PNG for WhatsApp, laid out like the owner app's card. */
++async function cardImage(card: Card): Promise<Blob> {
++  const size = 640;
++  const canvas = document.createElement('canvas');
++  canvas.width = size;
++  canvas.height = size + 200;
++  const ctx = canvas.getContext('2d')!;
++  ctx.fillStyle = '#FFFFFF';
++  ctx.fillRect(0, 0, canvas.width, canvas.height);
++  ctx.fillStyle = '#111111';
++  ctx.textAlign = 'center';
++  ctx.font = '600 34px system-ui, sans-serif';
++  ctx.fillText(card.restaurant, size / 2, 64);
++  ctx.font = '24px system-ui, sans-serif';
++  ctx.fillText(t('loyalty.card_title'), size / 2, 104);
++  ctx.imageSmoothingEnabled = false;
++  ctx.drawImage(await loadImage(card.qr), 60, 130, size - 120, size - 120);
++  ctx.font = '600 30px system-ui, sans-serif';
++  ctx.fillText(card.customer_name, size / 2, size + 80);
++  ctx.font = '20px ui-monospace, monospace';
++  ctx.fillStyle = '#666666';
++  ctx.fillText(card.code, size / 2, size + 130);
++  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png'));
++}
++
++function download(file: File) {
++  const url = URL.createObjectURL(file);
++  const a = document.createElement('a');
++  a.href = url;
++  a.download = file.name;
++  a.click();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
++
++const LoyaltyCardDialog: React.FC<{ customer: string; onClose: () => void }> = ({ customer, onClose }) => {
++  const posProfile = usePOSStore((s) => s.posProfile);
++  const [card, setCard] = useState<Card | null>(null);
++  const [error, setError] = useState('');
++  const [busy, setBusy] = useState(false);
++  // The PNG is built when the card arrives: Safari allows share() only right after the tap, so
++  // the tap handler must not await anything before it.
++  const [png, setPng] = useState<File | null>(null);
++
++  useEffect(() => {
++    call
++      .get<{ message: Card }>('erp_restaurant.erp_restaurant.loyalty.get_card', { customer })
++      .then((r) => setCard(r.message))
++      .catch((err) => setError(parseFrappeError(err, t('loyalty.card_load_failed'))));
++  }, [customer]);
++
++  useEffect(() => {
++    if (!card) return;
++    let live = true;
++    cardImage(card)
++      .then((b) => live && setPng(new File([b], `${t('loyalty.card_title')} ${card.customer_name}.png`, { type: 'image/png' })))
++      .catch(() => live && setError(t('loyalty.card_image_failed')));
++    return () => {
++      live = false;
++    };
++  }, [card]);
++
++  const handlePrint = () => {
++    if (!card) return;
++    // Same printer as the bill: QZ Tray, else the browser's print view (opened in the tap itself,
++    // so it is not blocked as a popup).
++    if (posProfile?.print_type !== 'qz' || !posProfile.qz_host) {
++      const params = new URLSearchParams({
++        doctype: 'Customer',
++        name: card.customer,
++        format: CARD_FORMAT,
++        no_letterhead: '1',
++        letterhead: 'No Letterhead',
++        settings: '{}',
++        trigger_print: '1',
++        _lang: printLanguage(),
++      });
++      window.open(`/printview?${params.toString()}`, '_blank', 'noopener,noreferrer');
++      return;
++    }
++    const qzHost = posProfile.qz_host;
++    setBusy(true);
++    call
++      .get<{ message: { html: string } }>('frappe.www.printview.get_html_and_style', {
++        doc: 'Customer',
++        name: card.customer,
++        print_format: CARD_FORMAT,
++        _lang: printLanguage(),
++        no_letterhead: 1,
++        letterhead: 'No Letterhead',
++        settings: {},
++      })
++      .then((r) => printWithQz(qzHost, r.message.html, posProfile.custom_bill_printer))
++      .then(() => showToast.success(t('loyalty.card_printed')))
++      .catch((err) => showToast.error(t('loyalty.card_print_failed', { reason: err?.message || String(err) })))
++      .finally(() => setBusy(false));
++  };
++
++  const handleDownload = () => {
++    if (png) download(png);
++  };
++
++  const handleShare = async () => {
++    if (!card || !png) return;
++    if (!navigator.canShare?.({ files: [png] })) {
++      download(png);
++      showToast.info(t('loyalty.share_unsupported'));
++      return;
++    }
++    try {
++      await navigator.share({ files: [png], text: t('loyalty.share_text', { restaurant: card.restaurant }) });
++    } catch (err) {
++      // Closing the share sheet is not an error; a refused share falls back to a download.
++      if (err instanceof DOMException && err.name === 'AbortError') return;
++      download(png);
++      showToast.info(t('loyalty.share_failed'));
++    }
++  };
++
++  return (
++    <Dialog open={true} onOpenChange={onClose}>
++      <DialogContent className="w-full max-w-sm p-5">
++        <div className="mb-3 flex items-center justify-between">
++          <h3 className="text-lg font-semibold text-gray-900">{t('loyalty.card_title')}</h3>
++          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label={t('common.cancel')}>
++            <X className="h-5 w-5" />
++          </button>
++        </div>
++        {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
++        {!card && !error && (
++          <div className="flex justify-center py-10">
++            <Loader className="h-6 w-6 animate-spin text-gray-400" />
++          </div>
++        )}
++        {card && (
++          <>
++            <div className="text-center">
++              <div className="text-base font-semibold text-gray-900">{card.customer_name}</div>
++              <img src={card.qr} alt="" className="mx-auto my-3 h-56 w-56" style={{ imageRendering: 'pixelated' }} />
++              <div dir="ltr" className="font-mono text-xs tracking-wider text-gray-500">
++                {card.code}
++              </div>
++            </div>
++            <div className="mt-4 grid grid-cols-3 gap-2">
++              <Button type="button" variant="default" onClick={handlePrint} disabled={busy}>
++                {busy ? <Loader className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
++                <span className="ms-1">{t('loyalty.print')}</span>
++              </Button>
++              <Button type="button" variant="outline" onClick={handleDownload} disabled={!png}>
++                <Download className="h-4 w-4" />
++                <span className="ms-1">{t('loyalty.download')}</span>
++              </Button>
++              <Button type="button" variant="outline" onClick={handleShare} disabled={!png}>
++                <Share2 className="h-4 w-4" />
++                <span className="ms-1">{t('loyalty.share')}</span>
++              </Button>
++            </div>
++          </>
++        )}
++      </DialogContent>
++    </Dialog>
++  );
++};
++
++export default LoyaltyCardDialog;
 diff --git a/pos/src/components/LoyaltyScanListener.tsx b/pos/src/components/LoyaltyScanListener.tsx
 new file mode 100644
 index 00000000..c33b22cc
@@ -308,10 +604,10 @@ index 20687e15..479c59d7 100644
            >
              {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
 diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
-index 7725c93a..26ba0ad2 100644
+index 7725c93a..23c50d45 100644
 --- a/pos/src/i18n/locales/ar.json
 +++ b/pos/src/i18n/locales/ar.json
-@@ -644,5 +644,19 @@
+@@ -644,5 +644,31 @@
          "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
          "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
          "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
@@ -328,14 +624,26 @@ index 7725c93a..26ba0ad2 100644
 +        "not_for_platforms": "لا يمكن استعمال بطاقة الوفاء في طلب منصة.",
 +        "scan_on_order_screen": "امسح بطاقة الوفاء في شاشة الطلب، قبل إرسال الطلب.",
 +        "order_already_sent": "هذا الطلب أُرسل بالفعل: لا يمكن تغيير زبونه. امسح البطاقة قبل إرسال الطلب التالي.",
-+        "receipt_print_failed": "لم يُطبع الوصل ({{reason}}). أعد طباعته من «مدفوع مؤخراً»."
++        "receipt_print_failed": "لم يُطبع الوصل ({{reason}}). أعد طباعته من «مدفوع مؤخراً».",
++        "card_checkbox": "إنشاء بطاقة الوفاء (الزبون موافق على التسجيل في لائحة الوفاء)",
++        "card_title": "بطاقة الوفاء",
++        "print": "طباعة",
++        "download": "تحميل",
++        "share": "مشاركة",
++        "card_printed": "تمت طباعة بطاقة الوفاء.",
++        "card_print_failed": "لم تُطبع البطاقة ({{reason}}). حمّلها أو أعد المحاولة.",
++        "card_load_failed": "تعذر تحميل بطاقة الوفاء.",
++        "share_text": "بطاقة الوفاء الخاصة بك في {{restaurant}}: اعرض هذا الرمز عند الصندوق لكسب النقاط.",
++        "share_unsupported": "المشاركة غير متاحة على هذا الجهاز: تم تحميل البطاقة.",
++        "share_failed": "تعذرت مشاركة البطاقة: تم تحميلها بدلا من ذلك.",
++        "card_image_failed": "تعذر إنشاء صورة البطاقة: اطبعها بدلا من ذلك."
      }
  }
 diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
-index 498a9b44..c8c81fb2 100644
+index 498a9b44..a5e0cba3 100644
 --- a/pos/src/i18n/locales/en.json
 +++ b/pos/src/i18n/locales/en.json
-@@ -637,5 +637,19 @@
+@@ -637,5 +637,31 @@
      "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
      "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
      "bill_requested": "{{table}} asks for the bill (no. {{number}})"
@@ -352,14 +660,26 @@ index 498a9b44..c8c81fb2 100644
 +    "not_for_platforms": "A loyalty card cannot be used on a platform order.",
 +    "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
 +    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order.",
-+    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid."
++    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid.",
++    "card_checkbox": "Create a loyalty card (the customer agrees to be on the loyalty list)",
++    "card_title": "Loyalty card",
++    "print": "Print",
++    "download": "Download",
++    "share": "Share",
++    "card_printed": "Loyalty card printed.",
++    "card_print_failed": "Card not printed ({{reason}}). Download it or try again.",
++    "card_load_failed": "The loyalty card could not be loaded.",
++    "share_text": "Your {{restaurant}} loyalty card: show this code at the till to earn points.",
++    "share_unsupported": "Sharing is not available on this device: the card was downloaded.",
++    "share_failed": "The card could not be shared: it was downloaded instead.",
++    "card_image_failed": "The card picture could not be made: print it instead."
    }
  }
 diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
-index 5bc9a232..f839ff08 100644
+index 5bc9a232..df4818a0 100644
 --- a/pos/src/i18n/locales/fr.json
 +++ b/pos/src/i18n/locales/fr.json
-@@ -637,5 +637,19 @@
+@@ -637,5 +637,31 @@
      "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
      "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
      "bill_requested": "{{table}} demande l'addition (n° {{number}})"
@@ -376,6 +696,44 @@ index 5bc9a232..f839ff08 100644
 +    "not_for_platforms": "Une carte fidélité ne peut pas servir sur une commande plateforme.",
 +    "scan_on_order_screen": "Scannez la carte fidélité sur l'écran de commande, avant d'envoyer la commande.",
 +    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande.",
-+    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment »."
++    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment ».",
++    "card_checkbox": "Créer sa carte fidélité (le client accepte d'être sur la liste fidélité)",
++    "card_title": "Carte fidélité",
++    "print": "Imprimer",
++    "download": "Télécharger",
++    "share": "Partager",
++    "card_printed": "Carte fidélité imprimée.",
++    "card_print_failed": "Carte non imprimée ({{reason}}). Téléchargez-la ou réessayez.",
++    "card_load_failed": "La carte fidélité n'a pas pu être chargée.",
++    "share_text": "Votre carte fidélité {{restaurant}} : montrez ce code à la caisse pour gagner des points.",
++    "share_unsupported": "Le partage n'est pas disponible sur cet appareil : la carte a été téléchargée.",
++    "share_failed": "La carte n'a pas pu être partagée : elle a été téléchargée.",
++    "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt."
    }
  }
+diff --git a/pos/src/lib/customer-api.ts b/pos/src/lib/customer-api.ts
+index 33747822..2e21d7ec 100644
+--- a/pos/src/lib/customer-api.ts
++++ b/pos/src/lib/customer-api.ts
+@@ -37,6 +37,11 @@ export interface CreateCustomerData {
+   customer_group?: string;
+   territory?: string;
+   name?: string;
++  // Patch 47 (ticket 39): erp_restaurant's create_customer enrolls the customer when ticked.
++  loyalty_card?: number;
++  consent?: number;
++  pos_profile?: string;
++  loyalty_code?: string | null;
+ }
+ 
+ export interface CreateCustomerResponse {
+@@ -80,6 +85,9 @@ export async function addCustomer(
+     }
+     return {
+       data: {
++        // Patch 47: the customer's id (a homonym gets a suffix) and the new card's code.
++        name: msg.name,
++        loyalty_code: msg.loyalty_code,
+         customer_name: msg.customer_name,
+         mobile_number: msg.mobile_number,
+         customer_group: msg.customer_group,

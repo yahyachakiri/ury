@@ -1883,8 +1883,9 @@ scans it with a USB scanner and that customer is set on the current order only; 
 earned on paid orders can be used as money off.
 
 Files touched: `pos/src/components/LoyaltyScanListener.tsx` (new), `pos/src/App.tsx`
-(mounts it next to SelfOrderListener), `pos/src/components/PaymentDialog.tsx`, locales
-(`loyalty.*`).
+(mounts it next to SelfOrderListener), `pos/src/components/PaymentDialog.tsx`,
+`pos/src/components/LoyaltyCardDialog.tsx` (new), `pos/src/components/CustomerPicker.tsx`,
+`pos/src/lib/customer-api.ts`, locales (`loyalty.*`).
 
 What it does:
 1. LoyaltyScanListener listens to keydown on the document (capture phase), reading keys
@@ -1920,22 +1921,41 @@ What it does:
    returns its failures without an error, and a print view opened after the payment's await
    is outside the tap and would be blocked as a popup on the iPad; there the cashier reprints
    from Recently Paid.
+4. The "New customer" form (CustomerPicker) has a "loyalty card" box, which is also the
+   customer's consent (owner, 2026-11-05: cashiers enroll at the till). It sends
+   `loyalty_card`, `consent` and the till's `pos_profile` to `ury.ury_pos.api.create_customer`,
+   which erp_restaurant replaces (`api/ury_compat.create_customer`: the site's customer group
+   and territory instead of URY's "Individual" / "India", which made every creation fail, and
+   the enrollment). `addCustomer` keeps the answer's `name` (a homonym gets a suffix) and
+   `loyalty_code`; with a code, LoyaltyCardDialog opens: the QR drawn by erp_restaurant
+   (`loyalty.get_card`), "Imprimer" (print format "Loyalty Card" on the bill printer through QZ
+   Tray, else the browser's print view opened in the tap), "Télécharger" and "Partager" (a PNG
+   card laid out like the owner app's, built when the card loads so the tap calls the Web
+   Share API without waiting, which Safari requires; a refused share downloads the card).
 
 Why it can't be done in `erp_restaurant`: the scan is keyboard input in the till's page,
 and the order's customer and the payment rows live in the POS React state and dialog.
 Everything else is in erp_restaurant: the code check, points earned (POS Invoice
 before_validate sets the loyalty program), the redemption (`api/ury_compat.make_invoice`
 passes the points to `loyalty.set_order_loyalty`, ERPNext checks the balance and the total
-and counts the amount as paid), the daily closing line, the points lines on the receipt;
-only the trigger of the print after payment is in the till.
+and counts the amount as paid), the daily closing line, the points lines on the receipt, the
+customer creation and enrollment, the QR and the card's print format; the till only adds the
+form's box, the card window and the print triggers.
 
 Risk profile: medium. PaymentDialog.tsx is also changed by Patches 07, 09, 19/23 and 45,
-and this patch changes payment amounts when points are used. A document keydown listener
+and this patch changes payment amounts when points are used. CustomerPicker.tsx is also
+changed by Patches 04, 17 and 46, was refactored upstream shortly before the pin, and is used
+by the order panel, BillSplitDialog and the waiter app (CustomerSelect), so the loyalty box
+and the card window appear in all three. A document keydown listener
 could swallow an Enter: it only does for a `LOY...` burst typed at scanner speed. The next
 order goes back to the counter customer through the existing reset (Patch 04 default
 customer). Entering points overwrites cash already typed (as a discount already does).
 Known gaps: no scan in the waiter (captain) app (a scan there only shows the message), the
-emergency till (/caisse) or the customer QR app; the cashier can also pick the customer by
+emergency till (/caisse) or the customer QR app; a waiter may create a card (box and card
+window), where "Imprimer" uses the till's QZ host and likely fails on a phone with the
+"Carte non imprimée" message, while Télécharger and Partager work; the box with a phone that
+belongs to an existing individual customer enrolls that customer and renames it to the name
+typed (as the owner app does); the cashier can also pick the customer by
 name or phone with the existing customer search. Unknown until the scanner test: whether
 iPadOS sends key presses to the page when nothing is focused, and whether a connected
 scanner hides the on-screen keyboard cashiers use for amounts.
@@ -1966,8 +1986,17 @@ Acceptance criteria:
     the receipt once on the bill printer (points used, earned, new balance); paying without
     points prints nothing; with QZ Tray closed, the "Receipt not printed" message and the
     order is paid.
+16. New customer without the box: created (no "Échec de la création du client") in the site's
+    group and territory, set on the order, no card window. A phone already on a customer: the
+    message names that customer.
+17. New customer with the box: card window with the QR, the order has that customer; scanning
+    the QR on a new order sets the customer.
+18. "Imprimer" on a QZ till prints the card on the bill printer (restaurant, name, QR, code);
+    the printed QR scans. "Télécharger" saves the PNG; "Partager" on the iPad opens the share
+    sheet (WhatsApp).
+19. Box ticked without a loyalty program set up: the server's message, no customer created.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: not committed yet.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 

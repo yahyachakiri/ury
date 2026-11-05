@@ -650,6 +650,18 @@
     "not_for_platforms": "Une carte fidélité ne peut pas servir sur une commande plateforme.",
     "scan_on_order_screen": "Scannez la carte fidélité sur l'écran de commande, avant d'envoyer la commande.",
     "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande.",
-    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment »."
+    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment ».",
+    "card_checkbox": "Créer sa carte fidélité (le client accepte d'être sur la liste fidélité)",
+    "card_title": "Carte fidélité",
+    "print": "Imprimer",
+    "download": "Télécharger",
+    "share": "Partager",
+    "card_printed": "Carte fidélité imprimée.",
+    "card_print_failed": "Carte non imprimée ({{reason}}). Téléchargez-la ou réessayez.",
+    "card_load_failed": "La carte fidélité n'a pas pu être chargée.",
+    "share_text": "Votre carte fidélité {{restaurant}} : montrez ce code à la caisse pour gagner des points.",
+    "share_unsupported": "Le partage n'est pas disponible sur cet appareil : la carte a été téléchargée.",
+    "share_failed": "La carte n'a pas pu être partagée : elle a été téléchargée.",
+    "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt."
   }
 }

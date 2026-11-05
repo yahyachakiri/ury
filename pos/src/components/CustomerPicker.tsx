@@ -6,6 +6,7 @@ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { t } from '../i18n';
+import LoyaltyCardDialog from './LoyaltyCardDialog';
 
 export interface CustomerPickerProps {
   value: Customer | null;
@@ -21,16 +22,20 @@ function NewCustomerForm({
   setIsCreatingCustomer: setParentIsCreatingCustomer,
   prefillName = '',
   prefillPhone = '',
+  onCardCreated,
 }: {
   onClose: () => void;
   onSuccess?: () => void;
   onCustomerCreated: (customer: Customer) => void;
+  onCardCreated?: (customer: string) => void;
   isCreatingCustomer?: boolean;
   setIsCreatingCustomer?: React.Dispatch<React.SetStateAction<boolean>>;
   prefillName?: string;
   prefillPhone?: string;
 }) {
-  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories } = usePOSStore();
+  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories, posProfile } = usePOSStore();
+  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list.
+  const [loyaltyCard, setLoyaltyCard] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerGroup, setNewCustomerGroup] = useState('');
@@ -77,6 +82,11 @@ function NewCustomerForm({
       };
       if (newCustomerGroup) customerData.customer_group = newCustomerGroup;
       if (newCustomerTerritory) customerData.territory = newCustomerTerritory;
+      if (loyaltyCard) {
+        customerData.loyalty_card = 1;
+        customerData.consent = 1;
+        if (posProfile?.name) customerData.pos_profile = posProfile.name;
+      }
 
       const response = await addCustomer(customerData);
       const created = response.data;
@@ -89,8 +99,10 @@ function NewCustomerForm({
       setNewCustomerPhone('');
       setNewCustomerGroup('');
       setNewCustomerTerritory('');
+      setLoyaltyCard(false);
       onSuccess?.();
       onClose();
+      if (created.loyalty_code && created.name) onCardCreated?.(created.name);
     } catch (error: unknown) {
       setApiError(parseFrappeError(error, t('customer.failed_create')));
     } finally {
@@ -135,6 +147,16 @@ function NewCustomerForm({
           <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
         </div>
       </div>
+      <label className="flex items-start gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4"
+          checked={loyaltyCard}
+          onChange={(e) => setLoyaltyCard(e.target.checked)}
+          disabled={isCreatingCustomer}
+        />
+        <span>{t('loyalty.card_checkbox')}</span>
+      </label>
       <div className="flex gap-3 mt-6">
         <Button type="submit" variant="default" className="flex-1" disabled={isCreatingCustomer}>
           {isCreatingCustomer ? (
@@ -165,6 +187,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
   const [searchError, setSearchError] = useState<string | null>(null);
   const [prefillName, setPrefillName] = useState('');
   const [prefillPhone, setPrefillPhone] = useState('');
+  const [cardFor, setCardFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !searchTerm.trim()) {
@@ -317,10 +340,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
               setIsCreatingCustomer={setIsCreatingCustomer}
               prefillName={prefillName}
               prefillPhone={prefillPhone}
+              onCardCreated={setCardFor}
             />
           </DialogContent>
         </Dialog>
       )}
+      {cardFor && <LoyaltyCardDialog customer={cardFor} onClose={() => setCardFor(null)} />}
     </div>
   );
 }

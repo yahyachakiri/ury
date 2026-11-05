@@ -650,6 +650,18 @@
     "not_for_platforms": "A loyalty card cannot be used on a platform order.",
     "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
     "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order.",
-    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid."
+    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid.",
+    "card_checkbox": "Create a loyalty card (the customer agrees to be on the loyalty list)",
+    "card_title": "Loyalty card",
+    "print": "Print",
+    "download": "Download",
+    "share": "Share",
+    "card_printed": "Loyalty card printed.",
+    "card_print_failed": "Card not printed ({{reason}}). Download it or try again.",
+    "card_load_failed": "The loyalty card could not be loaded.",
+    "share_text": "Your {{restaurant}} loyalty card: show this code at the till to earn points.",
+    "share_unsupported": "Sharing is not available on this device: the card was downloaded.",
+    "share_failed": "The card could not be shared: it was downloaded instead.",
+    "card_image_failed": "The card picture could not be made: print it instead."
   }
 }
