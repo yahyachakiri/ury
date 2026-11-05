@@ -2140,6 +2140,8 @@ right, as with Patch 48.
 Checked locally (Chrome, test-dev origin, 2026-11-05): the bill HTML from the QZ log and an
 Arabic sample draw to a 576-dot 1-bit image, logo inlined, canvas not tainted. Not run on
 a printer.
+Owner test 2026-11-05 (dev bench, a40851a1): prints correctly on both Windows PCs and on a
+Mac (Patch 48's blank macOS ticket gone). Reported without per-step detail.
 
 Acceptance criteria:
 1. On both Windows PCs, without changing their driver settings: a bill prints at real
