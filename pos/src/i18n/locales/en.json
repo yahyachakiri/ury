@@ -261,6 +261,7 @@
     "no_active_order": "No active order found for this table",
     "qz_host_not_set": "QZ host is not set",
     "print_failed": "Print failed: {{reason}}",
+    "print_failed_pay_anyway": "Bill not printed: {{reason}}. You can still take the payment.",
     "invalid_discount": "Please enter a valid discount value",
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "discount_exceeds_total": "Discount cannot exceed the order total",

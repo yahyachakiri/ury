@@ -28,6 +28,7 @@ import {
   mapSplitGroupInvoiceToPOSInvoice,
   type POSInvoice,
   type SplitGroupInvoice,
+  updatePrintStatus,
 } from '../lib/invoice-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
@@ -320,6 +321,7 @@ export default function Orders() {
   async function handlePrintOrder() {
     if (!selectedOrder || !posStore.posProfile) return;
     setIsPrinting(true);
+    let printed = false;
     try {
       await printOrder({
         orderId: selectedOrder.name,
@@ -327,20 +329,26 @@ export default function Orders() {
         printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
       });
       showToast.success(t('success.printed'));
-      // Locally update selectedOrder.invoice_printed to 1
-      if (selectedOrder && typeof selectedOrder === 'object') {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
-      }
-      // If order was Unbilled, set to Draft and reload draft orders
-      if (selectedStatus === 'Unbilled') {
-        showToast.info(t('success.order_moved_to_draft'));
-        setSelectedStatus('Draft');
-        fetchOrders();
-      }
+      printed = true;
     } catch (err: any) {
-      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
+      // Patch 53: a failed print still counts as the print, so the cashier can take the payment
+      // with the printer off. If the server cannot be reached either, Payment stays blocked.
+      printed = await updatePrintStatus(selectedOrder.name).then(() => true, () => false);
+      const reason = err?.message || String(err);
+      showToast.error(t(printed ? 'errors.print_failed_pay_anyway' : 'errors.print_failed', { reason }));
     } finally {
       setIsPrinting(false);
+    }
+    if (!printed) return;
+    // Locally update selectedOrder.invoice_printed to 1
+    if (selectedOrder && typeof selectedOrder === 'object') {
+      selectOrder({ ...selectedOrder, invoice_printed: 1 });
+    }
+    // If order was Unbilled, set to Draft and reload draft orders
+    if (selectedStatus === 'Unbilled') {
+      showToast.info(t('success.order_moved_to_draft'));
+      setSelectedStatus('Draft');
+      fetchOrders();
     }
   }
 

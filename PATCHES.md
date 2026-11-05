@@ -2288,6 +2288,58 @@ reload /pos and /ury; open /order from the "Commande par QR" page in a private w
 
 Patch file: `patches/52-reflowgo-tab-titles.patch`. Commit: b55edd89.
 
+### Patch 53 — Payment allowed after a failed bill print
+
+Fix (owner request 2026-11-05): with the bill printer off (Patch 51 error) or QZ Tray not
+running, the cashier could not take the payment. Payment needs `invoice_printed = 1`, which
+`printOrder` only sets after a successful QZ print.
+
+Files touched: `pos/src/pages/Orders.tsx` (`handlePrintOrder`), `pos/src/pages/Table.tsx`
+(table print), `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json`
+(`errors.print_failed_pay_anyway`)
+
+What it does: the cashier still has to tap Print first. When the bill print from Orders or
+from the Tables page fails, the page calls URY's `qz_print_update` (`updatePrintStatus`, the
+call a successful print makes: order marked printed, table freed) and shows "Addition non
+imprimée : … Vous pouvez quand même encaisser."; Orders unlocks Payment as after a print
+(Unbilled moves to Draft), Tables reloads so the table shows billed. If that call fails too
+(server unreachable), the old print error shows and Payment stays blocked. `printOrder` is
+unchanged, so the waiter app's bill print and the receipt printed after a payment keep
+upstream behavior. Network-type tills (`print_type = network`) already allowed it upstream:
+URY's server returns "Failed to …" text with success, and the POS marks the order printed.
+
+Why it can't be done in `erp_restaurant`: the print happens in the browser and the Payment
+button checks `invoice_printed` in the POS; the server never hears about a failed print.
+
+Risk profile: low to medium (Orders.tsx and Table.tsx are busy upstream files). Accepted: a
+failed print counts as printed, so the order is locked for non-billing users and an unpaid
+table is freed, exactly as after a real print. Inherited from upstream: `qz_print_update` can
+answer `{"status": "Failure"}` without an error, which is not checked (same as a successful
+print).
+
+Acceptance criteria:
+1. Printer off: Print shows the "you can still take the payment" error, then Payment opens
+   the payment dialog and the payment goes through.
+2. QZ Tray closed (the iPad case): same as 1.
+3. Without tapping Print, Payment still says "Veuillez imprimer la facture…".
+4. Printer on: Print and Payment work as before (success message, no error).
+5. A dine-in order printed from the Tables page with the printer off shows the table as
+   billed and can be paid from Orders.
+6. Waiter app: a failed bill print still shows its print error and does not lock the order.
+7. French, Arabic (RTL) and English messages.
+
+Manual test (test-dev, PC with QZ Tray, Bill Printer set to the printer's IP):
+1. Turn the printer off. Take a takeaway order with a `Test ...` item, open it in Orders,
+   tap Payment: criterion 3. Tap Print: criterion 1 message; tap Payment and pay cash.
+2. Close QZ Tray, new order, Print then Payment: criterion 2. Reopen QZ Tray.
+3. Turn the printer on, new order, Print and Payment: criterion 4.
+4. Printer off, dine-in order on a table, print it from the Tables page: criterion 5.
+5. Printer off, waiter account, print a table bill from the waiter app, then add an item:
+   criterion 6.
+6. Repeat step 1's message check in Arabic and English. Cancel or refund the test orders.
+
+Patch file: `patches/53-pay-after-failed-print.patch`. Commit: (not committed yet).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

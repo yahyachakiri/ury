@@ -11,7 +11,7 @@ import { Badge } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
-import { resolvePrintFormat } from '../lib/invoice-api';
+import { resolvePrintFormat, updatePrintStatus } from '../lib/invoice-api';
 import { canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
@@ -201,15 +201,23 @@ const TableView = () => {
         return;
       }
 
-      await printOrder({
-        orderId: invoiceId,
-        posProfile,
-        printFormat: resolvePrintFormat(
-          orderResponse.message ?? {},
-          posProfile.print_format
-        ),
-      });
-      showToast.success(t('success.printed'));
+      try {
+        await printOrder({
+          orderId: invoiceId,
+          posProfile,
+          printFormat: resolvePrintFormat(
+            orderResponse.message ?? {},
+            posProfile.print_format
+          ),
+        });
+        showToast.success(t('success.printed'));
+      } catch (printError) {
+        // Patch 53: a failed print still counts as the print, so the order can be paid.
+        await updatePrintStatus(invoiceId).catch(() => {
+          throw printError;
+        });
+        showToast.error(t('errors.print_failed_pay_anyway', { reason: parseFrappeError(printError, t('errors.failed_print')) }));
+      }
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
       showToast.error(parseFrappeError(error, t('errors.failed_print')));
