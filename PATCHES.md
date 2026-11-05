@@ -2156,7 +2156,7 @@ Manual test (test-dev, on each PC with QZ Tray and the SPRT printer):
 4. Reprint the kitchen ticket, then cancel the order (cancelled ticket prints).
 5. Check criteria 1 to 4; if nothing prints, send the QZ log of that print.
 
-Patch file: `patches/50-qz-escpos-raster.patch`. Commits: not committed yet.
+Patch file: `patches/50-qz-escpos-raster.patch`. Commit: eaca4c77.
 
 ## Build and deploy
 
