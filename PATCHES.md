@@ -2141,7 +2141,9 @@ Checked locally (Chrome, test-dev origin, 2026-11-05): the bill HTML from the QZ
 Arabic sample draw to a 576-dot 1-bit image, logo inlined, canvas not tainted. Not run on
 a printer.
 Owner test 2026-11-05 (dev bench, a40851a1): prints correctly on both Windows PCs and on a
-Mac (Patch 48's blank macOS ticket gone). Reported without per-step detail.
+Mac (Patch 48's blank macOS ticket gone); cancelled ticket band and paper cut checked.
+Known gap (same as Patch 48): with the printer off, Windows accepts the job and the POS
+shows success, nothing prints. Arabic text not checked on paper yet.
 
 Acceptance criteria:
 1. On both Windows PCs, without changing their driver settings: a bill prints at real
@@ -2149,12 +2151,13 @@ Acceptance criteria:
 2. Auto-printed and reprinted kitchen tickets: same; a cancelled ticket's black title
    band prints black with white text.
 3. Each ticket is cut right after its content.
-4. Arabic text on a bill reads right to left with joined letters.
+4. Arabic text in a ticket (for example an Arabic line note) reads right to left with joined
+   letters. Bills themselves print in French when the POS is in Arabic (Patch 42).
 
 Manual test (test-dev, on each PC with QZ Tray and the SPRT printer):
 1. Hard-refresh /pos so the new bundle loads.
 2. Take a takeaway order with one `Test ...` item; the kitchen ticket auto-prints.
-3. In Orders, print the bill; switch the POS to Arabic and print it again.
+3. Add an Arabic note on the line (for example بدون بصل) before sending, then print the bill.
 4. Reprint the kitchen ticket, then cancel the order (cancelled ticket prints).
 5. Check criteria 1 to 4; if nothing prints, send the QZ log of that print.
 
