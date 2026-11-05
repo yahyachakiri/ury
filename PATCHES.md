@@ -2210,7 +2210,7 @@ Manual test (test-dev, on a PC with QZ Tray):
    takes. Turn it on and wait: nothing should come out.
 5. Print again: criterion 3. Cancel the test order.
 
-Patch file: `patches/51-network-printer-ip.patch`. Commit: not committed yet.
+Patch file: `patches/51-network-printer-ip.patch`. Commit: f9b05da1.
 
 ## Build and deploy
 
