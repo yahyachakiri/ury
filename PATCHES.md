@@ -1967,7 +1967,7 @@ Acceptance criteria:
     points prints nothing; with QZ Tray closed, the "Receipt not printed" message and the
     order is paid.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: not committed yet.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 
