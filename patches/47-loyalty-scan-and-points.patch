@@ -120,17 +120,23 @@ index 00000000..c33b22cc
 +
 +export default LoyaltyScanListener;
 diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
-index 20687e15..baad59f6 100644
+index 20687e15..479c59d7 100644
 --- a/pos/src/components/PaymentDialog.tsx
 +++ b/pos/src/components/PaymentDialog.tsx
-@@ -1,5 +1,5 @@
+@@ -1,10 +1,11 @@
  import React, { useState, useEffect, useMemo } from 'react';
 -import { X, Percent, Coins } from 'lucide-react';
 +import { X, Percent, Coins, Gift } from 'lucide-react';
  import { usePOSStore } from '../store/pos-store';
  import { formatCurrency, call, parseFrappeError } from '@ury/core';
  import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
-@@ -55,6 +55,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+ import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
+ import { t } from '../i18n';
++import { printOrder } from '../lib/print';
+ 
+ 
+ interface PaymentDialogProps {
+@@ -55,6 +56,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
        .then((r) => setHiddenModes(r.message || []))
        .catch(() => setHiddenModes([]));
    }, [customer]);
@@ -153,7 +159,7 @@ index 20687e15..baad59f6 100644
    // Memoized: the cash autofill effect below depends on this list.
    const paymentModes = useMemo(
      () => allPaymentModes.filter((mode: any) => !hiddenModes.includes(typeof mode === 'string' ? mode : mode.id)),
-@@ -157,11 +173,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -157,11 +174,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
    // nearest MAD without). Merged bills keep upstream rounding: their total
    // spans two invoices, each rounded by the server.
    const centsTotal = Math.round(discountedTotal * 100) / 100;
@@ -173,7 +179,7 @@ index 20687e15..baad59f6 100644
  
    // Calculate split payment total
    const payments = paymentModes
-@@ -172,10 +195,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -172,10 +196,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
      })
      .filter(Boolean);
    const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
@@ -191,7 +197,7 @@ index 20687e15..baad59f6 100644
    const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
    const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
  
-@@ -190,6 +219,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -190,6 +220,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
          [DEFAULT_PAYMENT_MODE]:String(finalTotal) 
        }))
      }
@@ -202,7 +208,7 @@ index 20687e15..baad59f6 100644
    },[finalTotal,paymentModes])
  
    // Helper to calculate remaining balance
-@@ -235,12 +268,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -235,12 +269,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
          customer,
          invoice,
          owner,
@@ -215,10 +221,19 @@ index 20687e15..baad59f6 100644
        // The order total, not the cash tendered (the change is not "received").
 -      showToast.success(t('payment.success', { amount: formatCurrency(finalTotal) }));
 +      showToast.success(t('payment.success', { amount: formatCurrency(orderTotal) }));
++      // Patch 47: a payment with points prints the receipt (erp_restaurant Restaurant Receipt:
++      // points used, earned and the new balance). A failed print does not undo the payment.
++      // QZ only: network printing reports no failure, and the browser print view opened after
++      // the await would be blocked as a popup on the iPad.
++      if (pointsUsed > 0 && storePosProfile?.print_type === 'qz') {
++        printOrder({ orderId: invoice, posProfile: storePosProfile, printFormat: storePosProfile.print_format }).catch((err) =>
++          showToast.error(t('loyalty.receipt_print_failed', { reason: err?.message || String(err) }))
++        );
++      }
        onClose();
        clearSelectedOrder();
        await fetchOrders();
-@@ -318,6 +352,39 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -318,6 +362,39 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
              </div>
            )}
  
@@ -258,7 +273,7 @@ index 20687e15..baad59f6 100644
            {/* Payment Methods Section - Split Payment */}
            <div className="space-y-4 mb-6">
              <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
-@@ -416,17 +483,30 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -416,17 +493,30 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                <div className="border-t pt-2">
                  <div className="flex justify-between font-semibold text-lg">
                    <span>{t('payment.total')}</span>
@@ -293,10 +308,10 @@ index 20687e15..baad59f6 100644
            >
              {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
 diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
-index 7725c93a..1d2aef2a 100644
+index 7725c93a..26ba0ad2 100644
 --- a/pos/src/i18n/locales/ar.json
 +++ b/pos/src/i18n/locales/ar.json
-@@ -644,5 +644,18 @@
+@@ -644,5 +644,19 @@
          "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
          "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
          "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
@@ -312,14 +327,15 @@ index 7725c93a..1d2aef2a 100644
 +        "scan_failed": "تعذرت قراءة بطاقة الوفاء. امسحها مرة أخرى.",
 +        "not_for_platforms": "لا يمكن استعمال بطاقة الوفاء في طلب منصة.",
 +        "scan_on_order_screen": "امسح بطاقة الوفاء في شاشة الطلب، قبل إرسال الطلب.",
-+        "order_already_sent": "هذا الطلب أُرسل بالفعل: لا يمكن تغيير زبونه. امسح البطاقة قبل إرسال الطلب التالي."
++        "order_already_sent": "هذا الطلب أُرسل بالفعل: لا يمكن تغيير زبونه. امسح البطاقة قبل إرسال الطلب التالي.",
++        "receipt_print_failed": "لم يُطبع الوصل ({{reason}}). أعد طباعته من «مدفوع مؤخراً»."
      }
  }
 diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
-index 498a9b44..aee48e4a 100644
+index 498a9b44..c8c81fb2 100644
 --- a/pos/src/i18n/locales/en.json
 +++ b/pos/src/i18n/locales/en.json
-@@ -637,5 +637,18 @@
+@@ -637,5 +637,19 @@
      "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
      "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
      "bill_requested": "{{table}} asks for the bill (no. {{number}})"
@@ -335,14 +351,15 @@ index 498a9b44..aee48e4a 100644
 +    "scan_failed": "The loyalty card could not be read. Scan it again.",
 +    "not_for_platforms": "A loyalty card cannot be used on a platform order.",
 +    "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
-+    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order."
++    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order.",
++    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid."
    }
  }
 diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
-index 5bc9a232..0e4ee394 100644
+index 5bc9a232..f839ff08 100644
 --- a/pos/src/i18n/locales/fr.json
 +++ b/pos/src/i18n/locales/fr.json
-@@ -637,5 +637,18 @@
+@@ -637,5 +637,19 @@
      "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
      "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
      "bill_requested": "{{table}} demande l'addition (n° {{number}})"
@@ -358,6 +375,7 @@ index 5bc9a232..0e4ee394 100644
 +    "scan_failed": "La carte fidélité n'a pas pu être lue. Scannez-la encore.",
 +    "not_for_platforms": "Une carte fidélité ne peut pas servir sur une commande plateforme.",
 +    "scan_on_order_screen": "Scannez la carte fidélité sur l'écran de commande, avant d'envoyer la commande.",
-+    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande."
++    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande.",
++    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment »."
    }
  }

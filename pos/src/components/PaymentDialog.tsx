@@ -5,6 +5,7 @@ import { formatCurrency, call, parseFrappeError } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { printOrder } from '../lib/print';
 
 
 interface PaymentDialogProps {
@@ -275,6 +276,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       });
       // The order total, not the cash tendered (the change is not "received").
       showToast.success(t('payment.success', { amount: formatCurrency(orderTotal) }));
+      // Patch 47: a payment with points prints the receipt (erp_restaurant Restaurant Receipt:
+      // points used, earned and the new balance). A failed print does not undo the payment.
+      // QZ only: network printing reports no failure, and the browser print view opened after
+      // the await would be blocked as a popup on the iPad.
+      if (pointsUsed > 0 && storePosProfile?.print_type === 'qz') {
+        printOrder({ orderId: invoice, posProfile: storePosProfile, printFormat: storePosProfile.print_format }).catch((err) =>
+          showToast.error(t('loyalty.receipt_print_failed', { reason: err?.message || String(err) }))
+        );
+      }
       onClose();
       clearSelectedOrder();
       await fetchOrders();

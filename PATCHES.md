@@ -1910,13 +1910,24 @@ What it does:
    method), as ERPNext requires one. The maximum is capped at the order total rounded by
    Patch 09; ERPNext v15 `validate_loyalty_points` compares with `rounded_total`, which
    erp_restaurant pos_rounding sets to the same value (checked in the version-15 source).
+3. After a payment that used points, on a till that prints through QZ Tray
+   (`print_type` qz), PaymentDialog prints the receipt with the till's `printOrder` and the
+   POS Profile's print format (owner, 2026-11-05): erp_restaurant's
+   "Restaurant Receipt" shows the points used among the payments, the points earned and the
+   new balance (`loyalty.receipt_points`). Not awaited: a failed print shows a message to
+   reprint from Recently Paid and the payment stays. No print when no points were used
+   (URY prints nothing after payment). Not on network or browser printing: network printing
+   returns its failures without an error, and a print view opened after the payment's await
+   is outside the tap and would be blocked as a popup on the iPad; there the cashier reprints
+   from Recently Paid.
 
 Why it can't be done in `erp_restaurant`: the scan is keyboard input in the till's page,
 and the order's customer and the payment rows live in the POS React state and dialog.
 Everything else is in erp_restaurant: the code check, points earned (POS Invoice
 before_validate sets the loyalty program), the redemption (`api/ury_compat.make_invoice`
 passes the points to `loyalty.set_order_loyalty`, ERPNext checks the balance and the total
-and counts the amount as paid), the daily closing line.
+and counts the amount as paid), the daily closing line, the points lines on the receipt;
+only the trigger of the print after payment is in the till.
 
 Risk profile: medium. PaymentDialog.tsx is also changed by Patches 07, 09, 19/23 and 45,
 and this patch changes payment amounts when points are used. A document keydown listener
@@ -1951,8 +1962,12 @@ Acceptance criteria:
 12. Cash tendered above what is left to pay: correct change.
 13. Rounding to 0.5 on, factor 0.5, a total with cents, "Tout utiliser": accepted.
 14. iPad hardware keyboard set to Arabic: the scan still works. English pass.
+15. Till with print_type qz and print format "Restaurant Receipt": paying with points prints
+    the receipt once on the bill printer (points used, earned, new balance); paying without
+    points prints nothing; with QZ Tray closed, the "Receipt not printed" message and the
+    order is paid.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commit: 92ea2b5d.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: not committed yet.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 

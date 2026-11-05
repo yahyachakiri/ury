@@ -649,6 +649,7 @@
     "scan_failed": "La carte fidélité n'a pas pu être lue. Scannez-la encore.",
     "not_for_platforms": "Une carte fidélité ne peut pas servir sur une commande plateforme.",
     "scan_on_order_screen": "Scannez la carte fidélité sur l'écran de commande, avant d'envoyer la commande.",
-    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande."
+    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande.",
+    "receipt_print_failed": "Reçu non imprimé ({{reason}}). Réimprimez-le depuis « Payé récemment »."
   }
 }

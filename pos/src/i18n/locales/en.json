@@ -649,6 +649,7 @@
     "scan_failed": "The loyalty card could not be read. Scan it again.",
     "not_for_platforms": "A loyalty card cannot be used on a platform order.",
     "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
-    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order."
+    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order.",
+    "receipt_print_failed": "Receipt not printed ({{reason}}). Reprint it from Recently Paid."
   }
 }
