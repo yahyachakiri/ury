@@ -21,6 +21,7 @@ export interface ErrorMessages {
   unavailable: string;
   unexpected: string;
   printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
+  printerUnreachable: string; // Patch 51: a network printer (IP address) does not answer
 }
 
 const errorMessages: ErrorMessages = {
@@ -30,6 +31,7 @@ const errorMessages: ErrorMessages = {
   unavailable: 'The server is not responding. Wait a moment and try again.',
   unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
   printDraw: 'The ticket could not be prepared for the printer. Try again.',
+  printerUnreachable: 'The printer does not answer. Check that it is on and connected to the network, then print again.',
 };
 
 export function setErrorMessages(messages: Partial<ErrorMessages>): void {

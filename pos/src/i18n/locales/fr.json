@@ -297,6 +297,7 @@
     "server_unavailable": "Le serveur ne répond pas. Patientez un instant et réessayez.",
     "unexpected": "Une erreur est survenue. Réessayez ; si cela se reproduit, prévenez votre responsable.",
     "print_draw": "Le ticket n'a pas pu être préparé pour l'imprimante. Réessayez.",
+    "printer_unreachable": "L'imprimante ne répond pas. Vérifiez qu'elle est allumée et branchée au réseau, puis relancez l'impression.",
     "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
     "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
     "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",

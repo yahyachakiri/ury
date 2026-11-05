@@ -2163,6 +2163,55 @@ Manual test (test-dev, on each PC with QZ Tray and the SPRT printer):
 
 Patch file: `patches/50-qz-escpos-raster.patch`. Commit: eaca4c77.
 
+### Patch 51 — Network printers by IP address, error when the printer is off
+
+Fix (ticket 04, owner test 2026-11-05): with the printer off, the POS said "printed" and
+nothing came out. QZ hands the job to the computer's print queue, which accepts it whatever
+the printer's state, so QZ reports success (the job may print later, when the printer is
+back on).
+
+Files touched: `packages/core/src/print/qz.ts` (`printWithQz` queue, printer choice and
+error in `printOne`), `packages/core/src/frappe/errors.ts` (`printerUnreachable`, on top of
+Patches 46 and 50), `pos/src/main.tsx`, `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json`
+(`errors.printer_unreachable`)
+
+What it does: when the POS Profile's Kitchen Printer or Bill Printer
+(`custom_kitchen_printer`, `custom_bill_printer`, erp_restaurant) is an IPv4 address, with an
+optional port (`192.168.1.50`, `192.168.1.50:9100`), QZ opens a socket to the printer and
+sends Patch 50's ESC/POS bytes directly (port 9100 unless given): no driver and no print
+queue. If the socket fails (error text matching connect / refused / timed out / unreachable /
+no route / host is down), the cashier gets the translated "The printer does not answer"
+message through the existing print-failed messages. A printer name or an empty field works as
+before (queue, success even when the printer is off). erp_restaurant e1d6f53 describes the IP option
+in the owner app placeholder and the desk field descriptions.
+
+Why it can't be done in `erp_restaurant`: the QZ printer config is built in the browser by
+the shared `@ury/core` print transport.
+
+Risk profile: low to medium. Only tills whose printer field holds an IP address change.
+Unknown: QZ's exact socket error text (unmatched errors are shown as QZ sends them) and how
+long Windows or macOS waits before giving up on a printer that is off (could be up to about
+20 s). The printer needs a fixed IP address (set on the printer or reserved in the router).
+iPads still need a PC with QZ Tray.
+
+Acceptance criteria:
+1. With the till's Kitchen and Bill Printer set to the printer's IP, kitchen tickets and
+   bills print as with Patch 50.
+2. Printer off: the POS shows "L'imprimante ne répond pas…" instead of success, and nothing
+   prints later when the printer is turned back on.
+3. Printer back on: printing works again without reloading /pos.
+4. A till with a printer name still prints through the queue as before.
+
+Manual test (test-dev, on a PC with QZ Tray):
+1. Print the SPRT self-test page to read its IP address (or find it in the router).
+2. /admin > Settings > Tills: set Kitchen and Bill Printer to that IP; open /pos in a new tab.
+3. Take a takeaway order with a `Test ...` item and print its bill: criteria 1.
+4. Turn the printer off, print the bill again: criterion 2; note how many seconds the error
+   takes. Turn it on and wait: nothing should come out.
+5. Print again: criterion 3. Cancel the test order.
+
+Patch file: `patches/51-network-printer-ip.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

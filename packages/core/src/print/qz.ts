@@ -49,21 +49,50 @@ export function disconnectQzPrinter(): void {
   if (qz.websocket.isActive()) qz.websocket.disconnect();
 }
 
+// Patch 51: "192.168.1.50" or "192.168.1.50:9100"; the Java socket errors when nothing answers
+// (not QZ Tray's own "Connection closed" / "not been established" websocket errors).
+const NETWORK_PRINTER = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/;
+const UNREACHABLE = /ConnectException|refused|timed? ?out|unreachable|no route to host|host is down/i;
+// Patch 51: one job at a time, so a kitchen ticket and a bill sent together to the same network
+// printer do not compete for its single connection.
+let printQueue: Promise<unknown> = Promise.resolve();
+
 // Patch 10: printerName picks a printer installed on the QZ Tray machine;
 // empty keeps upstream behavior (the machine's default printer).
-export async function printWithQz(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
+export function printWithQz(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
+  const job = printQueue.catch(() => undefined).then(() => printOne(host, htmlToPrint, printerName));
+  printQueue = job;
+  return job;
+}
+
+async function printOne(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
   setQzSecurity();
 
   const printing = async () => {
     const wanted = printerName?.trim();
+    // Patch 51: an IP address (port 9100 unless given) prints straight to the printer over
+    // the network, so a printer that is off fails the print instead of waiting in the
+    // computer's print queue while the POS shows success.
+    const network = wanted?.match(NETWORK_PRINTER);
     // find(name) resolves the first installed printer whose name contains it
     // (so use the full name) and rejects when none matches.
-    const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
+    const printer = network
+      ? { host: network[1], port: network[2] || '9100' }
+      : wanted
+        ? ((await qz.printers.find(wanted)) as string)
+        : await qz.printers.getDefault();
     // Patch 50 (replaces Patch 48): raw ESC/POS bytes, drawn below, so no driver or
     // Windows setting resizes the ticket.
     const data = [{ type: 'raw', format: 'command', flavor: 'base64', data: await htmlToEscPos(htmlToPrint) }];
     const config = qz.configs.create(printer);
-    await qz.print(config, data as any);
+    try {
+      await qz.print(config, data as any);
+    } catch (err) {
+      if (network && UNREACHABLE.test(String((err as Error)?.message ?? err))) {
+        throw new Error(errorMessage('printerUnreachable'));
+      }
+      throw err;
+    }
   };
 
   if (qz.websocket.isActive()) {
