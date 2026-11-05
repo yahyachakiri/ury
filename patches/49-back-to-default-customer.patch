@@ -1,16 +1,16 @@
 diff --git a/pos/src/components/CustomerPicker.tsx b/pos/src/components/CustomerPicker.tsx
-index 46c463f8..5d33d784 100644
+index 33d65cca..1c9409b5 100644
 --- a/pos/src/components/CustomerPicker.tsx
 +++ b/pos/src/components/CustomerPicker.tsx
 @@ -1,6 +1,6 @@
  import { useState, useEffect } from 'react';
- import { parseFrappeError } from '@ury/core';
+ import { call, parseFrappeError } from '@ury/core';
 -import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
 +import { UserPlus, Phone, Loader, ChevronDown, RotateCcw } from 'lucide-react';
  import { Button, Dialog, DialogContent, Input } from '@ury/ui';
  
  import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
-@@ -188,6 +188,9 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+@@ -200,6 +200,9 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
    const [prefillName, setPrefillName] = useState('');
    const [prefillPhone, setPrefillPhone] = useState('');
    const [cardFor, setCardFor] = useState<string | null>(null);
@@ -20,7 +20,7 @@ index 46c463f8..5d33d784 100644
  
    useEffect(() => {
      if (!isOpen || !searchTerm.trim()) {
-@@ -247,19 +250,35 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+@@ -259,19 +262,35 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
      <div className="relative">
        {value ? (
          <div className="flex items-center justify-between rounded-lg bg-blue-50 p-3">

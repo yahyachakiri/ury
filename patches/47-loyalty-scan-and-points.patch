@@ -19,10 +19,16 @@ index 75931d89..1c4e6b6e 100644
          <AuthGuard>
            <POSOpeningProvider>
 diff --git a/pos/src/components/CustomerPicker.tsx b/pos/src/components/CustomerPicker.tsx
-index 2615e87a..46c463f8 100644
+index 2615e87a..33d65cca 100644
 --- a/pos/src/components/CustomerPicker.tsx
 +++ b/pos/src/components/CustomerPicker.tsx
-@@ -6,6 +6,7 @@ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+@@ -1,11 +1,12 @@
+ import { useState, useEffect } from 'react';
+-import { parseFrappeError } from '@ury/core';
++import { call, parseFrappeError } from '@ury/core';
+ import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
+ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+ 
  import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
  import { usePOSStore, type Customer } from '../store/pos-store';
  import { t } from '../i18n';
@@ -30,7 +36,7 @@ index 2615e87a..46c463f8 100644
  
  export interface CustomerPickerProps {
    value: Customer | null;
-@@ -21,16 +22,20 @@ function NewCustomerForm({
+@@ -21,16 +22,30 @@ function NewCustomerForm({
    setIsCreatingCustomer: setParentIsCreatingCustomer,
    prefillName = '',
    prefillPhone = '',
@@ -47,16 +53,26 @@ index 2615e87a..46c463f8 100644
  }) {
 -  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories } = usePOSStore();
 +  const { customerGroups, territories, fetchCustomerGroups, fetchTerritories, posProfile } = usePOSStore();
-+  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list.
++  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list;
++  // shown only while the restaurant's loyalty program is on (erp_restaurant loyalty.till_loyalty_on).
 +  const [loyaltyCard, setLoyaltyCard] = useState(false);
++  const [loyaltyOn, setLoyaltyOn] = useState(false);
++  useEffect(() => {
++    call
++      .get<{ message: boolean }>('erp_restaurant.erp_restaurant.loyalty.till_loyalty_on', {
++        pos_profile: posProfile?.name,
++      })
++      .then((r) => setLoyaltyOn(!!r.message))
++      .catch(() => setLoyaltyOn(false));
++  }, [posProfile?.name]);
    const [newCustomerName, setNewCustomerName] = useState('');
    const [newCustomerPhone, setNewCustomerPhone] = useState('');
    const [newCustomerGroup, setNewCustomerGroup] = useState('');
-@@ -77,6 +82,11 @@ function NewCustomerForm({
+@@ -77,6 +92,11 @@ function NewCustomerForm({
        };
        if (newCustomerGroup) customerData.customer_group = newCustomerGroup;
        if (newCustomerTerritory) customerData.territory = newCustomerTerritory;
-+      if (loyaltyCard) {
++      if (loyaltyCard && loyaltyOn) {
 +        customerData.loyalty_card = 1;
 +        customerData.consent = 1;
 +        if (posProfile?.name) customerData.pos_profile = posProfile.name;
@@ -64,7 +80,7 @@ index 2615e87a..46c463f8 100644
  
        const response = await addCustomer(customerData);
        const created = response.data;
-@@ -89,8 +99,10 @@ function NewCustomerForm({
+@@ -89,8 +109,10 @@ function NewCustomerForm({
        setNewCustomerPhone('');
        setNewCustomerGroup('');
        setNewCustomerTerritory('');
@@ -75,24 +91,26 @@ index 2615e87a..46c463f8 100644
      } catch (error: unknown) {
        setApiError(parseFrappeError(error, t('customer.failed_create')));
      } finally {
-@@ -135,6 +147,16 @@ function NewCustomerForm({
+@@ -135,6 +157,18 @@ function NewCustomerForm({
            <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
          </div>
        </div>
-+      <label className="flex items-start gap-2 text-sm text-gray-700">
-+        <input
-+          type="checkbox"
-+          className="mt-0.5 h-4 w-4"
-+          checked={loyaltyCard}
-+          onChange={(e) => setLoyaltyCard(e.target.checked)}
-+          disabled={isCreatingCustomer}
-+        />
-+        <span>{t('loyalty.card_checkbox')}</span>
-+      </label>
++      {loyaltyOn && (
++        <label className="flex items-start gap-2 text-sm text-gray-700">
++          <input
++            type="checkbox"
++            className="mt-0.5 h-4 w-4"
++            checked={loyaltyCard}
++            onChange={(e) => setLoyaltyCard(e.target.checked)}
++            disabled={isCreatingCustomer}
++          />
++          <span>{t('loyalty.card_checkbox')}</span>
++        </label>
++      )}
        <div className="flex gap-3 mt-6">
          <Button type="submit" variant="default" className="flex-1" disabled={isCreatingCustomer}>
            {isCreatingCustomer ? (
-@@ -165,6 +187,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+@@ -165,6 +199,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
    const [searchError, setSearchError] = useState<string | null>(null);
    const [prefillName, setPrefillName] = useState('');
    const [prefillPhone, setPrefillPhone] = useState('');
@@ -100,7 +118,7 @@ index 2615e87a..46c463f8 100644
  
    useEffect(() => {
      if (!isOpen || !searchTerm.trim()) {
-@@ -317,10 +340,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
+@@ -317,10 +352,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
                setIsCreatingCustomer={setIsCreatingCustomer}
                prefillName={prefillName}
                prefillPhone={prefillPhone}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { parseFrappeError } from '@ury/core';
+import { call, parseFrappeError } from '@ury/core';
 import { UserPlus, Phone, Loader, ChevronDown, RotateCcw } from 'lucide-react';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 
@@ -34,8 +34,18 @@ function NewCustomerForm({
   prefillPhone?: string;
 }) {
   const { customerGroups, territories, fetchCustomerGroups, fetchTerritories, posProfile } = usePOSStore();
-  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list.
+  // Patch 47: "loyalty card" box, which is also the customer's consent to the loyalty list;
+  // shown only while the restaurant's loyalty program is on (erp_restaurant loyalty.till_loyalty_on).
   const [loyaltyCard, setLoyaltyCard] = useState(false);
+  const [loyaltyOn, setLoyaltyOn] = useState(false);
+  useEffect(() => {
+    call
+      .get<{ message: boolean }>('erp_restaurant.erp_restaurant.loyalty.till_loyalty_on', {
+        pos_profile: posProfile?.name,
+      })
+      .then((r) => setLoyaltyOn(!!r.message))
+      .catch(() => setLoyaltyOn(false));
+  }, [posProfile?.name]);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerGroup, setNewCustomerGroup] = useState('');
@@ -82,7 +92,7 @@ function NewCustomerForm({
       };
       if (newCustomerGroup) customerData.customer_group = newCustomerGroup;
       if (newCustomerTerritory) customerData.territory = newCustomerTerritory;
-      if (loyaltyCard) {
+      if (loyaltyCard && loyaltyOn) {
         customerData.loyalty_card = 1;
         customerData.consent = 1;
         if (posProfile?.name) customerData.pos_profile = posProfile.name;
@@ -147,16 +157,18 @@ function NewCustomerForm({
           <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
         </div>
       </div>
-      <label className="flex items-start gap-2 text-sm text-gray-700">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4"
-          checked={loyaltyCard}
-          onChange={(e) => setLoyaltyCard(e.target.checked)}
-          disabled={isCreatingCustomer}
-        />
-        <span>{t('loyalty.card_checkbox')}</span>
-      </label>
+      {loyaltyOn && (
+        <label className="flex items-start gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4"
+            checked={loyaltyCard}
+            onChange={(e) => setLoyaltyCard(e.target.checked)}
+            disabled={isCreatingCustomer}
+          />
+          <span>{t('loyalty.card_checkbox')}</span>
+        </label>
+      )}
       <div className="flex gap-3 mt-6">
         <Button type="submit" variant="default" className="flex-1" disabled={isCreatingCustomer}>
           {isCreatingCustomer ? (

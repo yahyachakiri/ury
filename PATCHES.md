@@ -1922,7 +1922,10 @@ What it does:
    is outside the tap and would be blocked as a popup on the iPad; there the cashier reprints
    from Recently Paid.
 4. The "New customer" form (CustomerPicker) has a "loyalty card" box, which is also the
-   customer's consent (owner, 2026-11-05: cashiers enroll at the till). It sends
+   customer's consent (owner, 2026-11-05: cashiers enroll at the till). The box shows only
+   while the restaurant's loyalty program is on (erp_restaurant `loyalty.till_loyalty_on`,
+   owner app Settings > Fidélité on / off); off, the server also gives no points, refuses
+   cards ("Le programme de fidélité est désactivé") and refuses enrollment. It sends
    `loyalty_card`, `consent` and the till's `pos_profile` to `ury.ury_pos.api.create_customer`,
    which erp_restaurant replaces (`api/ury_compat.create_customer`: the site's customer group
    and territory instead of URY's "Individual" / "India", which made every creation fail, and
@@ -1939,8 +1942,9 @@ Everything else is in erp_restaurant: the code check, points earned (POS Invoice
 before_validate sets the loyalty program), the redemption (`api/ury_compat.make_invoice`
 passes the points to `loyalty.set_order_loyalty`, ERPNext checks the balance and the total
 and counts the amount as paid), the daily closing line, the points lines on the receipt, the
-customer creation and enrollment, the QR and the card's print format; the till only adds the
-form's box, the card window and the print triggers.
+customer creation and enrollment, the QR and the card's print format, the on / off flag read by
+`loyalty.till_loyalty_on`; the till only adds the form's box, the card window and the print
+triggers.
 
 Risk profile: medium. PaymentDialog.tsx is also changed by Patches 07, 09, 19/23 and 45,
 and this patch changes payment amounts when points are used. CustomerPicker.tsx is also
@@ -1995,8 +1999,11 @@ Acceptance criteria:
     the printed QR scans. "Télécharger" saves the PNG; "Partager" on the iPad opens the share
     sheet (WhatsApp).
 19. Box ticked without a loyalty program set up: the server's message, no customer created.
+20. Program turned off in the owner app: no box in the New customer form (after reopening
+    it), no points block in the payment dialog, a scan shows "Le programme de fidélité est
+    désactivé" and keeps the customer; turned on again: all back.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9; box hidden when the program is off: not committed yet.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 
