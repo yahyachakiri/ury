@@ -2005,90 +2005,48 @@ Acceptance criteria:
 
 Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9; box hidden when the program is off: a96bfdd7.
 
-### Patch 48 — QZ Tray lays the ticket out wider than the paper
+### Patch 48 — QZ Tray prints on 80 mm paper at 203 dpi
 
-Fix (ticket 04, owner printer test 2026-11-05, SPRT POS8811 80 mm on Windows, driver paper
-72 x 297 mm, 203 dpi). After a driver reinstall the bill printed zoomed, only about half
-of it on the paper. QZ Tray got no page settings from the POS, so it laid the HTML out at
-the paper width (its default), and the 68 mm bill printed about 3x zoomed with its right
-part cut. Why the factor is that large is Unknown (driver resolution 203 dpi is a
-suspect); the value below is measured, not derived. A first try at 96 mm (0f65e85b)
-showed a third more of the line, so QZ reads `pageWidth` in mm and the print scales in
-proportion; 250 mm comes from measuring that print against a correct one.
+Fix (ticket 04, owner printer tests 2026-11-05, SPRT POS8811 80 mm, printable 72 mm, 203 dpi).
+QZ Tray got no paper settings from the POS, so they came from the driver or Java:
+- Windows: paper 80 mm (227 pt) but the driver reports 600 dpi, about 3x the head's 203 dpi,
+  so the bill printed about 3x zoomed and cut (QZ log: "Print resolution = 600dpi").
+- macOS (CUPS): Java ignored the CUPS default (80 x 210 mm) and used A4 (595 pt): a blank
+  short ticket.
+First versions laid the page out 96 mm (0f65e85b), then 250 mm (15d93fd5) wide: 250 hid
+the Windows zoom but made macOS print about a third of the size.
 
 Files touched: `packages/core/src/print/qz.ts` (`printWithQz` config and data options only)
 
-What it does: every QZ Tray print (bill and kitchen tickets, Patch 10) is laid out 250 mm
-wide (`pageWidth: 250`, units mm), and QZ's default `scaleContent` shrinks it to the paper.
-erp_restaurant's "Restaurant Receipt" and "Kitchen Ticket" are 68 mm wide, left aligned
-(erp_restaurant f2f04a1). Margins stay QZ's default (0).
+What it does: every QZ Tray print (bill and kitchen tickets, Patch 10) asks for 80 x 297 mm
+paper (`size`, units mm), 8 dots per mm (`density`, 203 dpi) and lays the HTML out at the
+paper width (`pageWidth: 80`), so CSS mm print at real size. erp_restaurant's "Restaurant
+Receipt" and "Kitchen Ticket" are 68 mm wide, 5 mm from the left (erp_restaurant 1393382),
+inside the 72 mm the head prints.
 
 Why it can't be done in `erp_restaurant`: the QZ Tray page settings are built in the
 browser by the shared `@ury/core` print transport; erp_restaurant only supplies the HTML,
 and QZ's HTML renderer ignores CSS `@page`.
 
-Risk profile: low to medium. Two lines; every QZ print in pos changes size, kitchen tickets
-included (frontend does not print). Calibrated on one printer and driver (SPRT POS8811, the
-standard model): too small = lower the value, cut on the right = raise it, in proportion.
-Re-test any other printer model or driver.
+Risk profile: medium. Every QZ print in pos changes (frontend does not print). Unknown: a
+driver that refuses 203 dpi (then set it in the driver), and whether a CUPS driver feeds
+the whole 297 mm page. Only 80 mm printers are supported; re-test any other model.
 
 Acceptance criteria:
-1. SPRT 80 mm printer: a bill prints whole width ("8.00 DH" and the full IF number), text
-   at a readable size, not zoomed.
+1. Windows and macOS, SPRT 80 mm: a bill prints at real size, whole width ("18.00 DH" and
+   the full IF number), centered, logo above the name.
 2. Auto-printed and reprinted kitchen tickets: same.
-3. Driver paper and scaling left at their defaults: same result.
+3. The ticket is cut after its content, not after 29.7 cm of blank paper.
 
-Manual test (test-dev, till PC with QZ Tray and the SPRT printer):
+Manual test (test-dev, on each computer with QZ Tray and the SPRT printer):
 1. Hard-refresh /pos so the new bundle loads.
 2. Take a takeaway order with one `Test ...` item; the kitchen ticket auto-prints.
 3. In Orders, print the bill.
-4. Check criteria 1 and 2 on paper; photo if anything is cut or too small.
+4. Check criteria 1 to 3; photo and the QZ log lines "Print resolution" and "Page layout"
+   if anything is off.
 5. Reprint the kitchen ticket from Orders; cancel the test order.
 
-Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5.
-
-### Patch 49 — One tap back to the default customer
-
-Owner request (2026-11-05, ticket 39): after a loyalty scan (Patch 47), or any customer picked
-by mistake, going back to the counter customer meant "Modifier" then typing "Client" in the
-search, which opens the on-screen keyboard on the touch-screen tills.
-
-Files touched: `pos/src/components/CustomerPicker.tsx` (customer card only), locales
-(`customer.back_to_default`).
-
-What it does: the customer card shows a second button, a circular arrow with the default
-customer's name, next to "Modifier", when the POS Profile has a default customer (Patch 04,
-`posProfile.customer`) and the order's customer is another one. One tap sets that default
-customer, built the same way as Patch 04's `getDefaultCustomer` (id and name = the POS
-Profile's customer). Same `disabled` lock as "Modifier": a sent order keeps its customer.
-Delivery-platform orders show the platform picker instead of the card (CustomerSelect), so
-the button never appears there.
-
-Why it can't be done in `erp_restaurant`: the customer card and the order's customer are in
-the POS React state; there is no server or configuration point.
-
-Risk profile: low. A few lines in the card's markup (and `min-w-0` on the name, so a long
-name wraps instead of squeezing the buttons); CustomerPicker.tsx is also changed by Patches
-46 and 47 (git log since the pin). The card is also used by BillSplitDialog and the
-waiter app, where the button behaves the same.
-
-Acceptance criteria:
-1. Loyalty customer set by a scan: the button "Client comptoir" (the till's default customer)
-   is next to "Modifier"; one tap sets Client comptoir, with no keyboard.
-2. Customer already the default: no button.
-3. Order already sent to the kitchen (customer locked): the button is disabled like "Modifier".
-4. Arabic: arrow mirrored, label read right to left; English and French labels.
-5. Touch screen: the button is easy to hit (40 px high).
-
-Manual test (test-dev, touch-screen till):
-1. Hard-refresh /pos. New takeaway order: the card shows Client comptoir and no extra button.
-2. Scan a loyalty card (or pick a customer): the button appears; tap it: Client comptoir is
-   back, no keyboard opens.
-3. Pick the customer again, add an item, send the order, reopen it from Orders: both buttons
-   disabled.
-4. Arabic once; the waiter app and the bill-split window once (same button).
-
-Patch file: `patches/49-back-to-default-customer.patch`. Commit: 885d0054.
+Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5, e4e9ce5c.
 
 ## Build and deploy
 
