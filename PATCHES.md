@@ -2179,9 +2179,13 @@ What it does: when the POS Profile's Kitchen Printer or Bill Printer
 (`custom_kitchen_printer`, `custom_bill_printer`, erp_restaurant) is an IPv4 address, with an
 optional port (`192.168.1.50`, `192.168.1.50:9100`), QZ opens a socket to the printer and
 sends Patch 50's ESC/POS bytes directly (port 9100 unless given): no driver and no print
-queue. If the socket fails (error text matching connect / refused / timed out / unreachable /
-no route / host is down), the cashier gets the translated "The printer does not answer"
-message through the existing print-failed messages. A printer name or an empty field works as
+queue. Host names (`printer.local`) are not network printers: they are looked up as
+installed printer names. If the socket fails (error text matching ConnectException / refused /
+timed out / unreachable / no route to host / host is down; QZ Tray's own websocket errors such
+as "Connection closed" are not mapped), the cashier gets the translated "The printer does not
+answer" message through the existing print-failed messages. Prints from one POS tab run one at
+a time (a kitchen ticket and a bill started together on the same printer IP would otherwise
+compete for its single connection). A printer name or an empty field works as
 before (queue, success even when the printer is off). erp_restaurant e1d6f53 describes the IP option
 in the owner app placeholder and the desk field descriptions.
 
@@ -2189,9 +2193,10 @@ Why it can't be done in `erp_restaurant`: the QZ printer config is built in the 
 the shared `@ury/core` print transport.
 
 Risk profile: low to medium. Only tills whose printer field holds an IP address change.
-Unknown: QZ's exact socket error text (unmatched errors are shown as QZ sends them) and how
-long Windows or macOS waits before giving up on a printer that is off (could be up to about
-20 s). The printer needs a fixed IP address (set on the printer or reserved in the router).
+Unknown: QZ's exact socket error text (unmatched errors are shown as QZ sends them; record it
+from test step 4) and how long Windows or macOS waits before giving up on a printer that is
+off (measure in step 4). Two POS tabs or PCs printing to the same IP at the same instant are
+not queued together (Unknown whether the SPRT accepts a second connection). The printer needs a fixed IP address (set on the printer or reserved in the router).
 iPads still need a PC with QZ Tray.
 
 Acceptance criteria:
@@ -2208,7 +2213,9 @@ Manual test (test-dev, on a PC with QZ Tray):
 3. Take a takeaway order with a `Test ...` item and print its bill: criteria 1.
 4. Turn the printer off, print the bill again: criterion 2; note how many seconds the error
    takes. Turn it on and wait: nothing should come out.
-5. Print again: criterion 3. Cancel the test order.
+5. Print again: criterion 3.
+6. With auto kitchen print on, send an order and print its bill straight away: both print.
+   Cancel the test orders.
 
 Patch file: `patches/51-network-printer-ip.patch`. Commit: f9b05da1.
 
