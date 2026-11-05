@@ -637,5 +637,18 @@
     "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
     "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
     "bill_requested": "{{table}} asks for the bill (no. {{number}})"
+  },
+  "loyalty": {
+    "title": "Loyalty points",
+    "available": "{{points}} points available ({{amount}})",
+    "points_placeholder": "Points to use (max {{max}})",
+    "use_max": "Use all",
+    "points_used": "Points used ({{points}})",
+    "left_to_pay": "Left to pay",
+    "customer_set": "Loyalty customer: {{name}} ({{points}} points)",
+    "scan_failed": "The loyalty card could not be read. Scan it again.",
+    "not_for_platforms": "A loyalty card cannot be used on a platform order.",
+    "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
+    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order."
   }
 }

@@ -1876,6 +1876,84 @@ Acceptance criteria:
 
 Patch file: `patches/46-till-error-messages.patch`.
 
+### Patch 47 — Loyalty card scan at the till, points used in the payment dialog
+
+Owner decision (2026-11-04, ticket 39): a returning customer shows a QR code; the cashier
+scans it with a USB scanner and that customer is set on the current order only; points
+earned on paid orders can be used as money off.
+
+Files touched: `pos/src/components/LoyaltyScanListener.tsx` (new), `pos/src/App.tsx`
+(mounts it next to SelfOrderListener), `pos/src/components/PaymentDialog.tsx`, locales
+(`loyalty.*`).
+
+What it does:
+1. LoyaltyScanListener listens to keydown on the document (capture phase), reading keys
+   by physical position (`e.code`, so the iPad's layout, Arabic included, does not matter:
+   the code's letters avoid the keys that move between QWERTY and AZERTY). A burst typed
+   fast (60 ms or less between keys) that ends with `LOY` + 12 letters and then Enter is a
+   loyalty card: the Enter is stopped and the scanned characters are removed from the field
+   they were typed into. On the cashier's order screen (`/pos/pos`) only, for a new order
+   (not `isUpdatingOrder`, the same lock as the customer picker) that is not a platform
+   order, erp_restaurant `loyalty.resolve_loyalty_code` returns the customer and
+   `setSelectedCustomer` puts it on the order with a toast (name, points). Elsewhere
+   (Orders, the payment dialog, the waiter app) or on a sent order it only shows a message
+   saying to scan on the order screen before sending: the order being paid takes its
+   customer from the saved order, so points would otherwise go to the wrong order. An
+   unknown or turned-off card shows the server's translated message and keeps the
+   customer. Any other typing or scan is left alone.
+2. PaymentDialog asks erp_restaurant `loyalty.get_customer_loyalty(customer)` (not on merged
+   bills). With points, a "Points fidélité" block shows the balance, a points field capped
+   at the balance and at the order total, and "Tout utiliser". The summary shows the total,
+   the points used and what is left to pay; payment rows, the cash prefill, the shortfall
+   and the change use what is left to pay. make_invoice gets `redeem_points`; an order paid
+   entirely with points sends one payment row at 0 on the cash method (else the first
+   method), as ERPNext requires one. The maximum is capped at the order total rounded by
+   Patch 09; ERPNext v15 `validate_loyalty_points` compares with `rounded_total`, which
+   erp_restaurant pos_rounding sets to the same value (checked in the version-15 source).
+
+Why it can't be done in `erp_restaurant`: the scan is keyboard input in the till's page,
+and the order's customer and the payment rows live in the POS React state and dialog.
+Everything else is in erp_restaurant: the code check, points earned (POS Invoice
+before_validate sets the loyalty program), the redemption (`api/ury_compat.make_invoice`
+passes the points to `loyalty.set_order_loyalty`, ERPNext checks the balance and the total
+and counts the amount as paid), the daily closing line.
+
+Risk profile: medium. PaymentDialog.tsx is also changed by Patches 07, 09, 19/23 and 45,
+and this patch changes payment amounts when points are used. A document keydown listener
+could swallow an Enter: it only does for a `LOY...` burst typed at scanner speed. The next
+order goes back to the counter customer through the existing reset (Patch 04 default
+customer). Entering points overwrites cash already typed (as a discount already does).
+Known gaps: no scan in the waiter (captain) app (a scan there only shows the message), the
+emergency till (/caisse) or the customer QR app; the cashier can also pick the customer by
+name or phone with the existing customer search. Unknown until the scanner test: whether
+iPadOS sends key presses to the page when nothing is focused, and whether a connected
+scanner hides the on-screen keyboard cashiers use for amounts.
+
+Acceptance criteria:
+1. With the cursor in the menu search or nowhere, scanning a member's QR sets that customer
+   on the current order within a second, the search box keeps no scanned text, a toast
+   shows the name and points.
+2. After paying (or a new order), the customer is the counter customer again.
+3. A turned-off or reissued (old) card: "Carte fidélité inconnue ou désactivée", customer
+   unchanged. Typing "LOY" by hand in the search box does nothing special.
+4. Payment for a member with points: block shown, "Tout utiliser" caps at the balance and
+   the total, left to pay and the cash prefill drop by the points' value, paying succeeds;
+   the POS Invoice has redeem_loyalty_points, loyalty_points and loyalty_amount set.
+5. Points covering the whole order: left to pay 0, paying sends one row at 0 on cash and
+   succeeds.
+6. Counter customer, a company, a merged bill: no loyalty block.
+7. Arabic: block and toasts right to left.
+8. An item barcode scanned into the search box still finds the item.
+9. A scan on Orders, with the payment dialog open, and in the waiter app: message, the order
+   being paid keeps its customer.
+10. A scan while editing a sent order: message, customer unchanged.
+11. Discount then points: the points apply to the discounted total.
+12. Cash tendered above what is left to pay: correct change.
+13. Rounding to 0.5 on, factor 0.5, a total with cents, "Tout utiliser": accepted.
+14. iPad hardware keyboard set to Arabic: the scan still works. English pass.
+
+Patch file: `patches/47-loyalty-scan-and-points.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Percent, Coins } from 'lucide-react';
+import { X, Percent, Coins, Gift } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
@@ -55,6 +55,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       .then((r) => setHiddenModes(r.message || []))
       .catch(() => setHiddenModes([]));
   }, [customer]);
+  // Patch 47 (ticket 39): the customer's loyalty points (erp_restaurant loyalty.get_customer_loyalty).
+  // Not on merged bills (the server refuses them there). make_invoice gets the points used.
+  const [loyalty, setLoyalty] = useState<{ points: number; conversion_factor: number } | null>(null);
+  const [pointsInput, setPointsInput] = useState('');
+  useEffect(() => {
+    setLoyalty(null);
+    setPointsInput('');
+    if (!allowDiscount) return;
+    call
+      .get<{ message: { enrolled: boolean; points: number; conversion_factor: number } }>(
+        'erp_restaurant.erp_restaurant.loyalty.get_customer_loyalty',
+        { customer }
+      )
+      .then((r) => setLoyalty(r.message?.enrolled && r.message.points > 0 ? r.message : null))
+      .catch(() => setLoyalty(null));
+  }, [customer, allowDiscount]);
   // Memoized: the cash autofill effect below depends on this list.
   const paymentModes = useMemo(
     () => allPaymentModes.filter((mode: any) => !hiddenModes.includes(typeof mode === 'string' ? mode : mode.id)),
@@ -157,11 +173,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // nearest MAD without). Merged bills keep upstream rounding: their total
   // spans two invoices, each rounded by the server.
   const centsTotal = Math.round(discountedTotal * 100) / 100;
-  const finalTotal = !allowDiscount
+  const orderTotal = !allowDiscount
     ? Math.round(discountedTotal)
     : roundToHalf
       ? Math.ceil(Number((centsTotal * 2).toFixed(6))) / 2
       : centsTotal;
+  // Patch 47: points used lower what is left to pay (ERPNext counts them as paid).
+  const maxPoints = loyalty && loyalty.conversion_factor > 0
+    ? Math.min(loyalty.points, Math.floor(orderTotal / loyalty.conversion_factor + 1e-9))
+    : 0;
+  const pointsUsed = Math.min(maxPoints, Math.max(0, Math.floor(Number(pointsInput) || 0)));
+  const loyaltyAmount = loyalty ? Math.round(pointsUsed * loyalty.conversion_factor * 100) / 100 : 0;
+  const finalTotal = Math.max(0, Math.round((orderTotal - loyaltyAmount) * 100) / 100);
 
   // Calculate split payment total
   const payments = paymentModes
@@ -172,10 +195,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     })
     .filter(Boolean);
   const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+  // Patch 47: an order paid entirely with points still needs one payment row (ERPNext), at 0,
+  // on the cash method when the till has it.
+  const modeIds = paymentModes.map((mode: any) => (typeof mode === 'string' ? mode : mode.id));
+  const zeroRowMode = modeIds.includes(DEFAULT_PAYMENT_MODE) ? DEFAULT_PAYMENT_MODE : modeIds[0] ?? null;
+  const paidByPoints = loyaltyAmount > 0 && finalTotal <= 0.005 && payments.length === 0 && !!zeroRowMode;
+  const paymentsSent = paidByPoints ? [{ mode_of_payment: zeroRowMode, amount: 0 }] : payments;
   const shortfall = finalTotal - paymentsTotal;
   const isShort = shortfall > 0.005;
 
-  const finalAdjustment = finalTotal - discountedTotal;
+  const finalAdjustment = orderTotal - discountedTotal;
   const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
 
@@ -189,6 +218,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         ...prev,
         [DEFAULT_PAYMENT_MODE]:String(finalTotal) 
       }))
+    }
+    // Patch 47: points now cover the whole order, so no cash is due.
+    if (!finalTotal && loyaltyAmount > 0 && otherPaymentModesNotEntered && defaultPaymentModePresent) {
+      setPaymentInputs((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: '' }))
     }
   },[finalTotal,paymentModes])
 
@@ -235,12 +268,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         customer,
         invoice,
         owner,
-        payments,
+        payments: paymentsSent,
         pos_profile: posProfile,
         table,
+        redeem_points: pointsUsed > 0 ? pointsUsed : null,
       });
       // The order total, not the cash tendered (the change is not "received").
-      showToast.success(t('payment.success', { amount: formatCurrency(finalTotal) }));
+      showToast.success(t('payment.success', { amount: formatCurrency(orderTotal) }));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
@@ -313,6 +347,39 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                   size="sm"
                 >
                   {t('common.apply')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Patch 47: loyalty points of the order's customer */}
+          {loyalty && maxPoints > 0 && (
+            <div className="space-y-2 mb-6">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Gift className="w-5 h-5" />
+                {t('loyalty.title')}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {t('loyalty.available', {
+                  points: loyalty.points,
+                  amount: formatCurrency(loyalty.points * loyalty.conversion_factor),
+                })}
+              </p>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  min="0"
+                  max={maxPoints}
+                  step="1"
+                  value={pointsInput}
+                  onChange={(e) => setPointsInput(e.target.value)}
+                  placeholder={t('loyalty.points_placeholder', { max: maxPoints })}
+                  size="sm"
+                  className="flex-1"
+                  disabled={isProcessing}
+                />
+                <Button onClick={() => setPointsInput(String(maxPoints))} variant="default" size="sm" disabled={isProcessing}>
+                  {t('loyalty.use_max')}
                 </Button>
               </div>
             </div>
@@ -416,17 +483,30 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               <div className="border-t pt-2">
                 <div className="flex justify-between font-semibold text-lg">
                   <span>{t('payment.total')}</span>
-                  <span>{formatCurrency(finalTotal)}</span>
+                  <span>{formatCurrency(orderTotal)}</span>
                 </div>
               </div>
+              {/* Patch 47: points used and what is left to pay */}
+              {loyaltyAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span>{t('loyalty.points_used', { points: pointsUsed })}</span>
+                    <span>-{formatCurrency(loyaltyAmount)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>{t('loyalty.left_to_pay')}</span>
+                    <span>{formatCurrency(finalTotal)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || roundToHalf === null || payments.length === 0 || isShort}
-            variant={isProcessing || roundToHalf === null || payments.length === 0 || isShort ? "secondary" : "default"}
+            disabled={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort}
+            variant={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}

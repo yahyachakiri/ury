@@ -644,5 +644,18 @@
         "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
         "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
         "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
+    },
+    "loyalty": {
+        "title": "نقاط الوفاء",
+        "available": "{{points}} نقطة متاحة ({{amount}})",
+        "points_placeholder": "النقاط المستعملة (الحد الأقصى {{max}})",
+        "use_max": "استعمال الكل",
+        "points_used": "النقاط المستعملة ({{points}})",
+        "left_to_pay": "الباقي للأداء",
+        "customer_set": "زبون وفي: {{name}} ({{points}} نقطة)",
+        "scan_failed": "تعذرت قراءة بطاقة الوفاء. امسحها مرة أخرى.",
+        "not_for_platforms": "لا يمكن استعمال بطاقة الوفاء في طلب منصة.",
+        "scan_on_order_screen": "امسح بطاقة الوفاء في شاشة الطلب، قبل إرسال الطلب.",
+        "order_already_sent": "هذا الطلب أُرسل بالفعل: لا يمكن تغيير زبونه. امسح البطاقة قبل إرسال الطلب التالي."
     }
 }

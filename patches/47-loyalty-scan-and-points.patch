@@ -1,0 +1,363 @@
+diff --git a/pos/src/App.tsx b/pos/src/App.tsx
+index 75931d89..1c4e6b6e 100644
+--- a/pos/src/App.tsx
++++ b/pos/src/App.tsx
+@@ -10,6 +10,7 @@ import POSOpeningProvider from './components/POSOpeningProvider';
+ import ScreenSizeProvider from './components/ScreenSizeProvider';
+ import KotAlertListener from './components/KotAlertListener';
+ import SelfOrderListener from './components/SelfOrderListener';
++import LoyaltyScanListener from './components/LoyaltyScanListener';
+ import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
+ import CaptainTables from './captain/pages/CaptainTables';
+ import CaptainOrder from './captain/pages/CaptainOrder';
+@@ -38,6 +39,7 @@ function App() {
+       <ToastProvider />
+       <KotAlertListener />
+       <SelfOrderListener />
++      <LoyaltyScanListener />
+       <ScreenSizeProvider>
+         <AuthGuard>
+           <POSOpeningProvider>
+diff --git a/pos/src/components/LoyaltyScanListener.tsx b/pos/src/components/LoyaltyScanListener.tsx
+new file mode 100644
+index 00000000..c33b22cc
+--- /dev/null
++++ b/pos/src/components/LoyaltyScanListener.tsx
+@@ -0,0 +1,95 @@
++import { useEffect } from 'react';
++import { call, parseFrappeError } from '@ury/core';
++import { showToast } from '@ury/ui';
++import { usePOSStore } from '../store/pos-store';
++import { t } from '../i18n';
++
++// Patch 47 (ticket 39): a USB scanner types a loyalty card's code like a keyboard, fast,
++// then Enter. A burst that ends with "LOY" + 12 letters sets that customer on the order being
++// taken (erp_restaurant loyalty.resolve_loyalty_code); anything else is left alone, so item
++// search and typing work as before. Keys are read by physical position (e.code): the code's
++// letters avoid the keys that move between QWERTY and AZERTY (erp_restaurant
++// loyalty.ALPHABET), so it reads the same whatever the scanner's and the iPad's layouts,
++// Arabic included.
++const CODE = /LOY[BCDEFGHIJKLNOPRSTUVXY]{12}$/;
++const CODE_LENGTH = 15;
++const MAX_GAP_MS = 60;
++// Only the cashier's order screen: elsewhere (Orders, payment, waiter app) the order being
++// paid takes its customer from the saved order, not from the till's current tab.
++const ORDER_SCREEN = '/pos/pos';
++
++type Resolved = { customer: string; customer_name: string; phone: string; points: number; value: number };
++
++/** Removes the scanned characters the scanner typed into the focused field (React-controlled). */
++function clearTyped(el: Element | null, typed: string) {
++  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
++  if (!el.value.toUpperCase().endsWith(typed)) return;
++  const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
++  Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, el.value.slice(0, -typed.length));
++  el.dispatchEvent(new Event('input', { bubbles: true }));
++}
++
++const LoyaltyScanListener: React.FC = () => {
++  useEffect(() => {
++    let buffer = '';
++    let typedBuffer = '';
++    let last = 0;
++
++    const onKeyDown = (e: KeyboardEvent) => {
++      const now = e.timeStamp;
++      const fast = now - last <= MAX_GAP_MS;
++      last = now;
++      if (e.key === 'Enter') {
++        const match = fast ? CODE.exec(buffer) : null;
++        const typed = typedBuffer.slice(-CODE_LENGTH);
++        buffer = '';
++        typedBuffer = '';
++        if (!match) return;
++        e.preventDefault();
++        e.stopPropagation();
++        clearTyped(document.activeElement, typed.toUpperCase());
++        void resolve(match[0]);
++        return;
++      }
++      if (e.ctrlKey || e.metaKey || e.altKey) return;
++      const letter = /^Key([A-Z])$/.exec(e.code)?.[1] ?? (e.key.length === 1 ? e.key.toUpperCase() : null);
++      if (!letter) return;
++      buffer = fast ? (buffer + letter).slice(-32) : letter;
++      // What the layout actually typed into the focused field, to remove it after a scan.
++      typedBuffer = fast ? (typedBuffer + e.key).slice(-32) : e.key;
++    };
++
++    const resolve = async (code: string) => {
++      const { selectedOrderType, setSelectedCustomer, isUpdatingOrder } = usePOSStore.getState();
++      if (window.location.pathname.replace(/\/$/, '') !== ORDER_SCREEN) {
++        showToast.error(t('loyalty.scan_on_order_screen'));
++        return;
++      }
++      // A sent order keeps its customer (the till's customer picker is locked too).
++      if (isUpdatingOrder) {
++        showToast.error(t('loyalty.order_already_sent'));
++        return;
++      }
++      if (selectedOrderType === 'Aggregators') {
++        showToast.error(t('loyalty.not_for_platforms'));
++        return;
++      }
++      try {
++        const r = await call.get<{ message: Resolved }>('erp_restaurant.erp_restaurant.loyalty.resolve_loyalty_code', { code });
++        const c = r.message;
++        setSelectedCustomer({ id: c.customer, name: c.customer_name, phone: c.phone });
++        showToast.success(t('loyalty.customer_set', { name: c.customer_name, points: c.points }));
++      } catch (err) {
++        showToast.error(parseFrappeError(err, t('loyalty.scan_failed')));
++      }
++    };
++
++    // Capture phase: the Enter must not also submit the field the scanner typed into.
++    document.addEventListener('keydown', onKeyDown, true);
++    return () => document.removeEventListener('keydown', onKeyDown, true);
++  }, []);
++
++  return null;
++};
++
++export default LoyaltyScanListener;
+diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
+index 20687e15..baad59f6 100644
+--- a/pos/src/components/PaymentDialog.tsx
++++ b/pos/src/components/PaymentDialog.tsx
+@@ -1,5 +1,5 @@
+ import React, { useState, useEffect, useMemo } from 'react';
+-import { X, Percent, Coins } from 'lucide-react';
++import { X, Percent, Coins, Gift } from 'lucide-react';
+ import { usePOSStore } from '../store/pos-store';
+ import { formatCurrency, call, parseFrappeError } from '@ury/core';
+ import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
+@@ -55,6 +55,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+       .then((r) => setHiddenModes(r.message || []))
+       .catch(() => setHiddenModes([]));
+   }, [customer]);
++  // Patch 47 (ticket 39): the customer's loyalty points (erp_restaurant loyalty.get_customer_loyalty).
++  // Not on merged bills (the server refuses them there). make_invoice gets the points used.
++  const [loyalty, setLoyalty] = useState<{ points: number; conversion_factor: number } | null>(null);
++  const [pointsInput, setPointsInput] = useState('');
++  useEffect(() => {
++    setLoyalty(null);
++    setPointsInput('');
++    if (!allowDiscount) return;
++    call
++      .get<{ message: { enrolled: boolean; points: number; conversion_factor: number } }>(
++        'erp_restaurant.erp_restaurant.loyalty.get_customer_loyalty',
++        { customer }
++      )
++      .then((r) => setLoyalty(r.message?.enrolled && r.message.points > 0 ? r.message : null))
++      .catch(() => setLoyalty(null));
++  }, [customer, allowDiscount]);
+   // Memoized: the cash autofill effect below depends on this list.
+   const paymentModes = useMemo(
+     () => allPaymentModes.filter((mode: any) => !hiddenModes.includes(typeof mode === 'string' ? mode : mode.id)),
+@@ -157,11 +173,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+   // nearest MAD without). Merged bills keep upstream rounding: their total
+   // spans two invoices, each rounded by the server.
+   const centsTotal = Math.round(discountedTotal * 100) / 100;
+-  const finalTotal = !allowDiscount
++  const orderTotal = !allowDiscount
+     ? Math.round(discountedTotal)
+     : roundToHalf
+       ? Math.ceil(Number((centsTotal * 2).toFixed(6))) / 2
+       : centsTotal;
++  // Patch 47: points used lower what is left to pay (ERPNext counts them as paid).
++  const maxPoints = loyalty && loyalty.conversion_factor > 0
++    ? Math.min(loyalty.points, Math.floor(orderTotal / loyalty.conversion_factor + 1e-9))
++    : 0;
++  const pointsUsed = Math.min(maxPoints, Math.max(0, Math.floor(Number(pointsInput) || 0)));
++  const loyaltyAmount = loyalty ? Math.round(pointsUsed * loyalty.conversion_factor * 100) / 100 : 0;
++  const finalTotal = Math.max(0, Math.round((orderTotal - loyaltyAmount) * 100) / 100);
+ 
+   // Calculate split payment total
+   const payments = paymentModes
+@@ -172,10 +195,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+     })
+     .filter(Boolean);
+   const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
++  // Patch 47: an order paid entirely with points still needs one payment row (ERPNext), at 0,
++  // on the cash method when the till has it.
++  const modeIds = paymentModes.map((mode: any) => (typeof mode === 'string' ? mode : mode.id));
++  const zeroRowMode = modeIds.includes(DEFAULT_PAYMENT_MODE) ? DEFAULT_PAYMENT_MODE : modeIds[0] ?? null;
++  const paidByPoints = loyaltyAmount > 0 && finalTotal <= 0.005 && payments.length === 0 && !!zeroRowMode;
++  const paymentsSent = paidByPoints ? [{ mode_of_payment: zeroRowMode, amount: 0 }] : payments;
+   const shortfall = finalTotal - paymentsTotal;
+   const isShort = shortfall > 0.005;
+ 
+-  const finalAdjustment = finalTotal - discountedTotal;
++  const finalAdjustment = orderTotal - discountedTotal;
+   const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
+   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
+ 
+@@ -190,6 +219,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+         [DEFAULT_PAYMENT_MODE]:String(finalTotal) 
+       }))
+     }
++    // Patch 47: points now cover the whole order, so no cash is due.
++    if (!finalTotal && loyaltyAmount > 0 && otherPaymentModesNotEntered && defaultPaymentModePresent) {
++      setPaymentInputs((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: '' }))
++    }
+   },[finalTotal,paymentModes])
+ 
+   // Helper to calculate remaining balance
+@@ -235,12 +268,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+         customer,
+         invoice,
+         owner,
+-        payments,
++        payments: paymentsSent,
+         pos_profile: posProfile,
+         table,
++        redeem_points: pointsUsed > 0 ? pointsUsed : null,
+       });
+       // The order total, not the cash tendered (the change is not "received").
+-      showToast.success(t('payment.success', { amount: formatCurrency(finalTotal) }));
++      showToast.success(t('payment.success', { amount: formatCurrency(orderTotal) }));
+       onClose();
+       clearSelectedOrder();
+       await fetchOrders();
+@@ -318,6 +352,39 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+             </div>
+           )}
+ 
++          {/* Patch 47: loyalty points of the order's customer */}
++          {loyalty && maxPoints > 0 && (
++            <div className="space-y-2 mb-6">
++              <h3 className="text-lg font-semibold flex items-center gap-2">
++                <Gift className="w-5 h-5" />
++                {t('loyalty.title')}
++              </h3>
++              <p className="text-sm text-gray-600">
++                {t('loyalty.available', {
++                  points: loyalty.points,
++                  amount: formatCurrency(loyalty.points * loyalty.conversion_factor),
++                })}
++              </p>
++              <div className="flex gap-2 items-center">
++                <Input
++                  type="number"
++                  min="0"
++                  max={maxPoints}
++                  step="1"
++                  value={pointsInput}
++                  onChange={(e) => setPointsInput(e.target.value)}
++                  placeholder={t('loyalty.points_placeholder', { max: maxPoints })}
++                  size="sm"
++                  className="flex-1"
++                  disabled={isProcessing}
++                />
++                <Button onClick={() => setPointsInput(String(maxPoints))} variant="default" size="sm" disabled={isProcessing}>
++                  {t('loyalty.use_max')}
++                </Button>
++              </div>
++            </div>
++          )}
++
+           {/* Payment Methods Section - Split Payment */}
+           <div className="space-y-4 mb-6">
+             <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
+@@ -416,17 +483,30 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+               <div className="border-t pt-2">
+                 <div className="flex justify-between font-semibold text-lg">
+                   <span>{t('payment.total')}</span>
+-                  <span>{formatCurrency(finalTotal)}</span>
++                  <span>{formatCurrency(orderTotal)}</span>
+                 </div>
+               </div>
++              {/* Patch 47: points used and what is left to pay */}
++              {loyaltyAmount > 0 && (
++                <>
++                  <div className="flex justify-between text-green-600">
++                    <span>{t('loyalty.points_used', { points: pointsUsed })}</span>
++                    <span>-{formatCurrency(loyaltyAmount)}</span>
++                  </div>
++                  <div className="flex justify-between font-semibold">
++                    <span>{t('loyalty.left_to_pay')}</span>
++                    <span>{formatCurrency(finalTotal)}</span>
++                  </div>
++                </>
++              )}
+             </div>
+           </div>
+ 
+           {/* Payment Button */}
+           <Button
+             onClick={handlePayment}
+-            disabled={isProcessing || roundToHalf === null || payments.length === 0 || isShort}
+-            variant={isProcessing || roundToHalf === null || payments.length === 0 || isShort ? "secondary" : "default"}
++            disabled={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort}
++            variant={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort ? "secondary" : "default"}
+             className="w-full"
+           >
+             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 7725c93a..1d2aef2a 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -644,5 +644,18 @@
+         "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
+         "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
+         "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
++    },
++    "loyalty": {
++        "title": "نقاط الوفاء",
++        "available": "{{points}} نقطة متاحة ({{amount}})",
++        "points_placeholder": "النقاط المستعملة (الحد الأقصى {{max}})",
++        "use_max": "استعمال الكل",
++        "points_used": "النقاط المستعملة ({{points}})",
++        "left_to_pay": "الباقي للأداء",
++        "customer_set": "زبون وفي: {{name}} ({{points}} نقطة)",
++        "scan_failed": "تعذرت قراءة بطاقة الوفاء. امسحها مرة أخرى.",
++        "not_for_platforms": "لا يمكن استعمال بطاقة الوفاء في طلب منصة.",
++        "scan_on_order_screen": "امسح بطاقة الوفاء في شاشة الطلب، قبل إرسال الطلب.",
++        "order_already_sent": "هذا الطلب أُرسل بالفعل: لا يمكن تغيير زبونه. امسح البطاقة قبل إرسال الطلب التالي."
+     }
+ }
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 498a9b44..aee48e4a 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -637,5 +637,18 @@
+     "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
+     "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
+     "bill_requested": "{{table}} asks for the bill (no. {{number}})"
++  },
++  "loyalty": {
++    "title": "Loyalty points",
++    "available": "{{points}} points available ({{amount}})",
++    "points_placeholder": "Points to use (max {{max}})",
++    "use_max": "Use all",
++    "points_used": "Points used ({{points}})",
++    "left_to_pay": "Left to pay",
++    "customer_set": "Loyalty customer: {{name}} ({{points}} points)",
++    "scan_failed": "The loyalty card could not be read. Scan it again.",
++    "not_for_platforms": "A loyalty card cannot be used on a platform order.",
++    "scan_on_order_screen": "Scan the loyalty card on the order screen, before sending the order.",
++    "order_already_sent": "This order is already sent: its customer cannot change. Scan the card before sending the next order."
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 5bc9a232..0e4ee394 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -637,5 +637,18 @@
+     "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
+     "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
+     "bill_requested": "{{table}} demande l'addition (n° {{number}})"
++  },
++  "loyalty": {
++    "title": "Points fidélité",
++    "available": "{{points}} points disponibles ({{amount}})",
++    "points_placeholder": "Points à utiliser (max {{max}})",
++    "use_max": "Tout utiliser",
++    "points_used": "Points utilisés ({{points}})",
++    "left_to_pay": "Reste à payer",
++    "customer_set": "Client fidèle : {{name}} ({{points}} points)",
++    "scan_failed": "La carte fidélité n'a pas pu être lue. Scannez-la encore.",
++    "not_for_platforms": "Une carte fidélité ne peut pas servir sur une commande plateforme.",
++    "scan_on_order_screen": "Scannez la carte fidélité sur l'écran de commande, avant d'envoyer la commande.",
++    "order_already_sent": "Cette commande est déjà envoyée : son client ne peut plus changer. Scannez la carte avant d'envoyer la prochaine commande."
+   }
+ }
