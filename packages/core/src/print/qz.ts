@@ -58,11 +58,12 @@ export async function printWithQz(host: string, htmlToPrint: string, printerName
     // find(name) resolves the first installed printer whose name contains it
     // (so use the full name) and rejects when none matches.
     const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
-    // Patch 48: 80 mm thermal paper at its real 203 dpi (8 dots/mm), laid out at the
-    // paper width. Without it the Windows driver reported 600 dpi (bill printed 3x
-    // zoomed) and macOS Java used A4 (blank ticket) (QZ logs, owner tests 2026-11-05).
-    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 80 } }];
-    const config = qz.configs.create(printer, { units: 'mm', size: { width: 80, height: 297 }, density: 8 });
+    // Patch 48: 80 mm paper (macOS Java used A4), HTML laid out 250 mm wide and scaled
+    // to it. The SPRT Windows driver reports 600 dpi for a 203 dpi head, so at the paper
+    // width the bill printed 3x zoomed; QZ ignores `density` for HTML (QZ logs, owner
+    // tests 2026-11-05). 250 is measured on that driver.
+    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 250 } }];
+    const config = qz.configs.create(printer, { units: 'mm', size: { width: 80, height: 297 } });
     await qz.print(config, data as any);
   };
 
