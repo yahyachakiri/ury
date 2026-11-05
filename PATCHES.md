@@ -2003,7 +2003,7 @@ Acceptance criteria:
     it), no points block in the payment dialog, a scan shows "Le programme de fidélité est
     désactivé" and keeps the customer; turned on again: all back.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9; box hidden when the program is off: not committed yet.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; receipt print after payment: 5d126d89; card from the till: a0e548a9; box hidden when the program is off: a96bfdd7.
 
 ### Patch 48 — QZ Tray lays the ticket out wider than the paper
 
