@@ -2259,8 +2259,14 @@ from those lines, not upstream. On a conflict in an HTML entry, keep the Jinja t
 Build: pos, frontend and self-order checked locally with Vite into a scratch folder: the
 Jinja title is kept in the built HTML. Mosaic does not build locally (its Vite config needs
 the bench's `sites/common_site_config.json`, also before this patch); `i18n.js` passes a
-syntax check. The deploy rebuilds the apps whose folders changed. erp_restaurant needs no
-migrate for the translations; clear-cache.
+syntax check. The server deploy builds pos only (`POS_BUILD_CMD="cd pos && yarn build"`):
+/ury, /order and /mosaic keep their old title until `yarn build` is run by hand in
+`frontend`, `self-order` and `mosaic` (then clear-cache). erp_restaurant needs no migrate
+for the translations; clear-cache.
+
+Server check 2026-11-05 (test-dev, after deploy): /pos title "Reflowgo - Caisse" (fr),
+"Reflowgo - نقطة البيع" with dir=rtl (`?_lang=ar`), "Reflowgo - POS" (`?_lang=en`).
+/ury, /order, /mosaic still "URY", "Order", "Mosaic" (not rebuilt).
 
 Acceptance criteria:
 1. /pos, /ury, /order, /mosaic: no tab title contains "URY" or "Mosaic".
