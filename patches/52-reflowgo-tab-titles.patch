@@ -1,0 +1,67 @@
+diff --git a/frontend/index.html b/frontend/index.html
+index d4d035fa..4f9ab24e 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -9,7 +9,8 @@
+     <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+-    <title>URY</title>
++    <!-- Patch 52: product name in the tab title (fr / ar in erp_restaurant translations) -->
++    <title>{{ _("Reflowgo - Management") }}</title>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/mosaic/index.html b/mosaic/index.html
+index f6cde365..8a48f59e 100644
+--- a/mosaic/index.html
++++ b/mosaic/index.html
+@@ -9,7 +9,8 @@
+   <!-- Patch 26: texts in the restaurant's default language (erp_restaurant branding.py) -->
+   <script>window.restaurant_lang = {{ (restaurant_lang or "en") | tojson }};</script>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-  <title>Mosaic</title>
++  <!-- Patch 52: product name; the kitchen title is set by src/i18n.js -->
++  <title>Reflowgo</title>
+ </head>
+ 
+ <body>
+diff --git a/mosaic/src/i18n.js b/mosaic/src/i18n.js
+index ab8857c0..6f5e6d1c 100644
+--- a/mosaic/src/i18n.js
++++ b/mosaic/src/i18n.js
+@@ -137,5 +137,5 @@ export function kotType(type) {
+ export function applyDocumentLanguage() {
+   document.documentElement.lang = lang;
+   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+-  document.title = t("kitchen");
++  document.title = `Reflowgo - ${t("kitchen")}`; // Patch 52
+ }
+diff --git a/pos/index.html b/pos/index.html
+index 40dee05d..a04ce8d3 100644
+--- a/pos/index.html
++++ b/pos/index.html
+@@ -9,7 +9,8 @@
+     <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+-    <title>URY POS</title>
++    <!-- Patch 52: product name in the tab title (fr / ar in erp_restaurant translations) -->
++    <title>{{ _("Reflowgo - POS") }}</title>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/self-order/index.html b/self-order/index.html
+index 88bec3b1..dd8412e6 100644
+--- a/self-order/index.html
++++ b/self-order/index.html
+@@ -6,7 +6,8 @@
+     <link rel="icon" href="{{ favicon }}" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+-    <title>Order</title>
++    <!-- Patch 52: product name in the tab title (fr / ar in erp_restaurant translations) -->
++    <title>{{ _("Reflowgo - Order") }}</title>
+   </head>
+   <body>
+     <div id="root"></div>

@@ -46,7 +46,8 @@ are not included. Use `make-patch.sh` for this.
 Files touched:
 - `pos/public/ury.ico`
 - `pos/public/ury_pos.png`
-- `pos/index.html` (the `<title>URY POS</title>` line)
+- `pos/index.html` (planned for the `<title>URY POS</title>` line; the title
+  was never changed here, see Patch 52)
 - `pos/src/components/HufLogo.tsx` (or its usage site)
 - `pos/src/pages/Dashboard.tsx` (where `HufLogo` is rendered)
 - `pos/src/components/Header.tsx` (the header logo image)
@@ -57,7 +58,7 @@ Files touched:
   `URY MOSAIC` link card labels)
 
 What it does: replaces the favicon and POS icon assets, the browser tab
-title, and removes or replaces the small branding SVG rendered on the
+title (not done; Patch 52), and removes or replaces the small branding SVG rendered on the
 Dashboard page. It also replaces the logo images used by the management
 frontend and the Mosaic app, and shortens the two dashboard link card
 labels to `POS` and `MOSAIC`. The POS header no longer renders the logo
@@ -90,7 +91,7 @@ runtime); the image replacements here are no longer referenced by those
 screens.
 
 KNOWN GAP, not yet verified: other places that may still show URY
-branding, such as the management frontend tab title, favicon, PWA
+branding, such as the management frontend tab title (done in Patch 52), favicon, PWA
 manifest name, print formats, and locale strings containing "URY". Check
 these before treating the logo removal as complete.
 
@@ -729,7 +730,7 @@ Acceptance criteria:
 Manual test steps: `../tasks/backlog-replace-logo.md`.
 
 Not covered (text, not logos): tab titles "URY POS" (pos) and "URY"
-(frontend), the /apps tile title "URY" and `app_icon_title`, the legacy
+(frontend) (done in Patch 52), the /apps tile title "URY" and `app_icon_title`, the legacy
 /urypos page favicon (legacy app, not built here), print formats and locale
 strings containing "URY".
 
@@ -2218,6 +2219,65 @@ Manual test (test-dev, on a PC with QZ Tray):
    Cancel the test orders.
 
 Patch file: `patches/51-network-printer-ip.patch`. Commit: f9b05da1.
+
+### Patch 52 — Reflowgo in the tab titles
+
+Feature (owner request 2026-11-05). Closes the "tab titles" item that Patch 15 left out:
+the browser tabs said "URY POS" (/pos) and "URY" (/ury).
+
+Files touched: `pos/index.html`, `frontend/index.html`, `self-order/index.html`,
+`mosaic/index.html` (`<title>`), `mosaic/src/i18n.js` (`applyDocumentLanguage`, Patch 26)
+
+What it does: the tabs read "Reflowgo - <screen>" in the user's language:
+
+| Page | en | fr | ar |
+|---|---|---|---|
+| /pos (till, waiter app) | Reflowgo - POS | Reflowgo - Caisse | Reflowgo - نقطة البيع |
+| /ury (management app) | Reflowgo - Management | Reflowgo - Gestion | Reflowgo - الإدارة |
+| /order (customer QR app) | Reflowgo - Order | Reflowgo - Commande | Reflowgo - الطلب |
+| /mosaic (kitchen screen) | Reflowgo - Kitchen | Reflowgo - Cuisine | Reflowgo - المطبخ |
+
+/pos, /ury and /order: the title is a Jinja `{{ _("...") }}` rendered by Frappe in the
+request's language (`frappe.lang`; a guest on /order gets the browser's language if the
+site has it, else the site default), translated by the fr / ar rows in `erp_restaurant`
+`translations/fr.csv` and `ar.csv`. Whole-title source strings so no desk word ("POS",
+"Order") gets a new translation. /mosaic: "Reflowgo" in the HTML, then Patch 26 sets
+"Reflowgo - " + its own "kitchen" text in the restaurant's default language.
+
+Why it can't be done in `erp_restaurant`: the titles are text in the URY HTML entries;
+`erp_restaurant` can only feed them values (Patch 15 pattern) or rewrite every response.
+
+Not covered: the /apps tile and desk app switcher title "URY" (`ury/hooks.py`
+`add_to_apps_screen`, `app_title`), the desk workspace "URY", the legacy /urypos page
+(not built), print formats.
+
+Risk profile: low. Applies after Patches 15 and 26: the patch file's context lines are
+Patch 15's favicon / `app_logo_url` lines in the four HTML entries and Patch 26's
+`restaurant_lang` line and `applyDocumentLanguage` in mosaic, so a conflict usually comes
+from those lines, not upstream. On a conflict in an HTML entry, keep the Jinja title line.
+
+Build: pos, frontend and self-order checked locally with Vite into a scratch folder: the
+Jinja title is kept in the built HTML. Mosaic does not build locally (its Vite config needs
+the bench's `sites/common_site_config.json`, also before this patch); `i18n.js` passes a
+syntax check. The deploy rebuilds the apps whose folders changed. erp_restaurant needs no
+migrate for the translations; clear-cache.
+
+Acceptance criteria:
+1. /pos, /ury, /order, /mosaic: no tab title contains "URY" or "Mosaic".
+2. User language French: "Reflowgo - Caisse" (/pos), "Reflowgo - Gestion" (/ury).
+3. User language Arabic: "Reflowgo - نقطة البيع" (/pos), "Reflowgo - الإدارة" (/ury). Check
+   the words, not their order: the browser may show the mixed title as "نقطة البيع - Reflowgo".
+4. /mosaic (site default French): "Reflowgo - Cuisine".
+5. /order from a QR code: "Reflowgo - Commande", "Reflowgo - Order" or "Reflowgo - الطلب".
+   Accepted: the title follows the phone's language (cookie, then Accept-Language, then the
+   site default), not the QR app's own language switch (Patch 24), so an English phone on
+   a French site shows "Reflowgo - Order" over a French app.
+
+Manual test (test-dev): after deploy and clear-cache, open each page in a new tab as a
+French user and read the tab title; switch the user's language to Arabic (and English),
+reload /pos and /ury; open /order from the "Commande par QR" page in a private window.
+
+Patch file: `patches/52-reflowgo-tab-titles.patch`. Commit: not committed yet.
 
 ## Build and deploy
 

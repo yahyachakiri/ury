@@ -137,5 +137,5 @@ export function kotType(type) {
 export function applyDocumentLanguage() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-  document.title = t("kitchen");
+  document.title = `Reflowgo - ${t("kitchen")}`; // Patch 52
 }

@@ -9,7 +9,8 @@
     <script>window.app_logo_url = {{ (app_logo_url or "") | tojson }};</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <title>URY</title>
+    <!-- Patch 52: product name in the tab title (fr / ar in erp_restaurant translations) -->
+    <title>{{ _("Reflowgo - Management") }}</title>
   </head>
   <body>
     <div id="root"></div>
