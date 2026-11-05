@@ -1952,7 +1952,7 @@ Acceptance criteria:
 13. Rounding to 0.5 on, factor 0.5, a total with cents, "Tout utiliser": accepted.
 14. iPad hardware keyboard set to Arabic: the scan still works. English pass.
 
-Patch file: `patches/47-loyalty-scan-and-points.patch`.
+Patch file: `patches/47-loyalty-scan-and-points.patch`. Commit: 92ea2b5d.
 
 ## Build and deploy
 
