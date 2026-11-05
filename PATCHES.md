@@ -2081,7 +2081,7 @@ Manual test (test-dev, touch-screen till):
    disabled.
 4. Arabic once; the waiter app and the bill-split window once (same button).
 
-Patch file: `patches/49-back-to-default-customer.patch`. Commit: not committed yet.
+Patch file: `patches/49-back-to-default-customer.patch`. Commit: 885d0054.
 
 ## Build and deploy
 
