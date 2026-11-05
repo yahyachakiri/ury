@@ -58,10 +58,10 @@ export async function printWithQz(host: string, htmlToPrint: string, printerName
     // find(name) resolves the first installed printer whose name contains it
     // (so use the full name) and rejects when none matches.
     const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
-    // Patch 48: lay the HTML out 96 mm wide, then scaleContent shrinks it to the
-    // paper. At the paper width (QZ default) the 68 mm bill printed zoomed and cut
-    // (owner test 2026-11-05); assumption: QZ sizes the page in points, the HTML in CSS px.
-    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 96 } }];
+    // Patch 48: lay the HTML out 250 mm wide, then scaleContent shrinks it to the
+    // paper. At the paper width (QZ default) the 68 mm bill printed about 3x zoomed and
+    // cut; 96 mm only gained a third (owner tests 2026-11-05, SPRT 80 mm, 203 dpi).
+    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 250 } }];
     const config = qz.configs.create(printer, { units: 'mm' });
     await qz.print(config, data as any);
   };
