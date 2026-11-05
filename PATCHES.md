@@ -2007,6 +2007,9 @@ Patch file: `patches/47-loyalty-scan-and-points.patch`. Commits: 92ea2b5d; recei
 
 ### Patch 48 — QZ Tray prints on 80 mm paper, laid out for the SPRT driver
 
+Replaced by Patch 50 (2026-11-05): its code is gone from `qz.ts`, but apply its patch file
+before 50's (50 is a diff on top of 48).
+
 Fix (ticket 04, owner printer tests 2026-11-05, SPRT POS8811 80 mm, printable 72 mm, 203 dpi).
 QZ Tray got no paper settings from the POS, so they came from the driver or Java:
 - Windows: paper 80 mm (227 pt) but the driver reports 600 dpi, about 3x the head's 203 dpi,
@@ -2050,6 +2053,110 @@ Manual test (test-dev, on each computer with QZ Tray and the SPRT printer):
 5. Reprint the kitchen ticket from Orders; cancel the test order.
 
 Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5, e4e9ce5c, c257f989.
+
+### Patch 49 — One tap back to the default customer
+
+Owner request (2026-11-05, ticket 39): after a loyalty scan (Patch 47), or any customer picked
+by mistake, going back to the counter customer meant "Modifier" then typing "Client" in the
+search, which opens the on-screen keyboard on the touch-screen tills.
+
+Files touched: `pos/src/components/CustomerPicker.tsx` (customer card only), locales
+(`customer.back_to_default`).
+
+What it does: the customer card shows a second button, a circular arrow with the default
+customer's name, next to "Modifier", when the POS Profile has a default customer (Patch 04,
+`posProfile.customer`) and the order's customer is another one. One tap sets that default
+customer, built the same way as Patch 04's `getDefaultCustomer` (id and name = the POS
+Profile's customer). Same `disabled` lock as "Modifier": a sent order keeps its customer.
+Delivery-platform orders show the platform picker instead of the card (CustomerSelect), so
+the button never appears there.
+
+Why it can't be done in `erp_restaurant`: the customer card and the order's customer are in
+the POS React state; there is no server or configuration point.
+
+Risk profile: low. A few lines in the card's markup (and `min-w-0` on the name, so a long
+name wraps instead of squeezing the buttons); CustomerPicker.tsx is also changed by Patches
+46 and 47 (git log since the pin). The card is also used by BillSplitDialog and the
+waiter app, where the button behaves the same.
+
+Acceptance criteria:
+1. Loyalty customer set by a scan: the button "Client comptoir" (the till's default customer)
+   is next to "Modifier"; one tap sets Client comptoir, with no keyboard.
+2. Customer already the default: no button.
+3. Order already sent to the kitchen (customer locked): the button is disabled like "Modifier".
+4. Arabic: arrow mirrored, label read right to left; English and French labels.
+5. Touch screen: the button is easy to hit (40 px high).
+
+Manual test (test-dev, touch-screen till):
+1. Hard-refresh /pos. New takeaway order: the card shows Client comptoir and no extra button.
+2. Scan a loyalty card (or pick a customer): the button appears; tap it: Client comptoir is
+   back, no keyboard opens.
+3. Pick the customer again, add an item, send the order, reopen it from Orders: both buttons
+   disabled.
+4. Arabic once; the waiter app and the bill-split window once (same button).
+
+Patch file: `patches/49-back-to-default-customer.patch`. Commit: 885d0054.
+
+### Patch 50 — QZ Tray prints ESC/POS raster images drawn by the browser
+
+Fix (ticket 04, owner printer tests 2026-11-05). Patch 48's 250 mm layout was right on one
+Windows PC (driver at 600 dpi) and printed the whole bill 3x smaller on a second one (same
+SPRT printer over Ethernet, driver at 203 dpi, QZ log "Print resolution = 203dpi",
+"Paper area 0,0:226,841"). QZ's HTML print is sized by each PC's driver, so no fixed value
+fits every till.
+
+Files touched: `packages/core/src/print/qz.ts` (`printWithQz` data and config; new
+helpers `htmlToEscPos`, `drawTicket`, `toBits`, `inlineImages`),
+`packages/core/src/frappe/errors.ts` (`printDraw` message, `errorMessage` getter, on top of
+Patch 46), `pos/src/main.tsx` (passes it translated), locales (`errors.print_draw` en/fr/ar)
+
+What it does: every QZ Tray print (bill, kitchen tickets Patch 10, loyalty card Patch 47)
+is drawn by the browser and sent as raw bytes, so no driver or Windows setting resizes it:
+1. The HTML is laid out 80 mm wide in an SVG `foreignObject` and drawn on a canvas at
+   8 dots per mm (203 dpi); pictures (logo, QR) are fetched and inlined as data URLs
+   first (a picture that cannot be fetched is left out, the ticket still prints).
+2. The printable 72 mm in the middle (576 dots) is kept, as a driver would; dots darker
+   than luminance 160 print black; blank rows after the content are dropped (up to 60 cm
+   drawn).
+3. Sent as ESC/POS: `ESC @`, `GS v 0` raster bands of 256 rows, then `GS V 66 0` (feed
+   and cut). QZ `type: 'raw', format: 'command', flavor: 'base64'`.
+erp_restaurant's formats are unchanged (68 mm wide, 5 mm from the left of the 80 mm paper,
+so 1 mm from the printable edge).
+
+Why it can't be done in `erp_restaurant`: the bytes sent to QZ Tray are built in the
+browser by the shared `@ury/core` print transport; erp_restaurant only supplies the HTML.
+
+Risk profile: medium. Every QZ print in pos changes (frontend does not print). `qz.ts` is
+also changed by Patches 10 and 41 (other functions). Depends on:
+the printer understanding ESC/POS `GS v 0` and `GS V` (SPRT POS8811: Assumption, standard
+for the model class); the Windows queue passing raw bytes (QZ raw); printable width 576
+dots (SPRT self-test). The driver's paper size, resolution and Windows display scaling no
+longer matter. If the queue drops raw jobs, QZ can print to the printer's IP on port 9100
+(config change, not built). Paper cut now comes from the ticket, not the driver. A control
+character in a note (invalid XML) would make the whole print fail with `errors.print_draw`;
+a ticket longer than 60 cm is printed only up to 60 cm, without an error. Layout direction is
+the format's: the formats set no `dir`, so an Arabic bill keeps the item left and the amount
+right, as with Patch 48.
+Checked locally (Chrome, test-dev origin, 2026-11-05): the bill HTML from the QZ log and an
+Arabic sample draw to a 576-dot 1-bit image, logo inlined, canvas not tainted. Not run on
+a printer.
+
+Acceptance criteria:
+1. On both Windows PCs, without changing their driver settings: a bill prints at real
+   size, whole width ("18.00 DH" and the full IF number), logo sharp above the name.
+2. Auto-printed and reprinted kitchen tickets: same; a cancelled ticket's black title
+   band prints black with white text.
+3. Each ticket is cut right after its content.
+4. Arabic text on a bill reads right to left with joined letters.
+
+Manual test (test-dev, on each PC with QZ Tray and the SPRT printer):
+1. Hard-refresh /pos so the new bundle loads.
+2. Take a takeaway order with one `Test ...` item; the kitchen ticket auto-prints.
+3. In Orders, print the bill; switch the POS to Arabic and print it again.
+4. Reprint the kitchen ticket, then cancel the order (cancelled ticket prints).
+5. Check criteria 1 to 4; if nothing prints, send the QZ log of that print.
+
+Patch file: `patches/50-qz-escpos-raster.patch`. Commits: not committed yet.
 
 ## Build and deploy
 

@@ -296,6 +296,7 @@
     "session_expired": "Votre session a expiré. Rechargez la page et reconnectez-vous.",
     "server_unavailable": "Le serveur ne répond pas. Patientez un instant et réessayez.",
     "unexpected": "Une erreur est survenue. Réessayez ; si cela se reproduit, prévenez votre responsable.",
+    "print_draw": "Le ticket n'a pas pu être préparé pour l'imprimante. Réessayez.",
     "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
     "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
     "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",

@@ -15,6 +15,7 @@ initI18n().then(() => {
     session: t('errors.session_expired'),
     unavailable: t('errors.server_unavailable'),
     unexpected: t('errors.unexpected'),
+    printDraw: t('errors.print_draw'), // Patch 50
   })
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

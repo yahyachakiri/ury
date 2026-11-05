@@ -20,6 +20,7 @@ export interface ErrorMessages {
   session: string;
   unavailable: string;
   unexpected: string;
+  printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
 }
 
 const errorMessages: ErrorMessages = {
@@ -28,10 +29,15 @@ const errorMessages: ErrorMessages = {
   session: 'Your session has expired. Reload the page and log in again.',
   unavailable: 'The server is not responding. Wait a moment and try again.',
   unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
+  printDraw: 'The ticket could not be prepared for the printer. Try again.',
 };
 
 export function setErrorMessages(messages: Partial<ErrorMessages>): void {
   Object.assign(errorMessages, messages);
+}
+
+export function errorMessage(key: keyof ErrorMessages): string {
+  return errorMessages[key];
 }
 
 const LOCK_ERROR = /QueryDeadlockError|QueryTimeoutError|Deadlock found when trying to get lock|Lock wait timeout exceeded/;

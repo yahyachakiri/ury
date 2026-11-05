@@ -296,6 +296,7 @@
     "session_expired": "Your session has expired. Reload the page and log in again.",
     "server_unavailable": "The server is not responding. Wait a moment and try again.",
     "unexpected": "Something went wrong. Try again; if it happens again, tell your manager.",
+    "print_draw": "The ticket could not be prepared for the printer. Try again.",
     "load_app": "The till could not load. Reload the page.",
     "load_profile": "The till settings could not load. Reload the page.",
     "load_menu": "The menu could not load. Reload the page.",
