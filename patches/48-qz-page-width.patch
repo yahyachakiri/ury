@@ -1,0 +1,18 @@
+diff --git a/packages/core/src/print/qz.ts b/packages/core/src/print/qz.ts
+index 423be112..65d3909a 100644
+--- a/packages/core/src/print/qz.ts
++++ b/packages/core/src/print/qz.ts
+@@ -58,8 +58,11 @@ export async function printWithQz(host: string, htmlToPrint: string, printerName
+     // find(name) resolves the first installed printer whose name contains it
+     // (so use the full name) and rejects when none matches.
+     const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
+-    const data = [{ type: 'html', format: 'plain', data: htmlToPrint }];
+-    const config = qz.configs.create(printer);
++    // Patch 48: lay the HTML out 96 mm wide, then scaleContent shrinks it to the
++    // paper. At the paper width (QZ default) the 68 mm bill printed zoomed and cut
++    // (owner test 2026-11-05); assumption: QZ sizes the page in points, the HTML in CSS px.
++    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 96 } }];
++    const config = qz.configs.create(printer, { units: 'mm' });
+     await qz.print(config, data as any);
+   };
+ 
