@@ -239,6 +239,7 @@
         "select_group": "حدد المجموعة",
         "select_territory": "حدد المنطقة",
         "adding": "جاري إضافة العميل...",
+        "back_to_default": "الرجوع إلى {{name}}",
         "add_button": "إضافة العميل",
         "failed_create": "فشل في إنشاء العميل. يرجى المحاولة مرة أخرى."
     },

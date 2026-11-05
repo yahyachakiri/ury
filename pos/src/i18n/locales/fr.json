@@ -232,6 +232,7 @@
     "select_group": "Sélectionner un groupe",
     "select_territory": "Sélectionner un territoire",
     "adding": "Ajout du client...",
+    "back_to_default": "Revenir à {{name}}",
     "add_button": "Ajouter le client",
     "failed_create": "Échec de la création du client. Veuillez réessayer."
   },

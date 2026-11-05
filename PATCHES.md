@@ -1944,7 +1944,7 @@ form's box, the card window and the print triggers.
 
 Risk profile: medium. PaymentDialog.tsx is also changed by Patches 07, 09, 19/23 and 45,
 and this patch changes payment amounts when points are used. CustomerPicker.tsx is also
-changed by Patches 04, 17 and 46, was refactored upstream shortly before the pin, and is used
+changed by Patch 46 (git log since the pin), was refactored upstream shortly before the pin, and is used
 by the order panel, BillSplitDialog and the waiter app (CustomerSelect), so the loyalty box
 and the card window appear in all three. A document keydown listener
 could swallow an Enter: it only does for a `LOY...` burst typed at scanner speed. The next
@@ -2039,6 +2039,49 @@ Manual test (test-dev, till PC with QZ Tray and the SPRT printer):
 5. Reprint the kitchen ticket from Orders; cancel the test order.
 
 Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5.
+
+### Patch 49 — One tap back to the default customer
+
+Owner request (2026-11-05, ticket 39): after a loyalty scan (Patch 47), or any customer picked
+by mistake, going back to the counter customer meant "Modifier" then typing "Client" in the
+search, which opens the on-screen keyboard on the touch-screen tills.
+
+Files touched: `pos/src/components/CustomerPicker.tsx` (customer card only), locales
+(`customer.back_to_default`).
+
+What it does: the customer card shows a second button, a circular arrow with the default
+customer's name, next to "Modifier", when the POS Profile has a default customer (Patch 04,
+`posProfile.customer`) and the order's customer is another one. One tap sets that default
+customer, built the same way as Patch 04's `getDefaultCustomer` (id and name = the POS
+Profile's customer). Same `disabled` lock as "Modifier": a sent order keeps its customer.
+Delivery-platform orders show the platform picker instead of the card (CustomerSelect), so
+the button never appears there.
+
+Why it can't be done in `erp_restaurant`: the customer card and the order's customer are in
+the POS React state; there is no server or configuration point.
+
+Risk profile: low. A few lines in the card's markup (and `min-w-0` on the name, so a long
+name wraps instead of squeezing the buttons); CustomerPicker.tsx is also changed by Patches
+46 and 47 (git log since the pin). The card is also used by BillSplitDialog and the
+waiter app, where the button behaves the same.
+
+Acceptance criteria:
+1. Loyalty customer set by a scan: the button "Client comptoir" (the till's default customer)
+   is next to "Modifier"; one tap sets Client comptoir, with no keyboard.
+2. Customer already the default: no button.
+3. Order already sent to the kitchen (customer locked): the button is disabled like "Modifier".
+4. Arabic: arrow mirrored, label read right to left; English and French labels.
+5. Touch screen: the button is easy to hit (40 px high).
+
+Manual test (test-dev, touch-screen till):
+1. Hard-refresh /pos. New takeaway order: the card shows Client comptoir and no extra button.
+2. Scan a loyalty card (or pick a customer): the button appears; tap it: Client comptoir is
+   back, no keyboard opens.
+3. Pick the customer again, add an item, send the order, reopen it from Orders: both buttons
+   disabled.
+4. Arabic once; the waiter app and the bill-split window once (same button).
+
+Patch file: `patches/49-back-to-default-customer.patch`. Commit: not committed yet.
 
 ## Build and deploy
 

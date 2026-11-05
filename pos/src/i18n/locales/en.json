@@ -232,6 +232,7 @@
     "select_group": "Select group",
     "select_territory": "Select territory",
     "adding": "Adding Customer...",
+    "back_to_default": "Back to {{name}}",
     "add_button": "Add Customer",
     "failed_create": "Failed to create customer. Please try again."
   },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { parseFrappeError } from '@ury/core';
-import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
+import { UserPlus, Phone, Loader, ChevronDown, RotateCcw } from 'lucide-react';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
@@ -188,6 +188,9 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
   const [prefillName, setPrefillName] = useState('');
   const [prefillPhone, setPrefillPhone] = useState('');
   const [cardFor, setCardFor] = useState<string | null>(null);
+  // Patch 49: one tap back to the till's default customer (POS Profile customer, Patch 04), so a
+  // customer set by a loyalty scan or by mistake is undone without the on-screen keyboard.
+  const defaultCustomer = usePOSStore((s) => s.posProfile?.customer) || null;
 
   useEffect(() => {
     if (!isOpen || !searchTerm.trim()) {
@@ -247,19 +250,35 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
     <div className="relative">
       {value ? (
         <div className="flex items-center justify-between rounded-lg bg-blue-50 p-3">
-          <div>
+          <div className="min-w-0">
             <p className="font-medium text-blue-900">{value.name}</p>
             <p className="text-sm text-blue-700">{value.phone}</p>
           </div>
-          <Button
-            onClick={() => onChange(null)}
-            disabled={disabled}
-            variant="ghost"
-            size="sm"
-            className="text-blue-700 hover:text-blue-800"
-          >
-            {t('common.change')}
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {defaultCustomer && value.id !== defaultCustomer && (
+              <Button
+                onClick={() => onChange({ id: defaultCustomer, name: defaultCustomer, phone: '' })}
+                disabled={disabled}
+                variant="outline"
+                size="sm"
+                className="h-10 border-blue-200 bg-white px-3 text-blue-700 hover:text-blue-800"
+                aria-label={t('customer.back_to_default', { name: defaultCustomer })}
+                title={t('customer.back_to_default', { name: defaultCustomer })}
+              >
+                <RotateCcw className="h-4 w-4 rtl:-scale-x-100" />
+                <span className="ms-1">{defaultCustomer}</span>
+              </Button>
+            )}
+            <Button
+              onClick={() => onChange(null)}
+              disabled={disabled}
+              variant="ghost"
+              size="sm"
+              className="text-blue-700 hover:text-blue-800"
+            >
+              {t('common.change')}
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="relative">
