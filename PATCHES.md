@@ -2277,7 +2277,7 @@ Manual test (test-dev): after deploy and clear-cache, open each page in a new ta
 French user and read the tab title; switch the user's language to Arabic (and English),
 reload /pos and /ury; open /order from the "Commande par QR" page in a private window.
 
-Patch file: `patches/52-reflowgo-tab-titles.patch`. Commit: not committed yet.
+Patch file: `patches/52-reflowgo-tab-titles.patch`. Commit: b55edd89.
 
 ## Build and deploy
 
