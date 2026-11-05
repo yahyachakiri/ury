@@ -1,5 +1,5 @@
 diff --git a/packages/core/src/print/qz.ts b/packages/core/src/print/qz.ts
-index 423be112..65d3909a 100644
+index 423be112..946cbaf9 100644
 --- a/packages/core/src/print/qz.ts
 +++ b/packages/core/src/print/qz.ts
 @@ -58,8 +58,11 @@ export async function printWithQz(host: string, htmlToPrint: string, printerName
@@ -8,10 +8,10 @@ index 423be112..65d3909a 100644
      const printer = wanted ? ((await qz.printers.find(wanted)) as string) : await qz.printers.getDefault();
 -    const data = [{ type: 'html', format: 'plain', data: htmlToPrint }];
 -    const config = qz.configs.create(printer);
-+    // Patch 48: lay the HTML out 96 mm wide, then scaleContent shrinks it to the
-+    // paper. At the paper width (QZ default) the 68 mm bill printed zoomed and cut
-+    // (owner test 2026-11-05); assumption: QZ sizes the page in points, the HTML in CSS px.
-+    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 96 } }];
++    // Patch 48: lay the HTML out 250 mm wide, then scaleContent shrinks it to the
++    // paper. At the paper width (QZ default) the 68 mm bill printed about 3x zoomed and
++    // cut; 96 mm only gained a third (owner tests 2026-11-05, SPRT 80 mm, 203 dpi).
++    const data = [{ type: 'html', format: 'plain', data: htmlToPrint, options: { pageWidth: 250 } }];
 +    const config = qz.configs.create(printer, { units: 'mm' });
      await qz.print(config, data as any);
    };

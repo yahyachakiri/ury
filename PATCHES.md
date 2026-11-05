@@ -1959,14 +1959,16 @@ Patch file: `patches/47-loyalty-scan-and-points.patch`. Commit: 92ea2b5d.
 Fix (ticket 04, owner printer test 2026-11-05, SPRT POS8811 80 mm on Windows, driver paper
 72 x 297 mm, 203 dpi). After a driver reinstall the bill printed zoomed, only about half
 of it on the paper. QZ Tray got no page settings from the POS, so it laid the HTML out at
-the paper width (its default). Hypothesis, to confirm on the printer: QZ sizes that page in
-points (72 per inch) while the HTML is laid out in CSS px (96 per inch), so the 68 mm bill
-overflowed a page about 54 mm wide and the right part was cut before scaling.
+the paper width (its default), and the 68 mm bill printed about 3x zoomed with its right
+part cut. Why the factor is that large is Unknown (driver resolution 203 dpi is a
+suspect); the value below is measured, not derived. A first try at 96 mm (0f65e85b)
+showed a third more of the line, so QZ reads `pageWidth` in mm and the print scales in
+proportion; 250 mm comes from measuring that print against a correct one.
 
 Files touched: `packages/core/src/print/qz.ts` (`printWithQz` config and data options only)
 
-What it does: every QZ Tray print (bill and kitchen tickets, Patch 10) is laid out 96 mm
-wide (`pageWidth: 96`, units mm), and QZ's default `scaleContent` shrinks it to the paper.
+What it does: every QZ Tray print (bill and kitchen tickets, Patch 10) is laid out 250 mm
+wide (`pageWidth: 250`, units mm), and QZ's default `scaleContent` shrinks it to the paper.
 erp_restaurant's "Restaurant Receipt" and "Kitchen Ticket" are 68 mm wide, left aligned
 (erp_restaurant f2f04a1). Margins stay QZ's default (0).
 
@@ -1975,9 +1977,9 @@ browser by the shared `@ury/core` print transport; erp_restaurant only supplies 
 and QZ's HTML renderer ignores CSS `@page`.
 
 Risk profile: low to medium. Two lines; every QZ print in pos changes size, kitchen tickets
-included (frontend does not print). Whether QZ reads `pageWidth` in the config units is
-not documented in qz-tray 2.3.0: if the bill comes out tiny or still cut, adjust the value.
-Re-test any other printer model.
+included (frontend does not print). Calibrated on one printer and driver (SPRT POS8811, the
+standard model): too small = lower the value, cut on the right = raise it, in proportion.
+Re-test any other printer model or driver.
 
 Acceptance criteria:
 1. SPRT 80 mm printer: a bill prints whole width ("8.00 DH" and the full IF number), text
@@ -1992,7 +1994,7 @@ Manual test (test-dev, till PC with QZ Tray and the SPRT printer):
 4. Check criteria 1 and 2 on paper; photo if anything is cut or too small.
 5. Reprint the kitchen ticket from Orders; cancel the test order.
 
-Patch file: `patches/48-qz-page-width.patch`. Commit: 0f65e85b.
+Patch file: `patches/48-qz-page-width.patch`. Commits: 0f65e85b, 15d93fd5.
 
 ## Build and deploy
 
