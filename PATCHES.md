@@ -2453,7 +2453,7 @@ INV-00053. INV-00051 (first deploy) cancelled. Not checked: 5 (amount remise), 9
 system keyboard), 10 (merged bill), 11 (loyalty), Arabic and English on the server (Arabic seen
 only in the local render), round-to-half till.
 
-Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: 50d83ec9.
+Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: 50d83ec9, cash field without bill breakdown: 8eb9f426.
 
 ### Patch 55 — QZ Tray not running: translated message
 
