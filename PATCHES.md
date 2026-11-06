@@ -2490,7 +2490,7 @@ orders.
 
 Build: `tsc --noEmit` and `vite build` (scratch folder) passed locally.
 
-Patch file: `patches/55-qz-not-running-message.patch`. Commit: not committed yet.
+Patch file: `patches/55-qz-not-running-message.patch`. Commit: 12b0a084.
 
 ## Build and deploy
 
