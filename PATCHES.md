@@ -2443,7 +2443,7 @@ Not run: payment on a server, criterion 5 payload, 9 to 12, English, round-to-ha
 fork-patch-guardian review 2026-11-06: Pay-with-keypad-open bug fixed, superseded notes added
 to Patches 07, 19 and 23.
 
-Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: not committed yet.
+Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: 50d83ec9.
 
 ## Build and deploy
 
