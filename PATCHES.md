@@ -2442,6 +2442,14 @@ at 1024×768 with mocked data (no server): criteria 1 to 4, 6, 7 and Arabic seen
 Not run: payment on a server, criterion 5 payload, 9 to 12, English, round-to-half.
 fork-patch-guardian review 2026-11-06: Pay-with-keypad-open bug fixed, superseded notes added
 to Patches 07, 19 and 23.
+Browser check 2026-11-06 (test-dev, Claude in Chrome, desktop browser at about 1568×741, French,
+till cash method "Espèces"; first deploy showed no bills, fixed by the cash-method lookup):
+criteria 1, 2, 3, 4 (10 %: total 61.2, cash still 100, À rendre 38.8), 6, 7, 8 and 12 passed.
+Paid INV-00052: POS Invoice saved with additional_discount_percentage 10, discount 6.8, grand
+total 61.2, payment Espèces 100, change 38.8 (the dialog's figures); refunded from /admin as
+INV-00053. INV-00051 (first deploy) cancelled. Not checked: 5 (amount remise), 9 (touch device,
+system keyboard), 10 (merged bill), 11 (loyalty), Arabic and English on the server (Arabic seen
+only in the local render), round-to-half till.
 
 Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: 50d83ec9.
 
