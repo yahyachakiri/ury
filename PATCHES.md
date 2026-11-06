@@ -2338,6 +2338,11 @@ Manual test (test-dev, PC with QZ Tray, Bill Printer set to the printer's IP):
    criterion 6.
 6. Repeat step 1's message check in Arabic and English. Cancel or refund the test orders.
 
+Browser check 2026-11-05 (test-dev, Claude): criterion 3 passed (INV-00049). Owner test
+2026-11-05 (test-dev): criterion 1 passed (print fails, then Payment opens). Not checked yet:
+criteria 2, 4 to 7. Known gap: a QZ print that never ends (waiting on QZ Tray's Allow prompt)
+keeps Payment blocked; Patch 53 only acts once the print fails.
+
 Patch file: `patches/53-pay-after-failed-print.patch`. Commit: 58994fbd.
 
 ## Build and deploy
