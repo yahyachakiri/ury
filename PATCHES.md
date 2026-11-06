@@ -2551,7 +2551,7 @@ printer, a phone for /order).
 Build: `self-order` is not built by the deploy script: `cd apps/ury/self-order && yarn build`
 on the server after this patch (as Patch 24).
 
-Patch file: `patches/56-qr-orders-validated-at-counter.patch`.
+Patch file: `patches/56-qr-orders-validated-at-counter.patch`. Commit: e167b246.
 
 ## Build and deploy
 
