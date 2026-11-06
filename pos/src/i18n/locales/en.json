@@ -318,6 +318,7 @@
     "unexpected": "Something went wrong. Try again; if it happens again, tell your manager.",
     "print_draw": "The ticket could not be prepared for the printer. Try again.",
     "printer_unreachable": "The printer does not answer. Check that it is on and connected to the network, then print again.",
+    "qz_not_running": "QZ Tray is not running on this device, start it and print again",
     "load_app": "The till could not load. Reload the page.",
     "load_profile": "The till settings could not load. Reload the page.",
     "load_menu": "The menu could not load. Reload the page.",

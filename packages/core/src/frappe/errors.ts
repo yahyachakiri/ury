@@ -22,6 +22,7 @@ export interface ErrorMessages {
   unexpected: string;
   printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
   printerUnreachable: string; // Patch 51: a network printer (IP address) does not answer
+  qzNotRunning: string; // Patch 55: QZ Tray is not running (or closed) on this device
 }
 
 const errorMessages: ErrorMessages = {
@@ -32,6 +33,7 @@ const errorMessages: ErrorMessages = {
   unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
   printDraw: 'The ticket could not be prepared for the printer. Try again.',
   printerUnreachable: 'The printer does not answer. Check that it is on and connected to the network, then print again.',
+  qzNotRunning: 'QZ Tray is not running on this device, start it and print again', // no final period: shown inside other messages
 };
 
 export function setErrorMessages(messages: Partial<ErrorMessages>): void {

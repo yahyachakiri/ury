@@ -2453,6 +2453,45 @@ only in the local render), round-to-half till.
 
 Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: 50d83ec9.
 
+### Patch 55 — QZ Tray not running: translated message
+
+Fix (owner report 2026-11-06): with QZ Tray closed, the bill print toast read "Addition non
+imprimée : Unable to establish connection with QZ Tray. Vous pouvez quand même encaisser."
+(QZ Tray's own English text inside Patch 53's message).
+
+Files touched: `packages/core/src/print/qz.ts` (`qzError`, used by `loadQzPrinter` and
+`printOne`), `packages/core/src/frappe/errors.ts` (`qzNotRunning`, on top of Patches 46, 50,
+51), `pos/src/main.tsx`, `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json`
+(`errors.qz_not_running`)
+
+What it does: QZ Tray's errors "Unable to establish connection with QZ Tray", "A connection to
+QZ Tray has not been established yet" and "Connection closed before response received" (QZ
+Tray quit during a print) become "QZ Tray n'est pas lancé sur cet appareil, démarrez-le puis
+réimprimez" in the till's language, in every message that shows a print failure (bill,
+kitchen ticket, receipt, loyalty card). No final period: the text sits inside other messages.
+Other QZ errors still show as QZ sends them (e.g. "Connection attempt denied by Local Network
+Access restrictions", a Chrome permission).
+
+Why it can't be done in `erp_restaurant`: the error comes from the QZ Tray websocket in the
+browser (`@ury/core` print transport); the server never sees it.
+
+Risk profile: low. Message mapping only; print and payment flow unchanged.
+
+Acceptance criteria:
+1. QZ Tray closed, Print on an order in Orders: "Addition non imprimée : QZ Tray n'est pas
+   lancé sur cet appareil, démarrez-le puis réimprimez. Vous pouvez quand même encaisser."
+2. Same in Arabic (RTL) and English.
+3. QZ Tray running: prints as before.
+
+Manual test (test-dev, PC or Mac with QZ Tray): close QZ Tray, open /pos in a new tab, take a
+takeaway order with a `Test ...` item, Print in Orders: criterion 1. Switch the user to Arabic
+and English and repeat: criterion 2. Start QZ Tray, Print again: criterion 3. Cancel the test
+orders.
+
+Build: `tsc --noEmit` and `vite build` (scratch folder) passed locally.
+
+Patch file: `patches/55-qz-not-running-message.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

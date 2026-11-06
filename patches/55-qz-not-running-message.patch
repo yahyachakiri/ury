@@ -1,0 +1,109 @@
+diff --git a/packages/core/src/frappe/errors.ts b/packages/core/src/frappe/errors.ts
+index eec4d222..feafb2b2 100644
+--- a/packages/core/src/frappe/errors.ts
++++ b/packages/core/src/frappe/errors.ts
+@@ -22,6 +22,7 @@ export interface ErrorMessages {
+   unexpected: string;
+   printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
+   printerUnreachable: string; // Patch 51: a network printer (IP address) does not answer
++  qzNotRunning: string; // Patch 55: QZ Tray is not running (or closed) on this device
+ }
+ 
+ const errorMessages: ErrorMessages = {
+@@ -32,6 +33,7 @@ const errorMessages: ErrorMessages = {
+   unexpected: 'Something went wrong. Try again; if it happens again, tell your manager.',
+   printDraw: 'The ticket could not be prepared for the printer. Try again.',
+   printerUnreachable: 'The printer does not answer. Check that it is on and connected to the network, then print again.',
++  qzNotRunning: 'QZ Tray is not running on this device, start it and print again', // no final period: shown inside other messages
+ };
+ 
+ export function setErrorMessages(messages: Partial<ErrorMessages>): void {
+diff --git a/packages/core/src/print/qz.ts b/packages/core/src/print/qz.ts
+index a0b3210d..d8fbc753 100644
+--- a/packages/core/src/print/qz.ts
++++ b/packages/core/src/print/qz.ts
+@@ -31,6 +31,14 @@ function setQzSecurity(): void {
+   });
+ }
+ 
++// Patch 55: QZ Tray's own errors when it is not running or quits during a print, shown to the
++// cashier in English before; they become the till's translated message.
++const QZ_NOT_RUNNING = /Unable to establish connection with QZ|connection to QZ Tray has not been established|Connection closed before response received/i;
++
++function qzError(err: unknown): unknown {
++  return QZ_NOT_RUNNING.test(String((err as Error)?.message ?? err)) ? new Error(errorMessage('qzNotRunning')) : err;
++}
++
+ export async function loadQzPrinter(host: string): Promise<void> {
+   setQzSecurity();
+   if (!qz.websocket.isActive()) {
+@@ -41,7 +49,11 @@ export async function loadQzPrinter(host: string): Promise<void> {
+         connecting = null;
+       });
+     }
+-    await connecting;
++    try {
++      await connecting;
++    } catch (err) {
++      throw qzError(err); // Patch 55
++    }
+   }
+ }
+ 
+@@ -91,7 +103,7 @@ async function printOne(host: string, htmlToPrint: string, printerName?: string
+       if (network && UNREACHABLE.test(String((err as Error)?.message ?? err))) {
+         throw new Error(errorMessage('printerUnreachable'));
+       }
+-      throw err;
++      throw qzError(err); // Patch 55
+     }
+   };
+ 
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 1562023e..79b69832 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -325,6 +325,7 @@
+         "unexpected": "حدث خطأ. أعد المحاولة؛ وإذا تكرر ذلك، أخبر المسؤول.",
+         "print_draw": "تعذر تجهيز التذكرة للطابعة. أعد المحاولة.",
+         "printer_unreachable": "الطابعة لا تستجيب. تحقق من أنها مشغلة ومتصلة بالشبكة، ثم أعد الطباعة.",
++        "qz_not_running": "برنامج QZ Tray غير مشغل على هذا الجهاز، شغّله ثم أعد الطباعة",
+         "load_app": "تعذر تحميل الصندوق. أعد تحميل الصفحة.",
+         "load_profile": "تعذر تحميل إعدادات الصندوق. أعد تحميل الصفحة.",
+         "load_menu": "تعذر تحميل القائمة. أعد تحميل الصفحة.",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index ccb3ebd5..ecbeee93 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -318,6 +318,7 @@
+     "unexpected": "Something went wrong. Try again; if it happens again, tell your manager.",
+     "print_draw": "The ticket could not be prepared for the printer. Try again.",
+     "printer_unreachable": "The printer does not answer. Check that it is on and connected to the network, then print again.",
++    "qz_not_running": "QZ Tray is not running on this device, start it and print again",
+     "load_app": "The till could not load. Reload the page.",
+     "load_profile": "The till settings could not load. Reload the page.",
+     "load_menu": "The menu could not load. Reload the page.",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 48708c8e..9fa66d6a 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -318,6 +318,7 @@
+     "unexpected": "Une erreur est survenue. Réessayez ; si cela se reproduit, prévenez votre responsable.",
+     "print_draw": "Le ticket n'a pas pu être préparé pour l'imprimante. Réessayez.",
+     "printer_unreachable": "L'imprimante ne répond pas. Vérifiez qu'elle est allumée et branchée au réseau, puis relancez l'impression.",
++    "qz_not_running": "QZ Tray n'est pas lancé sur cet appareil, démarrez-le puis réimprimez",
+     "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
+     "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
+     "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",
+diff --git a/pos/src/main.tsx b/pos/src/main.tsx
+index 628373bf..251f4a46 100644
+--- a/pos/src/main.tsx
++++ b/pos/src/main.tsx
+@@ -17,6 +17,7 @@ initI18n().then(() => {
+     unexpected: t('errors.unexpected'),
+     printDraw: t('errors.print_draw'), // Patch 50
+     printerUnreachable: t('errors.printer_unreachable'), // Patch 51
++    qzNotRunning: t('errors.qz_not_running'), // Patch 55
+   })
+   createRoot(document.getElementById('root')!).render(
+     <StrictMode>

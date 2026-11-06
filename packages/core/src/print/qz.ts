@@ -31,6 +31,14 @@ function setQzSecurity(): void {
   });
 }
 
+// Patch 55: QZ Tray's own errors when it is not running or quits during a print, shown to the
+// cashier in English before; they become the till's translated message.
+const QZ_NOT_RUNNING = /Unable to establish connection with QZ|connection to QZ Tray has not been established|Connection closed before response received/i;
+
+function qzError(err: unknown): unknown {
+  return QZ_NOT_RUNNING.test(String((err as Error)?.message ?? err)) ? new Error(errorMessage('qzNotRunning')) : err;
+}
+
 export async function loadQzPrinter(host: string): Promise<void> {
   setQzSecurity();
   if (!qz.websocket.isActive()) {
@@ -41,7 +49,11 @@ export async function loadQzPrinter(host: string): Promise<void> {
         connecting = null;
       });
     }
-    await connecting;
+    try {
+      await connecting;
+    } catch (err) {
+      throw qzError(err); // Patch 55
+    }
   }
 }
 
@@ -91,7 +103,7 @@ async function printOne(host: string, htmlToPrint: string, printerName?: string 
       if (network && UNREACHABLE.test(String((err as Error)?.message ?? err))) {
         throw new Error(errorMessage('printerUnreachable'));
       }
-      throw err;
+      throw qzError(err); // Patch 55
     }
   };
 
