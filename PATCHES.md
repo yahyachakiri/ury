@@ -446,7 +446,9 @@ Files touched:
   ("Reprint kitchen ticket" action; auto print after a successful
   `cancel_order`, ticket 37)
 - `pos/src/components/SelfOrderListener.tsx` (after Valider on a QR table order) and
-  `pos/src/components/PaymentDialog.tsx` (after paying a QR pickup order): ticket 40, Patch 56
+  `pos/src/components/PaymentDialog.tsx` (after paying a QR pickup order), `pos/src/pages/Orders.tsx`
+  and `pos/src/lib/print.ts` (`printQrPickupKitchenTicket`, after printing a QR pickup order's
+  bill): ticket 40, Patch 56
 - `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`kitchen.*` keys)
 
 What it does: URY creates URY KOTs in `sync_order` (`kot_execute`: new
@@ -2509,6 +2511,8 @@ Ticket 40 (owner request 2026-11-06, choice B). Works with erp_restaurant `qr_va
 
 Files touched: `pos/src/components/SelfOrderListener.tsx` (Patch 43),
 `pos/src/components/PaymentDialog.tsx` (on top of Patches 07, 09, 45, 47, 54),
+`pos/src/pages/Orders.tsx` (`handlePrintOrder`, on top of Patches 10, 53), `pos/src/lib/print.ts`
+(Patch 10), `pos/src/App.tsx` (`OpenOrderBridge` inside the Router),
 `pos/src/i18n/locales/{en,fr,ar}.json` (`self_order.*`), `self-order/src/lib/api.ts`,
 `self-order/src/hooks/useOrderingSession.ts`, `self-order/src/layouts/MobileQRLayout.tsx`,
 `self-order/src/i18n.tsx` (Patch 24)
@@ -2524,11 +2528,26 @@ What it does:
    close button (it is the only place the request shows). The waiter app (/pos/order and
    /pos/order/table/...; not /pos/orders) shows it without buttons, and the server refuses
    Valider / Refuser without a cashier or manager role.
-2. A QR pickup order's toast says "à encaisser avant la cuisine". Its kitchen ticket is made
-   by the payment; when `make_invoice` answers `kitchen_tickets`, the payment dialog prints
-   it (auto print on). If the server could not create it (`kitchen_ticket_failed`; the payment
-   is saved), the cashier sees "Paiement enregistré, mais le ticket cuisine n'a pas pu être
-   créé. Prévenez la cuisine". Other orders: `make_invoice` answers nothing, nothing more prints.
+2. A QR pickup order's toast says "touchez pour l'ouvrir, l'impression du ticket l'envoie en cuisine" (waiter
+   app: "à encaisser avant la cuisine"). On the till, tapping a QR order toast (kind `order`;
+   not the bill-request toast) opens Orders with that order selected (`OpenOrderBridge`, the
+   listener sits outside the Router; same steps as Patch 08). While a dialog is open (payment,
+   cancel...) a tap does nothing and the toast stays, so an open payment never switches order.
+   An order beyond the Draft list's first page opens Orders with nothing selected (accepted). The print button next to Payment prints the bill, then calls erp_restaurant
+   `release_held_kitchen_ticket` (owner 2026-11-06): the held kitchen ticket is created and,
+   auto print on, every kitchen ticket of that QR pickup order not printed yet is printed. A
+   failed kitchen print says "Appuyez à nouveau sur Imprimer avant d'encaisser": the next Print prints the bill
+   and the still unprinted kitchen ticket (no "Réimprimer le ticket cuisine" needed). Other
+   orders: one server read, nothing more prints. One kitchen print per order at a time (a
+   double tap on Print prints it once). At payment the server re-reads the hold under a row
+   lock, so paying right after Print never makes a second ticket. A server error (network, or
+   erp_restaurant not deployed yet) shows one translated line. QR table orders are unchanged
+   (Valider prints).
+   Fallback, an order paid without printing it in Orders: the kitchen ticket is made by the
+   payment; when `make_invoice` answers `kitchen_tickets`, the payment dialog prints it (auto
+   print on). If the server could not create it (`kitchen_ticket_failed`; the payment is
+   saved), the cashier sees "Paiement enregistré, mais le ticket cuisine n'a pas pu être créé.
+   Prévenez la cuisine". Other orders: `make_invoice` answers nothing, nothing more prints.
 3. Customer app (/order, mobile layout): the latest three requests with "En attente de
    validation au comptoir", "Validée par le comptoir" or "Refusée par le comptoir : <raison>";
    checks for the answer every 8 s while one waits. Pickup: "Payez au comptoir pour lancer la
@@ -2541,7 +2560,11 @@ through QZ Tray after a payment, and only the customer app can show the waiting 
 it a customer would see the order vanish and send it again).
 
 Risk profile: medium. The payment dialog reads `make_invoice`'s answer (was ignored); the
-listener calls three new erp_restaurant methods. No store change.
+listener calls three new erp_restaurant methods; every bill print in Orders makes one more
+server call (after the print, not blocking it). No store change (the bridge uses the existing
+`setSelectedStatus` / `selectOrder`). Conflicts on a URY bump: `Orders.tsx` `handlePrintOrder`
+(on top of Patches 10 and 53) and the route list in `App.tsx` (often edited upstream). Deploy
+erp_restaurant before the POS build (the Print call needs `release_held_kitchen_ticket`).
 
 Acceptance criteria: ticket 40 (tasks/40-qr-orders-validated-at-counter.md), criteria 1 to 8.
 

@@ -591,7 +591,9 @@
     "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes.",
     "qz_host_missing": "L'hôte QZ n'est pas défini sur le profil PDV",
     "qz_disabled": "L'impression QZ n'est pas activée sur le profil PDV",
-    "not_created_on_payment": "Paiement enregistré, mais le ticket cuisine n'a pas pu être créé. Prévenez la cuisine pour cette commande."
+    "not_created_on_payment": "Paiement enregistré, mais le ticket cuisine n'a pas pu être créé. Prévenez la cuisine pour cette commande.",
+    "not_created_on_print": "Le ticket cuisine n'a pas pu être créé. Appuyez à nouveau sur Imprimer, ou prévenez la cuisine pour cette commande.",
+    "qr_print_failed": "Ticket cuisine non imprimé : {{reason}}. Appuyez à nouveau sur Imprimer avant d'encaisser."
   },
   "captain": {
     "load_context_failed": "Impossible de charger l'écran capitaine",
@@ -663,6 +665,7 @@
     "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
     "bill_requested": "{{table}} demande l'addition (n° {{number}})",
     "new_order_pickup_pay_first": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : à encaisser avant la cuisine",
+    "new_order_pickup_open": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : touchez pour l'ouvrir, l'impression du ticket l'envoie en cuisine",
     "request_title": "Commande QR à valider : {{table}}, {{qty}} article(s)",
     "accept": "Valider",
     "refuse": "Refuser",

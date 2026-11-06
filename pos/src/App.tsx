@@ -9,7 +9,7 @@ import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import KotAlertListener from './components/KotAlertListener';
-import SelfOrderListener from './components/SelfOrderListener';
+import SelfOrderListener, { OpenOrderBridge } from './components/SelfOrderListener';
 import LoyaltyScanListener from './components/LoyaltyScanListener';
 import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
 import CaptainTables from './captain/pages/CaptainTables';
@@ -44,6 +44,8 @@ function App() {
         <AuthGuard>
           <POSOpeningProvider>
             <Router basename="/pos">
+              {/* Patch 56: a tap on a QR order toast opens it in Orders. */}
+              <OpenOrderBridge />
               <Routes>
                 <Route element={<AppLayout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />

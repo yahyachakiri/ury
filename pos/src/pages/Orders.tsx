@@ -16,7 +16,7 @@ import BillMergeDialog from '../components/BillMergeDialog';
 import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
-import { printKitchenTickets, printOrder } from '../lib/print';
+import { printKitchenTickets, printOrder, printQrPickupKitchenTicket } from '../lib/print';
 import { call } from '@ury/core';
 import { splitBill } from '../lib/order-api';
 import {
@@ -340,6 +340,10 @@ export default function Orders() {
       setIsPrinting(false);
     }
     if (!printed) return;
+    // Patch 56: a QR pickup order's kitchen ticket goes out with its bill.
+    printQrPickupKitchenTicket({ invoice: selectedOrder.name, posProfile: posStore.posProfile }).catch((err) => {
+      showToast.error(err instanceof Error ? err.message : String(err));
+    });
     // Locally update selectedOrder.invoice_printed to 1
     if (selectedOrder && typeof selectedOrder === 'object') {
       selectOrder({ ...selectedOrder, invoice_printed: 1 });

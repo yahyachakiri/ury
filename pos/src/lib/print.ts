@@ -1,4 +1,4 @@
-import { call, printWithQz } from '@ury/core';
+import { call, parseFrappeError, printWithQz } from '@ury/core';
 import {
   getInvoicePrintHtml,
   printLanguage,
@@ -97,4 +97,40 @@ export async function printKitchenTickets({
     }
   }
   return tickets.length;
+}
+
+// Patch 56 (ticket 40): a QR pickup order's kitchen ticket goes out with its bill (owner
+// 2026-11-06). The server creates the held ticket and says whether this is a QR pickup order;
+// any kitchen ticket of it not printed yet is printed, so pressing Print again retries a failed
+// kitchen print (no Reprint needed). Other orders: one server read, nothing printed.
+// One kitchen print per order at a time: a second tap on Print while QZ is still printing would
+// find the same ticket not marked printed yet and print it twice.
+const qrKitchenPrinting = new Set<string>();
+
+export async function printQrPickupKitchenTicket({
+  invoice,
+  posProfile,
+}: {
+  invoice: string;
+  posProfile: PosProfileCombined;
+}): Promise<void> {
+  let res: { message?: { qr_pickup?: number; kitchen_ticket_failed?: number } };
+  try {
+    res = await call.post('erp_restaurant.erp_restaurant.qr_validation.release_held_kitchen_ticket', { invoice });
+  } catch (err) {
+    // Network, or the server without this method yet: one translated line, never a raw error.
+    throw new Error(t('kitchen.qr_print_failed', { reason: parseFrappeError(err, t('errors.network')) }));
+  }
+  const answer = res?.message;
+  if (!answer?.qr_pickup) return;
+  if (answer.kitchen_ticket_failed) throw new Error(t('kitchen.not_created_on_print'));
+  if (!posProfile.custom_auto_print_kitchen_ticket || qrKitchenPrinting.has(invoice)) return;
+  qrKitchenPrinting.add(invoice);
+  try {
+    await printKitchenTickets({ invoice, posProfile });
+  } catch (err) {
+    throw new Error(t('kitchen.qr_print_failed', { reason: err instanceof Error ? err.message : String(err) }));
+  } finally {
+    qrKitchenPrinting.delete(invoice);
+  }
 }

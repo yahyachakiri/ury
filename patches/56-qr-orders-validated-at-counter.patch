@@ -1,3 +1,25 @@
+diff --git a/pos/src/App.tsx b/pos/src/App.tsx
+index 1c4e6b6e..d610e0ca 100644
+--- a/pos/src/App.tsx
++++ b/pos/src/App.tsx
+@@ -9,7 +9,7 @@ import AuthGuard from './components/AuthGuard';
+ import POSOpeningProvider from './components/POSOpeningProvider';
+ import ScreenSizeProvider from './components/ScreenSizeProvider';
+ import KotAlertListener from './components/KotAlertListener';
+-import SelfOrderListener from './components/SelfOrderListener';
++import SelfOrderListener, { OpenOrderBridge } from './components/SelfOrderListener';
+ import LoyaltyScanListener from './components/LoyaltyScanListener';
+ import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
+ import CaptainTables from './captain/pages/CaptainTables';
+@@ -44,6 +44,8 @@ function App() {
+         <AuthGuard>
+           <POSOpeningProvider>
+             <Router basename="/pos">
++              {/* Patch 56: a tap on a QR order toast opens it in Orders. */}
++              <OpenOrderBridge />
+               <Routes>
+                 <Route element={<AppLayout />}>
+                   <Route index element={<Navigate to="/dashboard" replace />} />
 diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
 index ef464f7c..5aa9e328 100644
 --- a/pos/src/components/PaymentDialog.tsx
@@ -38,12 +60,13 @@ index ef464f7c..5aa9e328 100644
        clearSelectedOrder();
        await fetchOrders();
 diff --git a/pos/src/components/SelfOrderListener.tsx b/pos/src/components/SelfOrderListener.tsx
-index 975e27ca..4b93f313 100644
+index 975e27ca..35c55c4e 100644
 --- a/pos/src/components/SelfOrderListener.tsx
 +++ b/pos/src/components/SelfOrderListener.tsx
-@@ -1,7 +1,10 @@
+@@ -1,7 +1,11 @@
 -import { useEffect } from 'react';
 +import { useEffect, useState } from 'react';
++import { useNavigate } from 'react-router-dom';
  import { toast } from 'react-toastify';
  import type { Socket } from 'socket.io-client';
 +import { call, parseFrappeError } from '@ury/core';
@@ -53,14 +76,16 @@ index 975e27ca..4b93f313 100644
  import { usePOSStore } from '../store/pos-store';
  import { useRootStore } from '../store/root-store';
  import { getActiveDirection, t } from '../i18n';
-@@ -9,15 +12,31 @@ import { getActiveDirection, t } from '../i18n';
+@@ -9,15 +13,33 @@ import { getActiveDirection, t } from '../i18n';
  // Patch 43: alerts the till when a customer orders or asks for the bill from the
  // QR app. erp_restaurant (self_order_alerts.py) publishes erp_self_order_<branch>
  // after the order is saved.
 +// Ticket 40: a QR table order waits for the counter ("request": Valider / Refuser on the
 +// till, info only in the waiter app, which prints no kitchen tickets); the requests still
 +// waiting are shown again when the till starts; "request_done" removes it on every till.
-+// A QR pickup order ("pay_first") reaches the kitchen once paid (PaymentDialog).
++// A QR pickup order ("pay_first") reaches the kitchen when the cashier prints its bill in Orders
++// (owner 2026-11-06; lib/print.ts printQrPickupKitchenTicket), else once paid (PaymentDialog).
++// On the till, tapping a QR order toast opens Orders with that order selected (OpenOrderBridge).
 +
 +interface QrRequest {
 +  name: string;
@@ -86,7 +111,7 @@ index 975e27ca..4b93f313 100644
  // One context, unlocked by the first tap: iPad Safari keeps a context made outside a tap suspended.
  let audioCtx: AudioContext | null = null;
  
-@@ -58,9 +77,153 @@ function message(e: SelfOrderEvent): string {
+@@ -58,9 +80,154 @@ function message(e: SelfOrderEvent): string {
      return t('self_order.bill_requested', { table: e.table || '', number });
    }
    const qty = e.qty || 0;
@@ -94,7 +119,8 @@ index 975e27ca..4b93f313 100644
 -    ? t('self_order.new_order_table', { table: e.table, number, qty })
 -    : t('self_order.new_order_pickup', { number, qty });
 +  if (e.table) return t('self_order.new_order_table', { table: e.table, number, qty });
-+  return e.pay_first ? t('self_order.new_order_pickup_pay_first', { number, qty }) : t('self_order.new_order_pickup', { number, qty });
++  if (!e.pay_first) return t('self_order.new_order_pickup', { number, qty });
++  return t(onTill() ? 'self_order.new_order_pickup_open' : 'self_order.new_order_pickup_pay_first', { number, qty });
 +}
 +
 +const requestToastId = (name: string) => `request-${name}`;
@@ -243,7 +269,7 @@ index 975e27ca..4b93f313 100644
  }
  
  const SelfOrderListener: React.FC = () => {
-@@ -80,6 +243,17 @@ const SelfOrderListener: React.FC = () => {
+@@ -80,33 +247,93 @@ const SelfOrderListener: React.FC = () => {
  
      const onEvent = (e: SelfOrderEvent) => {
        if (!e?.invoice) return;
@@ -261,7 +287,22 @@ index 975e27ca..4b93f313 100644
        // One toast per order and kind: a customer adding more replaces the earlier one.
        const toastId = `${e.kind}-${e.invoice}`;
        const content = <div dir={getActiveDirection()}>{message(e)}</div>;
-@@ -92,17 +266,26 @@ const SelfOrderListener: React.FC = () => {
++      // Till, QR order toast: a tap opens the order in Orders, ready to print and take the payment.
++      const opens = e.kind === 'order' && onTill();
+       if (toast.isActive(toastId)) {
+         toast.update(toastId, { render: content });
+       } else {
+-        toast.info(content, { toastId, position: 'top-right', autoClose: false, closeOnClick: true, theme: 'colored' });
++        toast.info(content, {
++          toastId,
++          position: 'top-right',
++          autoClose: false,
++          closeOnClick: !opens,
++          theme: 'colored',
++          onClick: opens ? () => openInOrders(toastId, e.invoice) : undefined,
++        });
+       }
+       beep();
        refreshOrdersPage();
      };
  
@@ -288,27 +329,65 @@ index 975e27ca..4b93f313 100644
      };
    }, [branch]);
  
+   return null;
+ };
+ 
++const OPEN_ORDER_EVENT = 'erp-self-order-open';
++
++function openInOrders(toastId: string, invoice: string) {
++  // A dialog open (payment, cancel...) is about the order on screen: a tap must not switch it to
++  // another order. The toast stays until the cashier is done.
++  if (document.querySelector('[role="dialog"]')) return;
++  toast.dismiss(toastId);
++  window.dispatchEvent(new CustomEvent<string>(OPEN_ORDER_EVENT, { detail: invoice }));
++}
++
++// Mounted inside the Router (App.tsx), unlike the listener: selects the order in Orders' Draft
++// list and opens Orders, as a confirmed takeaway does (Patch 08).
++export const OpenOrderBridge: React.FC = () => {
++  const navigate = useNavigate();
++  useEffect(() => {
++    const open = async (event: Event) => {
++      const invoice = (event as CustomEvent<string>).detail;
++      if (!invoice) return;
++      const rootStore = useRootStore.getState();
++      rootStore.setOrderSearchQuery('');
++      await rootStore.setSelectedStatus('Draft');
++      const listed = useRootStore.getState().orders.find((o) => o.name === invoice);
++      if (listed) useRootStore.getState().selectOrder(listed);
++      navigate('/orders');
++    };
++    window.addEventListener(OPEN_ORDER_EVENT, open);
++    return () => window.removeEventListener(OPEN_ORDER_EVENT, open);
++  }, [navigate]);
++  return null;
++};
++
+ export default SelfOrderListener;
 diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
-index 79b69832..39189d4b 100644
+index 79b69832..9811dd2f 100644
 --- a/pos/src/i18n/locales/ar.json
 +++ b/pos/src/i18n/locales/ar.json
-@@ -597,7 +597,8 @@
+@@ -597,7 +597,10 @@
          "nothing_to_print": "لا توجد تذكرة مطبخ لهذا الطلب",
          "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات.",
          "qz_host_missing": "مضيف QZ غير محدد في ملف نقطة البيع",
 -        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع"
 +        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع",
-+        "not_created_on_payment": "تم تسجيل الدفع، لكن تعذّر إنشاء تذكرة المطبخ. أبلغ المطبخ بهذا الطلب."
++        "not_created_on_payment": "تم تسجيل الدفع، لكن تعذّر إنشاء تذكرة المطبخ. أبلغ المطبخ بهذا الطلب.",
++        "not_created_on_print": "تعذّر إنشاء تذكرة المطبخ. اضغط على طباعة مرة أخرى، أو أبلغ المطبخ بهذا الطلب.",
++        "qr_print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. اضغط على طباعة مرة أخرى قبل الدفع."
      },
      "captain": {
          "load_context_failed": "تعذّر تحميل شاشة النادل",
-@@ -667,7 +668,19 @@
+@@ -667,7 +670,20 @@
      "self_order": {
          "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
          "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
 -        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
 +        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})",
 +        "new_order_pickup_pay_first": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف: يُدفع قبل المطبخ",
++        "new_order_pickup_open": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف: اضغط عليه لفتحه، وطباعة التذكرة ترسله إلى المطبخ",
 +        "request_title": "طلب QR للتأكيد: {{table}}، {{qty}} صنف",
 +        "accept": "تأكيد",
 +        "refuse": "رفض",
@@ -324,26 +403,29 @@ index 79b69832..39189d4b 100644
      "loyalty": {
          "title": "نقاط الوفاء",
 diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
-index ecbeee93..5ecdede6 100644
+index ecbeee93..4c7b40c5 100644
 --- a/pos/src/i18n/locales/en.json
 +++ b/pos/src/i18n/locales/en.json
-@@ -590,7 +590,8 @@
+@@ -590,7 +590,10 @@
      "nothing_to_print": "No kitchen ticket for this order",
      "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders.",
      "qz_host_missing": "QZ host is not set on the POS profile",
 -    "qz_disabled": "QZ printing is not enabled on the POS profile"
 +    "qz_disabled": "QZ printing is not enabled on the POS profile",
-+    "not_created_on_payment": "Payment saved, but the kitchen ticket could not be created. Tell the kitchen about this order."
++    "not_created_on_payment": "Payment saved, but the kitchen ticket could not be created. Tell the kitchen about this order.",
++    "not_created_on_print": "The kitchen ticket could not be created. Press Print again, or tell the kitchen about this order.",
++    "qr_print_failed": "Kitchen ticket not printed: {{reason}}. Press Print again before taking the payment."
    },
    "captain": {
      "load_context_failed": "Unable to load the waiter screen",
-@@ -660,7 +661,19 @@
+@@ -660,7 +663,20 @@
    "self_order": {
      "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
      "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
 -    "bill_requested": "{{table}} asks for the bill (no. {{number}})"
 +    "bill_requested": "{{table}} asks for the bill (no. {{number}})",
 +    "new_order_pickup_pay_first": "QR take-away order (no. {{number}}), {{qty}} item(s): take payment before the kitchen",
++    "new_order_pickup_open": "QR take-away order (no. {{number}}), {{qty}} item(s): tap to open it, printing its ticket sends it to the kitchen",
 +    "request_title": "QR order to confirm: {{table}}, {{qty}} item(s)",
 +    "accept": "Accept",
 +    "refuse": "Refuse",
@@ -359,26 +441,29 @@ index ecbeee93..5ecdede6 100644
    "loyalty": {
      "title": "Loyalty points",
 diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
-index 9fa66d6a..dd674207 100644
+index 9fa66d6a..99409ba5 100644
 --- a/pos/src/i18n/locales/fr.json
 +++ b/pos/src/i18n/locales/fr.json
-@@ -590,7 +590,8 @@
+@@ -590,7 +590,10 @@
      "nothing_to_print": "Aucun ticket cuisine pour cette commande",
      "print_failed": "Ticket cuisine non imprimé : {{reason}}. Utilisez « Réimprimer le ticket cuisine » dans Commandes.",
      "qz_host_missing": "L'hôte QZ n'est pas défini sur le profil PDV",
 -    "qz_disabled": "L'impression QZ n'est pas activée sur le profil PDV"
 +    "qz_disabled": "L'impression QZ n'est pas activée sur le profil PDV",
-+    "not_created_on_payment": "Paiement enregistré, mais le ticket cuisine n'a pas pu être créé. Prévenez la cuisine pour cette commande."
++    "not_created_on_payment": "Paiement enregistré, mais le ticket cuisine n'a pas pu être créé. Prévenez la cuisine pour cette commande.",
++    "not_created_on_print": "Le ticket cuisine n'a pas pu être créé. Appuyez à nouveau sur Imprimer, ou prévenez la cuisine pour cette commande.",
++    "qr_print_failed": "Ticket cuisine non imprimé : {{reason}}. Appuyez à nouveau sur Imprimer avant d'encaisser."
    },
    "captain": {
      "load_context_failed": "Impossible de charger l'écran capitaine",
-@@ -660,7 +661,19 @@
+@@ -660,7 +663,20 @@
    "self_order": {
      "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
      "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
 -    "bill_requested": "{{table}} demande l'addition (n° {{number}})"
 +    "bill_requested": "{{table}} demande l'addition (n° {{number}})",
 +    "new_order_pickup_pay_first": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : à encaisser avant la cuisine",
++    "new_order_pickup_open": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : touchez pour l'ouvrir, l'impression du ticket l'envoie en cuisine",
 +    "request_title": "Commande QR à valider : {{table}}, {{qty}} article(s)",
 +    "accept": "Valider",
 +    "refuse": "Refuser",
@@ -393,6 +478,80 @@ index 9fa66d6a..dd674207 100644
    },
    "loyalty": {
      "title": "Points fidélité",
+diff --git a/pos/src/lib/print.ts b/pos/src/lib/print.ts
+index 405e0d23..7b6709eb 100644
+--- a/pos/src/lib/print.ts
++++ b/pos/src/lib/print.ts
+@@ -1,4 +1,4 @@
+-import { call, printWithQz } from '@ury/core';
++import { call, parseFrappeError, printWithQz } from '@ury/core';
+ import {
+   getInvoicePrintHtml,
+   printLanguage,
+@@ -98,3 +98,39 @@ export async function printKitchenTickets({
+   }
+   return tickets.length;
+ }
++
++// Patch 56 (ticket 40): a QR pickup order's kitchen ticket goes out with its bill (owner
++// 2026-11-06). The server creates the held ticket and says whether this is a QR pickup order;
++// any kitchen ticket of it not printed yet is printed, so pressing Print again retries a failed
++// kitchen print (no Reprint needed). Other orders: one server read, nothing printed.
++// One kitchen print per order at a time: a second tap on Print while QZ is still printing would
++// find the same ticket not marked printed yet and print it twice.
++const qrKitchenPrinting = new Set<string>();
++
++export async function printQrPickupKitchenTicket({
++  invoice,
++  posProfile,
++}: {
++  invoice: string;
++  posProfile: PosProfileCombined;
++}): Promise<void> {
++  let res: { message?: { qr_pickup?: number; kitchen_ticket_failed?: number } };
++  try {
++    res = await call.post('erp_restaurant.erp_restaurant.qr_validation.release_held_kitchen_ticket', { invoice });
++  } catch (err) {
++    // Network, or the server without this method yet: one translated line, never a raw error.
++    throw new Error(t('kitchen.qr_print_failed', { reason: parseFrappeError(err, t('errors.network')) }));
++  }
++  const answer = res?.message;
++  if (!answer?.qr_pickup) return;
++  if (answer.kitchen_ticket_failed) throw new Error(t('kitchen.not_created_on_print'));
++  if (!posProfile.custom_auto_print_kitchen_ticket || qrKitchenPrinting.has(invoice)) return;
++  qrKitchenPrinting.add(invoice);
++  try {
++    await printKitchenTickets({ invoice, posProfile });
++  } catch (err) {
++    throw new Error(t('kitchen.qr_print_failed', { reason: err instanceof Error ? err.message : String(err) }));
++  } finally {
++    qrKitchenPrinting.delete(invoice);
++  }
++}
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 0e4060b0..999ec1b7 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -16,7 +16,7 @@ import BillMergeDialog from '../components/BillMergeDialog';
+ import OrderActionsMenu from '../components/OrderActionsMenu';
+ import SplitGroupPanel from '../components/SplitGroupPanel';
+ import MergedBillPanel from '../components/MergedBillPanel';
+-import { printKitchenTickets, printOrder } from '../lib/print';
++import { printKitchenTickets, printOrder, printQrPickupKitchenTicket } from '../lib/print';
+ import { call } from '@ury/core';
+ import { splitBill } from '../lib/order-api';
+ import {
+@@ -340,6 +340,10 @@ export default function Orders() {
+       setIsPrinting(false);
+     }
+     if (!printed) return;
++    // Patch 56: a QR pickup order's kitchen ticket goes out with its bill.
++    printQrPickupKitchenTicket({ invoice: selectedOrder.name, posProfile: posStore.posProfile }).catch((err) => {
++      showToast.error(err instanceof Error ? err.message : String(err));
++    });
+     // Locally update selectedOrder.invoice_printed to 1
+     if (selectedOrder && typeof selectedOrder === 'object') {
+       selectOrder({ ...selectedOrder, invoice_printed: 1 });
 diff --git a/self-order/src/hooks/useOrderingSession.ts b/self-order/src/hooks/useOrderingSession.ts
 index 032453d1..137dcdba 100644
 --- a/self-order/src/hooks/useOrderingSession.ts

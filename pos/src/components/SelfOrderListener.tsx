@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import type { Socket } from 'socket.io-client';
 import { call, parseFrappeError } from '@ury/core';
@@ -15,7 +16,9 @@ import { getActiveDirection, t } from '../i18n';
 // Ticket 40: a QR table order waits for the counter ("request": Valider / Refuser on the
 // till, info only in the waiter app, which prints no kitchen tickets); the requests still
 // waiting are shown again when the till starts; "request_done" removes it on every till.
-// A QR pickup order ("pay_first") reaches the kitchen once paid (PaymentDialog).
+// A QR pickup order ("pay_first") reaches the kitchen when the cashier prints its bill in Orders
+// (owner 2026-11-06; lib/print.ts printQrPickupKitchenTicket), else once paid (PaymentDialog).
+// On the till, tapping a QR order toast opens Orders with that order selected (OpenOrderBridge).
 
 interface QrRequest {
   name: string;
@@ -78,7 +81,8 @@ function message(e: SelfOrderEvent): string {
   }
   const qty = e.qty || 0;
   if (e.table) return t('self_order.new_order_table', { table: e.table, number, qty });
-  return e.pay_first ? t('self_order.new_order_pickup_pay_first', { number, qty }) : t('self_order.new_order_pickup', { number, qty });
+  if (!e.pay_first) return t('self_order.new_order_pickup', { number, qty });
+  return t(onTill() ? 'self_order.new_order_pickup_open' : 'self_order.new_order_pickup_pay_first', { number, qty });
 }
 
 const requestToastId = (name: string) => `request-${name}`;
@@ -257,10 +261,19 @@ const SelfOrderListener: React.FC = () => {
       // One toast per order and kind: a customer adding more replaces the earlier one.
       const toastId = `${e.kind}-${e.invoice}`;
       const content = <div dir={getActiveDirection()}>{message(e)}</div>;
+      // Till, QR order toast: a tap opens the order in Orders, ready to print and take the payment.
+      const opens = e.kind === 'order' && onTill();
       if (toast.isActive(toastId)) {
         toast.update(toastId, { render: content });
       } else {
-        toast.info(content, { toastId, position: 'top-right', autoClose: false, closeOnClick: true, theme: 'colored' });
+        toast.info(content, {
+          toastId,
+          position: 'top-right',
+          autoClose: false,
+          closeOnClick: !opens,
+          theme: 'colored',
+          onClick: opens ? () => openInOrders(toastId, e.invoice) : undefined,
+        });
       }
       beep();
       refreshOrdersPage();
@@ -289,6 +302,37 @@ const SelfOrderListener: React.FC = () => {
     };
   }, [branch]);
 
+  return null;
+};
+
+const OPEN_ORDER_EVENT = 'erp-self-order-open';
+
+function openInOrders(toastId: string, invoice: string) {
+  // A dialog open (payment, cancel...) is about the order on screen: a tap must not switch it to
+  // another order. The toast stays until the cashier is done.
+  if (document.querySelector('[role="dialog"]')) return;
+  toast.dismiss(toastId);
+  window.dispatchEvent(new CustomEvent<string>(OPEN_ORDER_EVENT, { detail: invoice }));
+}
+
+// Mounted inside the Router (App.tsx), unlike the listener: selects the order in Orders' Draft
+// list and opens Orders, as a confirmed takeaway does (Patch 08).
+export const OpenOrderBridge: React.FC = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const open = async (event: Event) => {
+      const invoice = (event as CustomEvent<string>).detail;
+      if (!invoice) return;
+      const rootStore = useRootStore.getState();
+      rootStore.setOrderSearchQuery('');
+      await rootStore.setSelectedStatus('Draft');
+      const listed = useRootStore.getState().orders.find((o) => o.name === invoice);
+      if (listed) useRootStore.getState().selectOrder(listed);
+      navigate('/orders');
+    };
+    window.addEventListener(OPEN_ORDER_EVENT, open);
+    return () => window.removeEventListener(OPEN_ORDER_EVENT, open);
+  }, [navigate]);
   return null;
 };
 

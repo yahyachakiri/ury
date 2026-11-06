@@ -591,7 +591,9 @@
     "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders.",
     "qz_host_missing": "QZ host is not set on the POS profile",
     "qz_disabled": "QZ printing is not enabled on the POS profile",
-    "not_created_on_payment": "Payment saved, but the kitchen ticket could not be created. Tell the kitchen about this order."
+    "not_created_on_payment": "Payment saved, but the kitchen ticket could not be created. Tell the kitchen about this order.",
+    "not_created_on_print": "The kitchen ticket could not be created. Press Print again, or tell the kitchen about this order.",
+    "qr_print_failed": "Kitchen ticket not printed: {{reason}}. Press Print again before taking the payment."
   },
   "captain": {
     "load_context_failed": "Unable to load the waiter screen",
@@ -663,6 +665,7 @@
     "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
     "bill_requested": "{{table}} asks for the bill (no. {{number}})",
     "new_order_pickup_pay_first": "QR take-away order (no. {{number}}), {{qty}} item(s): take payment before the kitchen",
+    "new_order_pickup_open": "QR take-away order (no. {{number}}), {{qty}} item(s): tap to open it, printing its ticket sends it to the kitchen",
     "request_title": "QR order to confirm: {{table}}, {{qty}} item(s)",
     "accept": "Accept",
     "refuse": "Refuse",
