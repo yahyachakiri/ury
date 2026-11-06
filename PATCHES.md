@@ -2449,7 +2449,9 @@ till cash method "Espèces"; first deploy showed no bills, fixed by the cash-met
 criteria 1, 2, 3, 4 (10 %: total 61.2, cash still 100, À rendre 38.8), 6, 7, 8 and 12 passed.
 Paid INV-00052: POS Invoice saved with additional_discount_percentage 10, discount 6.8, grand
 total 61.2, payment Espèces 100, change 38.8 (the dialog's figures); refunded from /admin as
-INV-00053. INV-00051 (first deploy) cancelled. Not checked: 5 (amount remise), 9 (touch device,
+INV-00053. INV-00051 (first deploy) cancelled. Second browser check 2026-11-06 (test-dev, after commit 8eb9f426): 50 order INV-00055, prefilled
+50 with "Montant exact"; one 50 bill also shows "Montant exact"; 420 in bills shows the full
+amount with no breakdown, counts on the badges. Order cancelled. Not checked: 5 (amount remise), 9 (touch device,
 system keyboard), 10 (merged bill), 11 (loyalty), Arabic and English on the server (Arabic seen
 only in the local render), round-to-half till.
 
@@ -2491,6 +2493,10 @@ and English and repeat: criterion 2. Start QZ Tray, Print again: criterion 3. Ca
 orders.
 
 Build: `tsc --noEmit` and `vite build` (scratch folder) passed locally.
+
+Browser check 2026-11-06 (test-dev, Claude, desktop without QZ Tray): cancelling an order showed
+"Ticket cuisine non imprimé : QZ Tray n'est pas lancé sur cet appareil, démarrez-le puis
+réimprimez…" in French. Not checked: other messages, Arabic, English.
 
 Patch file: `patches/55-qz-not-running-message.patch`. Commit: 12b0a084.
 
