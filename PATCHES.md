@@ -2360,7 +2360,8 @@ no keyboard: every number input in the payment dialog opened the system keyboard
 Files touched: `pos/src/components/PaymentDialog.tsx` (rewritten layout and input handling),
 `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`payment.*` keys for the new controls,
 `loyalty.points_exceed_max`, `loyalty.remove_points`; `payment.discount_placeholder`,
-`discount_amount_placeholder`, `amount_placeholder` removed, nothing else used them)
+`discount_amount_placeholder`, `amount_placeholder` removed, nothing else used them);
+erp_restaurant `pos_invoice_company_account.cash_payment_modes` (which methods are cash)
 
 What it does: no field in the dialog is a text input, so the system keyboard never opens.
 - Left column: cash row (amount button, `Exact`, clear), then either a 2×2 grid of bills
@@ -2390,6 +2391,11 @@ What it does: no field in the dialog is a text input, so the system keyboard nev
   two discount inputs of Patch 07. Patch 45 (hidden methods) and 47 (points, receipt print)
   keep their behaviour. The payload to `make_invoice` is unchanged: cash sent is what was
   tendered, as before.
+- The cash method (bills, prefill, `Exact`) is found by type: erp_restaurant
+  `cash_payment_modes` returns the enabled Mode of Payment of type Cash, never a platform or
+  company-account method; the name "Cash" (URY's `DEFAULT_PAYMENT_MODE`) stays as fallback.
+  Found on test-dev 2026-11-06: sites made by `new_site.py` call it "Espèces", so the first
+  deploy showed no bills and no prefill (the old dialog's prefill had the same blind spot).
 - Pay is disabled while the keypad is open, so a typed but not validated amount (remise, cash,
   points) is never dropped silently: the cashier taps Valider or closes the keypad first.
 - Behaviour change: amounts can no longer be typed on a physical keyboard (Windows tills), only
@@ -2401,7 +2407,7 @@ What it does: no field in the dialog is a text input, so the system keyboard nev
   and the dialog scrolls. The keypad stays left-to-right in Arabic.
 
 Why it can't be done in `erp_restaurant`: the dialog is rendered by the POS React app; no
-hook, field or API changes how it takes input.
+hook, field or API changes how it takes input. Only the cash-method lookup is in erp_restaurant.
 
 Risk profile: medium. PaymentDialog.tsx is fully rewritten (upstream changes to it will not
 merge; reapply by intent). Payment payload and server rules unchanged.
@@ -2437,7 +2443,7 @@ Not run: payment on a server, criterion 5 payload, 9 to 12, English, round-to-ha
 fork-patch-guardian review 2026-11-06: Pay-with-keypad-open bug fixed, superseded notes added
 to Patches 07, 19 and 23.
 
-Patch file: `patches/54-touch-payment-dialog.patch`. Commit: e1e1fd92.
+Patch file: `patches/54-touch-payment-dialog.patch`. Commits: e1e1fd92, cash method by type: not committed yet.
 
 ## Build and deploy
 

@@ -104,8 +104,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       .filter((id) => !hiddenModes.includes(id)),
     [allPaymentModes, hiddenModes]
   );
-  const hasCash = modeIds.includes(DEFAULT_PAYMENT_MODE);
-  const otherModes = modeIds.filter((id) => id !== DEFAULT_PAYMENT_MODE);
+  // Patch 54: the cash method is found by its type on the server (erp_restaurant cash_payment_modes):
+  // sites made by our provisioning call it "Espèces", URY only knew the name "Cash" (kept as fallback).
+  const [cashModes, setCashModes] = useState<string[]>([]);
+  useEffect(() => {
+    call
+      .get<{ message: string[] }>('erp_restaurant.erp_restaurant.pos_invoice_company_account.cash_payment_modes')
+      .then((r) => setCashModes(r.message || []))
+      .catch(() => setCashModes([]));
+  }, []);
+  const cashMode = modeIds.find((id) => cashModes.includes(id)) ?? (modeIds.includes(DEFAULT_PAYMENT_MODE) ? DEFAULT_PAYMENT_MODE : '');
+  const hasCash = cashMode !== '';
+  const otherModes = modeIds.filter((id) => id !== cashMode);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,8 +196,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const otherSum = otherModes.reduce((sum, id) => sum + (amounts[id] || 0), 0);
   // Patch 54: prefilled cash is derived, so it follows the remise, points and other methods,
   // and a tapped or validated amount is never overwritten (the old autofill effect did).
-  const cashAmount = !hasCash ? 0 : cashPrefilled ? Math.max(0, round2(finalTotal - otherSum)) : (amounts[DEFAULT_PAYMENT_MODE] || 0);
-  const amountOf = (id: string) => (id === DEFAULT_PAYMENT_MODE ? cashAmount : amounts[id] || 0);
+  const cashAmount = !hasCash ? 0 : cashPrefilled ? Math.max(0, round2(finalTotal - otherSum)) : (amounts[cashMode] || 0);
+  const amountOf = (id: string) => (id === cashMode ? cashAmount : amounts[id] || 0);
 
   const payments = modeIds
     .map((id) => ({ mode_of_payment: id, amount: round2(amountOf(id)) }))
@@ -195,7 +205,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const paymentsTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
   // Patch 47: an order paid entirely with points still needs one payment row (ERPNext), at 0,
   // on the cash method when the till has it.
-  const zeroRowMode = hasCash ? DEFAULT_PAYMENT_MODE : modeIds[0] ?? null;
+  const zeroRowMode = hasCash ? cashMode : modeIds[0] ?? null;
   const paidByPoints = loyaltyAmount > 0 && finalTotal <= 0.005 && payments.length === 0 && !!zeroRowMode;
   const paymentsSent = paidByPoints ? [{ mode_of_payment: zeroRowMode as string, amount: 0 }] : payments;
   const diff = round2(paymentsTotal - finalTotal);
@@ -220,11 +230,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       // First bill replaces the prefilled amount (68 order, tap 20 = 20, not 88).
       setCashPrefilled(false);
       setTally({ [value]: 1 });
-      setAmounts((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: value }));
+      setAmounts((prev) => ({ ...prev, [cashMode]: value }));
       return;
     }
     setTally((prev) => ({ ...prev, [value]: (prev[value] || 0) + 1 }));
-    setAmounts((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: round2((prev[DEFAULT_PAYMENT_MODE] || 0) + value) }));
+    setAmounts((prev) => ({ ...prev, [cashMode]: round2((prev[cashMode] || 0) + value) }));
   };
 
   const setExactCash = () => {
@@ -233,14 +243,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setTally({});
     setAmounts((prev) => {
       const next = { ...prev };
-      delete next[DEFAULT_PAYMENT_MODE];
+      delete next[cashMode];
       return next;
     });
   };
 
   const clearMode = (id: string) => {
     if (locked) return;
-    if (id === DEFAULT_PAYMENT_MODE) {
+    if (id === cashMode) {
       setCashPrefilled(false);
       setTally({});
     }
@@ -252,14 +262,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     if (locked) return;
     const others = modeIds
       .filter((m) => m !== id)
-      .reduce((sum, m) => sum + (m === DEFAULT_PAYMENT_MODE ? (cashPrefilled ? 0 : amounts[m] || 0) : amounts[m] || 0), 0);
+      .reduce((sum, m) => sum + (m === cashMode ? (cashPrefilled ? 0 : amounts[m] || 0) : amounts[m] || 0), 0);
     if (hasCash && cashPrefilled) {
       setCashPrefilled(false);
       setTally({});
     }
     setAmounts((prev) => ({
       ...prev,
-      ...(hasCash && cashPrefilled ? { [DEFAULT_PAYMENT_MODE]: 0 } : {}),
+      ...(hasCash && cashPrefilled ? { [cashMode]: 0 } : {}),
       [id]: Math.max(0, round2(finalTotal - others)),
     }));
   };
@@ -302,7 +312,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     if (!keypad) return;
     const v = parseFloat(buf) || 0;
     if (keypad.kind === 'mode') {
-      if (keypad.mode === DEFAULT_PAYMENT_MODE) {
+      if (keypad.mode === cashMode) {
         setCashPrefilled(false);
         setTally({});
       }
@@ -394,7 +404,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   const keypadHint = (() => {
     if (!keypad) return '';
-    if (keypad.kind === 'mode') return keypad.mode === DEFAULT_PAYMENT_MODE ? t('payment.keypad_cash') : t('payment.keypad_card', { mode: keypad.mode });
+    if (keypad.kind === 'mode') return keypad.mode === cashMode ? t('payment.keypad_cash') : t('payment.keypad_card', { mode: keypad.mode });
     if (keypad.kind === 'discount') return discountUnit === 'pct' ? t('payment.keypad_discount_pct') : t('payment.keypad_discount_amount');
     return t('loyalty.points_placeholder', { max: maxPoints });
   })();
@@ -452,13 +462,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
           {hasCash && (
             <div className="flex items-center gap-2.5 h-16 shrink-0">
-              <span className="w-24 shrink-0 text-lg font-semibold break-words leading-5">{DEFAULT_PAYMENT_MODE}</span>
+              <span className="w-24 shrink-0 text-lg font-semibold break-words leading-5">{cashMode}</span>
               <Button variant="outline"
                 type="button"
                 aria-label={t('payment.keypad_cash')}
-                onClick={() => openKeypad({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}
+                onClick={() => openKeypad({ kind: 'mode', mode: cashMode })}
                 disabled={locked}
-                className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 ${fieldBorder({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}`}
+                className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 ${fieldBorder({ kind: 'mode', mode: cashMode })}`}
               >
                 <span className={`text-[26px] font-semibold truncate ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
                   {formatCurrency(cashAmount)}
@@ -472,8 +482,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               </Button>
               <Button variant="outline"
                 type="button"
-                aria-label={t('payment.clear_mode', { mode: DEFAULT_PAYMENT_MODE })}
-                onClick={() => clearMode(DEFAULT_PAYMENT_MODE)}
+                aria-label={t('payment.clear_mode', { mode: cashMode })}
+                onClick={() => clearMode(cashMode)}
                 disabled={locked}
                 className={clearButton}
               >
@@ -570,7 +580,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               </div>
               <Button variant="outline"
                 type="button"
-                onClick={() => openKeypad({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}
+                onClick={() => openKeypad({ kind: 'mode', mode: cashMode })}
                 disabled={locked}
                 className="h-[60px] shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-lg font-semibold disabled:opacity-50"
               >
