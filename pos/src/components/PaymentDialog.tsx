@@ -1,12 +1,33 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Percent, Coins, Gift } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
-import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
+import { Button, Dialog, DialogContent, showToast } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 import { printOrder } from '../lib/print';
 
+// Patch 54: touch payment dialog. No field here is a text input, so the system keyboard never
+// opens: amounts are buttons that open an on-screen keypad, cash is tapped as bills.
+// Bill values: a constant so they can move to POS Profile config later.
+const BILLS = [20, 50, 100, 200];
+// Tinted after the Moroccan notes. bg / border / text when unused, solid when tapped.
+const BILL_COLORS: Record<number, { bg: string; line: string; fg: string; solid: string }> = {
+  20: { bg: '#F1EAF9', line: '#7C4FB0', fg: '#4B2A7B', solid: '#5B3594' },
+  50: { bg: '#E6F4EC', line: '#2E8B5B', fg: '#14573A', solid: '#1B6B47' },
+  100: { bg: '#F6ECE1', line: '#A9713A', fg: '#6A411A', solid: '#7C4F24' },
+  200: { bg: '#E4EEF8', line: '#2F6FA8', fg: '#163F66', solid: '#1E4F7C' },
+};
+const BILL_FALLBACK = { bg: '#F9FAFB', line: '#6B7280', fg: '#111827', solid: '#374151' };
+// Cheap touch panels fire twice: a second tap on the same bill this soon is ignored.
+const BILL_DEBOUNCE_MS = 150;
+const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', 'del'];
+const MAX_KEYPAD_CHARS = 7;
+
+type KeypadTarget =
+  | { kind: 'mode'; mode: string }
+  | { kind: 'discount' }
+  | { kind: 'points' };
 
 interface PaymentDialogProps {
   onClose: () => void;
@@ -28,10 +49,15 @@ interface PaymentDialogProps {
   allowDiscount?: boolean;
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const CloseIcon = ({ size = 24, strong = false }: { size?: number; strong?: boolean }) => (
+  <X width={size} height={size} strokeWidth={strong ? 2.4 : 2} aria-hidden="true" />
+);
+
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
-  roundedTotal,
   invoice,
   customer,
   posProfile,
@@ -59,10 +85,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // Patch 47 (ticket 39): the customer's loyalty points (erp_restaurant loyalty.get_customer_loyalty).
   // Not on merged bills (the server refuses them there). make_invoice gets the points used.
   const [loyalty, setLoyalty] = useState<{ points: number; conversion_factor: number } | null>(null);
-  const [pointsInput, setPointsInput] = useState('');
+  const [pointsWanted, setPointsWanted] = useState(0);
   useEffect(() => {
     setLoyalty(null);
-    setPointsInput('');
+    setPointsWanted(0);
     if (!allowDiscount) return;
     call
       .get<{ message: { enrolled: boolean; points: number; conversion_factor: number } }>(
@@ -72,36 +98,51 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       .then((r) => setLoyalty(r.message?.enrolled && r.message.points > 0 ? r.message : null))
       .catch(() => setLoyalty(null));
   }, [customer, allowDiscount]);
-  // Memoized: the cash autofill effect below depends on this list.
-  const paymentModes = useMemo(
-    () => allPaymentModes.filter((mode: any) => !hiddenModes.includes(typeof mode === 'string' ? mode : mode.id)),
+  const modeIds = useMemo(
+    () => allPaymentModes
+      .map((mode: string | { id: string }) => (typeof mode === 'string' ? mode : mode.id))
+      .filter((id) => !hiddenModes.includes(id)),
     [allPaymentModes, hiddenModes]
   );
+  const hasCash = modeIds.includes(DEFAULT_PAYMENT_MODE);
+  const otherModes = modeIds.filter((id) => id !== DEFAULT_PAYMENT_MODE);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Patch 07: the cashier enters either a percentage or a fixed amount (two
-  // fields, each fills the other); make_invoice always receives a percentage.
-  
-  // Calculate effective percentage if only amount is provided (for invoice-level discounts)
-  const effectivePercentage = discountPercentage 
-    ? discountPercentage 
-    : (discountAmount && grandTotal + discountAmount > 0 
-        ? (discountAmount / (grandTotal + discountAmount)) * 100 
+
+  // Patch 07: make_invoice always receives a percentage.
+  // Effective percentage of an invoice-level discount already on the order.
+  const effectivePercentage = discountPercentage
+    ? discountPercentage
+    : (discountAmount && grandTotal + discountAmount > 0
+        ? (discountAmount / (grandTotal + discountAmount)) * 100
         : 0);
-        
-  const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
-  const [discountAmountValue, setDiscountAmountValue] = useState<string>(discountAmount ? String(discountAmount) : '');
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
-  // Percentage sent to make_invoice, which sets additional_discount_percentage
-  // from it. Before Patch 07 the amount was sent here and applied as a
-  // percentage (10% of 250 MAD sent 25, the invoice got 25% off).
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0);
+  // Percentage sent to make_invoice, which sets additional_discount_percentage from it. Before
+  // Patch 07 the amount was sent here and applied as a percentage.
   const [appliedPercent, setAppliedPercent] = useState<number>(discountAmount ? effectivePercentage : 0);
-  const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
-  const [prefilledId, setPrefilledId] = useState<string | null>(null);
-  // Patch 45: an amount typed in a row before it was hidden must not skew the cash prefill.
+  // Patch 54: the percentage shown on the remise row ("Remise 10 %"), null for a fixed amount.
+  const [shownPercent, setShownPercent] = useState<number | null>(
+    discountAmount && discountPercentage ? discountPercentage : null
+  );
+
+  // Patch 54: amounts per payment mode. Cash stays "prefilled" (it follows what is left to pay)
+  // until the cashier taps a bill or validates a cash amount; after that it is never overwritten.
+  const [amounts, setAmounts] = useState<Record<string, number>>({});
+  const [cashPrefilled, setCashPrefilled] = useState(true);
+  const [tally, setTally] = useState<Record<number, number>>({});
+  const lastBillTap = useRef<{ value: number; at: number } | null>(null);
+
+  const [keypad, setKeypad] = useState<KeypadTarget | null>(null);
+  const [buf, setBuf] = useState('');
+  const [keypadError, setKeypadError] = useState<string | null>(null);
+  // Kept while the dialog is open: the last unit used for a remise.
+  const [discountUnit, setDiscountUnit] = useState<'pct' | 'amt'>('pct');
+
+  // Patch 45: an amount entered in a row before it was hidden must not count.
   useEffect(() => {
     if (!hiddenModes.length) return;
-    setPaymentInputs((prev) => {
+    setAmounts((prev) => {
       const next = { ...prev };
       hiddenModes.forEach((id) => delete next[id]);
       return next;
@@ -117,63 +158,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // applies the same rule to the invoice, so the change is 0. null = loading.
   const [roundToHalf, setRoundToHalf] = useState<boolean | null>(null);
   useEffect(() => {
-    call.get('erp_restaurant.erp_restaurant.pos_rounding.get_pos_rounding', { pos_profile: posProfile })
-      .then((res: any) => setRoundToHalf(res?.message?.round_to_half === 1))
+    call.get<{ message?: { round_to_half?: number } }>('erp_restaurant.erp_restaurant.pos_rounding.get_pos_rounding', { pos_profile: posProfile })
+      .then((res) => setRoundToHalf(res?.message?.round_to_half === 1))
       .catch(() => setRoundToHalf(false));
   }, [posProfile]);
 
-  // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
+  // baseTotal: the amount before any invoice-level discount.
   const baseTotal = grandTotal + (discountAmount || 0);
-
-  const round2 = (n: number) => String(Math.round(n * 100) / 100);
-
-  const handleApplyDiscount = () => {
-    const value = parseFloat(discountValue);
-    if (isNaN(value) || value <= 0) {
-      setError(t('errors.invalid_discount'));
-      return;
-    }
-    if (value > 100) {
-      setError(t('errors.discount_exceeds_max'));
-      return;
-    }
-    // Patch 09: whole cents, as ERPNext rounds discount_amount, so the amount
-    // asked matches the saved total.
-    const calculatedDiscount = Math.round(baseTotal * value) / 100;
-    setAppliedDiscount(calculatedDiscount);
-    setAppliedPercent(value);
-    setDiscountAmountValue(round2(calculatedDiscount));
-    setError(null);
-  };
-
-  const handleApplyDiscountAmount = () => {
-    const value = parseFloat(discountAmountValue);
-    if (isNaN(value) || value <= 0) {
-      setError(t('errors.invalid_discount'));
-      return;
-    }
-    if (value > baseTotal) {
-      setError(t('errors.discount_exceeds_total'));
-      return;
-    }
-    const percent = baseTotal > 0 ? (value / baseTotal) * 100 : 0;
-    setAppliedDiscount(value);
-    setAppliedPercent(percent);
-    setDiscountValue(round2(percent));
-    setError(null);
-  };
-
-  // Order summary logic
   const subtotal = baseTotal;
-  const adjustment = roundedTotal - grandTotal;
-  const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
-  const totalDiscount = appliedDiscount;
-  const discountedTotal = Math.max(0, subtotal - totalDiscount);
-  // Patch 09: up to the next 0.5 or exact (was: up to 1 MAD with a discount,
-  // nearest MAD without). Merged bills keep upstream rounding: their total
+  const discountedTotal = Math.max(0, subtotal - appliedDiscount);
+  // Patch 09: up to the next 0.5 or exact. Merged bills keep upstream rounding: their total
   // spans two invoices, each rounded by the server.
-  const centsTotal = Math.round(discountedTotal * 100) / 100;
+  const centsTotal = round2(discountedTotal);
   const orderTotal = !allowDiscount
     ? Math.round(discountedTotal)
     : roundToHalf
@@ -183,80 +179,166 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const maxPoints = loyalty && loyalty.conversion_factor > 0
     ? Math.min(loyalty.points, Math.floor(orderTotal / loyalty.conversion_factor + 1e-9))
     : 0;
-  const pointsUsed = Math.min(maxPoints, Math.max(0, Math.floor(Number(pointsInput) || 0)));
-  const loyaltyAmount = loyalty ? Math.round(pointsUsed * loyalty.conversion_factor * 100) / 100 : 0;
-  const finalTotal = Math.max(0, Math.round((orderTotal - loyaltyAmount) * 100) / 100);
+  const pointsUsed = Math.min(maxPoints, pointsWanted);
+  const loyaltyAmount = loyalty ? round2(pointsUsed * loyalty.conversion_factor) : 0;
+  const finalTotal = Math.max(0, round2(orderTotal - loyaltyAmount));
 
-  // Calculate split payment total
-  const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
-    })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+  const otherSum = otherModes.reduce((sum, id) => sum + (amounts[id] || 0), 0);
+  // Patch 54: prefilled cash is derived, so it follows the remise, points and other methods,
+  // and a tapped or validated amount is never overwritten (the old autofill effect did).
+  const cashAmount = !hasCash ? 0 : cashPrefilled ? Math.max(0, round2(finalTotal - otherSum)) : (amounts[DEFAULT_PAYMENT_MODE] || 0);
+  const amountOf = (id: string) => (id === DEFAULT_PAYMENT_MODE ? cashAmount : amounts[id] || 0);
+
+  const payments = modeIds
+    .map((id) => ({ mode_of_payment: id, amount: round2(amountOf(id)) }))
+    .filter((p) => p.amount > 0);
+  const paymentsTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
   // Patch 47: an order paid entirely with points still needs one payment row (ERPNext), at 0,
   // on the cash method when the till has it.
-  const modeIds = paymentModes.map((mode: any) => (typeof mode === 'string' ? mode : mode.id));
-  const zeroRowMode = modeIds.includes(DEFAULT_PAYMENT_MODE) ? DEFAULT_PAYMENT_MODE : modeIds[0] ?? null;
+  const zeroRowMode = hasCash ? DEFAULT_PAYMENT_MODE : modeIds[0] ?? null;
   const paidByPoints = loyaltyAmount > 0 && finalTotal <= 0.005 && payments.length === 0 && !!zeroRowMode;
-  const paymentsSent = paidByPoints ? [{ mode_of_payment: zeroRowMode, amount: 0 }] : payments;
-  const shortfall = finalTotal - paymentsTotal;
-  const isShort = shortfall > 0.005;
+  const paymentsSent = paidByPoints ? [{ mode_of_payment: zeroRowMode as string, amount: 0 }] : payments;
+  const diff = round2(paymentsTotal - finalTotal);
+  const isShort = diff < -0.005;
 
-  const finalAdjustment = orderTotal - discountedTotal;
-  const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
-  const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
+  const finalAdjustment = round2(orderTotal - discountedTotal);
+  const showFinalAdjustment = Math.abs(finalAdjustment) > 0.001;
 
-  useEffect(()=>{
-    const defaultPaymentModePresent=paymentModes.find((mode)=>mode===DEFAULT_PAYMENT_MODE)
-    //only one payment mode should be present, then autofill the final amount, if not do not fill
-    const otherPaymentModesNotEntered=Object.keys(paymentInputs).length<=1;
-    if(finalTotal && paymentModes && DEFAULT_PAYMENT_MODE && defaultPaymentModePresent && otherPaymentModesNotEntered){
-      //check if default payment mode is present in paymentModes
-      setPaymentInputs((prev)=>({ 
-        ...prev,
-        [DEFAULT_PAYMENT_MODE]:String(finalTotal) 
-      }))
+  const discountEnabled = storePosProfile?.enable_discount === 1 && allowDiscount;
+  const locked = isProcessing;
+
+  // --- Cash and other methods ---
+
+  const tapBill = (value: number) => {
+    if (locked) return;
+    const now = Date.now();
+    const last = lastBillTap.current;
+    if (last && last.value === value && now - last.at < BILL_DEBOUNCE_MS) return;
+    lastBillTap.current = { value, at: now };
+    setError(null);
+    if (cashPrefilled) {
+      // First bill replaces the prefilled amount (68 order, tap 20 = 20, not 88).
+      setCashPrefilled(false);
+      setTally({ [value]: 1 });
+      setAmounts((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: value }));
+      return;
     }
-    // Patch 47: points now cover the whole order, so no cash is due.
-    if (!finalTotal && loyaltyAmount > 0 && otherPaymentModesNotEntered && defaultPaymentModePresent) {
-      setPaymentInputs((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: '' }))
-    }
-  },[finalTotal,paymentModes])
-
-  // Helper to calculate remaining balance
-  const getRemainingBalance = (currentId: string) => {
-    const totalEntered = Object.entries(paymentInputs)
-      .filter(([id]) => id !== currentId)
-      .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
-    return Math.max(0, finalTotal - totalEntered);
+    setTally((prev) => ({ ...prev, [value]: (prev[value] || 0) + 1 }));
+    setAmounts((prev) => ({ ...prev, [DEFAULT_PAYMENT_MODE]: round2((prev[DEFAULT_PAYMENT_MODE] || 0) + value) }));
   };
 
-  // Handler for input focus to auto-fill remaining balance
-  const handlePaymentInputFocus = (id: string) => {
-    // Only auto-fill if the field is empty or zero
-    if (!paymentInputs[id] || parseFloat(paymentInputs[id]) === 0) {
-      const remaining = getRemainingBalance(id);
-      if (remaining > 0) {
-        setPaymentInputs(inputs => ({ ...inputs, [id]: String(remaining) }));
-        // Patch 19/23: the next keystroke replaces the prefilled amount (tendered cash
-        // 100 on 68 gives 100, not 68100), even when typed before the selection shows.
-        setPrefilledId(id);
+  const setExactCash = () => {
+    if (locked) return;
+    setCashPrefilled(true);
+    setTally({});
+    setAmounts((prev) => {
+      const next = { ...prev };
+      delete next[DEFAULT_PAYMENT_MODE];
+      return next;
+    });
+  };
+
+  const clearMode = (id: string) => {
+    if (locked) return;
+    if (id === DEFAULT_PAYMENT_MODE) {
+      setCashPrefilled(false);
+      setTally({});
+    }
+    setAmounts((prev) => ({ ...prev, [id]: 0 }));
+  };
+
+  // "Reste": this method takes what the other methods leave. Prefilled cash counts as 0.
+  const restToMode = (id: string) => {
+    if (locked) return;
+    const others = modeIds
+      .filter((m) => m !== id)
+      .reduce((sum, m) => sum + (m === DEFAULT_PAYMENT_MODE ? (cashPrefilled ? 0 : amounts[m] || 0) : amounts[m] || 0), 0);
+    if (hasCash && cashPrefilled) {
+      setCashPrefilled(false);
+      setTally({});
+    }
+    setAmounts((prev) => ({
+      ...prev,
+      ...(hasCash && cashPrefilled ? { [DEFAULT_PAYMENT_MODE]: 0 } : {}),
+      [id]: Math.max(0, round2(finalTotal - others)),
+    }));
+  };
+
+  // --- Keypad ---
+
+  const openKeypad = (target: KeypadTarget) => {
+    if (locked) return;
+    setKeypad(target);
+    setBuf('');
+    setKeypadError(null);
+  };
+
+  const closeKeypad = () => {
+    setKeypad(null);
+    setBuf('');
+    setKeypadError(null);
+  };
+
+  const pressKey = (k: string) => {
+    setKeypadError(null);
+    setBuf((b) => {
+      if (k === 'del') return b.slice(0, -1);
+      if (k === '.') return b.includes('.') ? b : (b || '0') + '.';
+      if (b.length >= MAX_KEYPAD_CHARS) return b;
+      // At most two decimals (cents).
+      const dot = b.indexOf('.');
+      if (dot >= 0 && b.length - dot > 2) return b;
+      return b + k;
+    });
+  };
+
+  const removeDiscount = () => {
+    setAppliedDiscount(0);
+    setAppliedPercent(0);
+    setShownPercent(null);
+  };
+
+  const confirmKeypad = () => {
+    if (!keypad) return;
+    const v = parseFloat(buf) || 0;
+    if (keypad.kind === 'mode') {
+      if (keypad.mode === DEFAULT_PAYMENT_MODE) {
+        setCashPrefilled(false);
+        setTally({});
       }
+      setAmounts((prev) => ({ ...prev, [keypad.mode]: round2(v) }));
+    } else if (keypad.kind === 'discount') {
+      if (v <= 0) {
+        removeDiscount();
+      } else if (discountUnit === 'pct') {
+        if (v > 100) {
+          setKeypadError(t('errors.discount_exceeds_max'));
+          return;
+        }
+        // Patch 09: whole cents, as ERPNext rounds discount_amount, so the amount asked
+        // matches the saved total.
+        setAppliedDiscount(Math.round(baseTotal * v) / 100);
+        setAppliedPercent(v);
+        setShownPercent(v);
+      } else {
+        if (v > baseTotal) {
+          setKeypadError(t('errors.discount_exceeds_total'));
+          return;
+        }
+        setAppliedDiscount(round2(v));
+        setAppliedPercent(baseTotal > 0 ? (v / baseTotal) * 100 : 0);
+        setShownPercent(null);
+      }
+    } else {
+      const pts = Math.floor(v);
+      if (pts > maxPoints) {
+        setKeypadError(t('loyalty.points_exceed_max', { max: maxPoints }));
+        return;
+      }
+      setPointsWanted(pts);
     }
-  };
-
-  const handlePaymentInputChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    if (prefilledId === id) {
-      const input = e.nativeEvent as InputEvent;
-      if (input.inputType === 'insertText' && input.data) value = input.data;
-      else if (input.inputType?.startsWith('delete')) value = '';
-      setPrefilledId(null);
-    }
-    setPaymentInputs(inputs => ({ ...inputs, [id]: value }));
+    setError(null);
+    closeKeypad();
   };
 
   const handlePayment = async () => {
@@ -297,229 +379,344 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     }
   };
 
+  // --- Rendering helpers ---
+
+  const isEditing = (target: KeypadTarget) =>
+    !!keypad && keypad.kind === target.kind && (target.kind !== 'mode' || (keypad.kind === 'mode' && keypad.mode === target.mode));
+  const fieldBorder = (target: KeypadTarget) =>
+    isEditing(target) ? 'border-2 border-primary' : 'border border-gray-300';
+  const sideButton = 'h-16 rounded-[10px] border border-gray-300 bg-gray-50 font-semibold text-gray-900 disabled:opacity-50';
+  const clearButton = 'h-16 w-16 shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-red-700 flex items-center justify-center disabled:opacity-50';
+
+  const tallyNote = BILLS.filter((v) => tally[v])
+    .map((v) => (tally[v] > 1 ? `${v} × ${tally[v]}` : String(v)))
+    .join(' + ');
+
+  const keypadHint = (() => {
+    if (!keypad) return '';
+    if (keypad.kind === 'mode') return keypad.mode === DEFAULT_PAYMENT_MODE ? t('payment.keypad_cash') : t('payment.keypad_card', { mode: keypad.mode });
+    if (keypad.kind === 'discount') return discountUnit === 'pct' ? t('payment.keypad_discount_pct') : t('payment.keypad_discount_amount');
+    return t('loyalty.points_placeholder', { max: maxPoints });
+  })();
+  const keypadDisplay = (buf || '0') + (keypad?.kind === 'discount' && discountUnit === 'pct' ? ' %' : '');
+
+  const modeRow = (id: string) => {
+    const amount = amounts[id] || 0;
+    return (
+      <div key={id} className="flex items-center gap-2.5 h-16 shrink-0">
+        <span className="w-24 shrink-0 text-base font-semibold leading-5 break-words">{id}</span>
+        <Button variant="outline"
+          type="button"
+          aria-label={id}
+          onClick={() => openKeypad({ kind: 'mode', mode: id })}
+          disabled={locked}
+          className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-start ${fieldBorder({ kind: 'mode', mode: id })}`}
+        >
+          <span className={`text-[26px] font-semibold truncate ${amount > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+            {amount > 0 ? formatCurrency(amount) : t('payment.none')}
+          </span>
+        </Button>
+        <Button variant="outline" type="button" onClick={() => restToMode(id)} disabled={locked} className={`${sideButton} w-[88px] shrink-0 text-[17px]`}>
+          {t('payment.rest')}
+        </Button>
+        <Button variant="outline" type="button" aria-label={t('payment.clear_mode', { mode: id })} onClick={() => clearMode(id)} disabled={locked} className={clearButton}>
+          <CloseIcon strong />
+        </Button>
+      </div>
+    );
+  };
+
+  let hero: { label: string; value: number; bg: string; fg: string };
+  if (diff > 0.005) hero = { label: t('payment.to_return'), value: diff, bg: '#ECFDF3', fg: '#065F46' };
+  else if (isShort) hero = { label: t('payment.missing'), value: -diff, bg: '#FFFBEB', fg: '#92400E' };
+  else hero = { label: t('payment.exact_change'), value: 0, bg: '#F3F4F6', fg: '#1F2937' };
+
+  // Patch 54: not while the keypad is open, or a typed but unvalidated amount would be dropped.
+  const payDisabled = isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort || keypad !== null;
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-dialog-max-h flex flex-col md:flex-row p-0" showCloseButton={false}>
-        {/* Left Column - Discount and Payment Mode */}
-        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">{t('payment.title')}</h2>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-              className="p-2"
-            >
-              <X className="w-5 h-5" />
+      <DialogContent
+        variant="xlarge"
+        className="bg-white w-full max-w-[976px] max-h-[94vh] lg:h-[min(720px,94vh)] flex flex-col lg:flex-row p-0 overflow-y-auto lg:overflow-hidden tabular-nums text-gray-900"
+        showCloseButton={false}
+      >
+        {/* Left column: cash, bills or keypad, other methods */}
+        <div className="lg:w-[580px] lg:shrink-0 px-7 py-6 flex flex-col gap-3.5 border-b lg:border-b-0 lg:border-e border-gray-200 lg:overflow-y-auto">
+          <div className="flex items-center justify-between h-12 shrink-0">
+            <h2 className="text-[26px] font-bold">{t('payment.title')}</h2>
+            <Button variant="ghost" type="button" aria-label={t('payment.close')} onClick={onClose} className="w-12 h-12 flex items-center justify-center">
+              <CloseIcon />
             </Button>
           </div>
 
-          {/* Discount Section (conditional) */}
-          {storePosProfile?.enable_discount === 1 && allowDiscount && (
-            <div className="space-y-4 mb-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Percent className="w-5 h-5" />
-                {t('payment.apply_discount')}
-              </h3>
-              <div className="flex gap-2 items-center">
-                <span className="w-12 text-sm font-medium text-gray-700">%</span>
-                <Input
-                  type="number"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  placeholder={t('payment.discount_placeholder')}
-                  size="sm"
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleApplyDiscount}
-                  variant="default"
-                  size="sm"
-                >
-                  {t('common.apply')}
-                </Button>
-              </div>
-              <div className="flex gap-2 items-center">
-                <span className="w-12 text-sm font-medium text-gray-700">{currencySymbol || currency}</span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={discountAmountValue}
-                  onChange={(e) => setDiscountAmountValue(e.target.value)}
-                  placeholder={t('payment.discount_amount_placeholder')}
-                  size="sm"
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleApplyDiscountAmount}
-                  variant="default"
-                  size="sm"
-                >
-                  {t('common.apply')}
-                </Button>
-              </div>
+          {hasCash && (
+            <div className="flex items-center gap-2.5 h-16 shrink-0">
+              <span className="w-24 shrink-0 text-lg font-semibold break-words leading-5">{DEFAULT_PAYMENT_MODE}</span>
+              <Button variant="outline"
+                type="button"
+                aria-label={t('payment.keypad_cash')}
+                onClick={() => openKeypad({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}
+                disabled={locked}
+                className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 ${fieldBorder({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}`}
+              >
+                <span className={`text-[26px] font-semibold truncate ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
+                  {formatCurrency(cashAmount)}
+                </span>
+                <span className="text-[15px] font-medium text-gray-600 whitespace-nowrap truncate" dir="ltr">
+                  {cashPrefilled ? (cashAmount > 0 ? t('payment.exact_amount') : '') : tallyNote}
+                </span>
+              </Button>
+              <Button variant="outline" type="button" onClick={setExactCash} disabled={locked} className={`${sideButton} w-[88px] shrink-0 text-[17px]`}>
+                {t('payment.exact')}
+              </Button>
+              <Button variant="outline"
+                type="button"
+                aria-label={t('payment.clear_mode', { mode: DEFAULT_PAYMENT_MODE })}
+                onClick={() => clearMode(DEFAULT_PAYMENT_MODE)}
+                disabled={locked}
+                className={clearButton}
+              >
+                <CloseIcon strong />
+              </Button>
             </div>
           )}
 
-          {/* Patch 47: loyalty points of the order's customer */}
-          {loyalty && maxPoints > 0 && (
-            <div className="space-y-2 mb-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Gift className="w-5 h-5" />
-                {t('loyalty.title')}
-              </h3>
-              <p className="text-sm text-gray-600">
-                {t('loyalty.available', {
-                  points: loyalty.points,
-                  amount: formatCurrency(loyalty.points * loyalty.conversion_factor),
-                })}
-              </p>
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="number"
-                  min="0"
-                  max={maxPoints}
-                  step="1"
-                  value={pointsInput}
-                  onChange={(e) => setPointsInput(e.target.value)}
-                  placeholder={t('loyalty.points_placeholder', { max: maxPoints })}
-                  size="sm"
-                  className="flex-1"
-                  disabled={isProcessing}
-                />
-                <Button onClick={() => setPointsInput(String(maxPoints))} variant="default" size="sm" disabled={isProcessing}>
-                  {t('loyalty.use_max')}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Payment Methods Section - Split Payment */}
-          <div className="space-y-4 mb-6">
-            <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
-            <div className="grid grid-cols-1 gap-3">
-              {paymentModes.map((mode: any) => {
-                const id = typeof mode === 'string' ? mode : mode.id;
-                return (
-                  <div key={id} className="flex items-center gap-3">
-                    <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paymentInputs[id] || ''}
-                      onChange={e => handlePaymentInputChange(id, e)}
-                      onBlur={() => setPrefilledId(null)}
-                      onFocus={(e) => {
-                        handlePaymentInputFocus(id);
-                        // Select the prefilled amount so typing the tendered cash replaces it (100, not 68100).
-                        const input = e.currentTarget;
-                        requestAnimationFrame(() => input.select());
-                      }}
-                      placeholder={t('payment.amount_placeholder')}
-                      className="flex-1"
-                      size="sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between mt-2 text-sm">
-              <span className="font-medium">{t('payment.total_entered')}</span>
-              <span className={`${isShort ? 'text-amber-700' : 'text-green-600'} font-semibold flex items-center gap-1`}>
-                {formatCurrency(paymentsTotal)} / {formatCurrency(finalTotal)}
-                {paymentsTotal > finalTotal && (
-                  <span className="text-yellow-700 font-semibold">
-                    <Coins className="inline w-4 h-4 ml-1 text-yellow-500" />
-                    <span className="text-yellow-500 font-bold ml-1">{formatCurrency(paymentsTotal - finalTotal)}</span>
+          {keypad ? (
+            <div className="h-[380px] lg:h-auto lg:flex-1 lg:min-h-[300px] flex flex-col gap-2.5">
+              <div className="min-h-14 shrink-0 flex items-center gap-2.5">
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span className={`text-sm font-medium leading-4 line-clamp-2 ${keypadError ? 'text-red-700' : 'text-gray-600'}`} role={keypadError ? 'alert' : undefined}>
+                    {keypadError || keypadHint}
                   </span>
+                  <span className="text-[26px] font-bold leading-[30px] min-h-[30px]" dir="ltr">{keypadDisplay}</span>
+                </div>
+                {keypad.kind === 'discount' && (
+                  <>
+                    <Button variant="outline"
+                      type="button"
+                      onClick={() => { setDiscountUnit('pct'); setKeypadError(null); }}
+                      className={`w-14 h-[52px] rounded-[10px] border border-gray-300 text-lg font-semibold ${discountUnit === 'pct' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-900'}`}
+                    >
+                      %
+                    </Button>
+                    <Button variant="outline"
+                      type="button"
+                      onClick={() => { setDiscountUnit('amt'); setKeypadError(null); }}
+                      className={`min-w-[64px] px-2 h-[52px] rounded-[10px] border border-gray-300 text-base font-semibold ${discountUnit === 'amt' ? 'bg-primary text-white' : 'bg-gray-50 text-gray-900'}`}
+                    >
+                      {currencySymbol || currency}
+                    </Button>
+                  </>
                 )}
-              </span>
+                <Button variant="ghost" type="button" aria-label={t('payment.close_keypad')} onClick={closeKeypad} className="w-[52px] h-[52px] flex items-center justify-center">
+                  <CloseIcon size={22} />
+                </Button>
+              </div>
+              <div dir="ltr" className="flex-1 min-h-0 grid grid-cols-[repeat(3,minmax(0,1fr))_116px] grid-rows-4 gap-2">
+                <Button variant="default"
+                  type="button"
+                  onClick={confirmKeypad}
+                  style={{ gridColumn: 4, gridRow: '1 / span 4' }}
+                  className="h-auto rounded-[10px] bg-primary text-white text-[19px] font-semibold"
+                >
+                  {t('payment.validate')}
+                </Button>
+                {KEYS.map((k, i) => (
+                  <Button variant="outline"
+                    key={k}
+                    type="button"
+                    aria-label={k === 'del' ? t('payment.backspace') : k}
+                    onClick={() => pressKey(k)}
+                    disabled={k === '.' && keypad.kind === 'points'}
+                    style={{ gridColumn: (i % 3) + 1, gridRow: Math.floor(i / 3) + 1 }}
+                    className="h-auto rounded-[10px] border border-gray-300 bg-gray-50 text-[28px] font-semibold disabled:opacity-40"
+                  >
+                    {k === 'del' ? '⌫' : k}
+                  </Button>
+                ))}
+              </div>
             </div>
-            {isShort && (
-              <p role="status" className="text-amber-700 text-sm font-medium">
-                {t('payment.short_by', { amount: formatCurrency(shortfall) })}
-              </p>
-            )}
-            {paymentsTotal > finalTotal && (
-              <p className="text-yellow-700 text-sm font-medium">
-                {t('payment.change_due', { amount: formatCurrency(paymentsTotal - finalTotal) })}
-              </p>
-            )}
-          </div>
+          ) : hasCash ? (
+            <div className="h-[380px] lg:h-auto lg:flex-1 lg:min-h-[300px] flex flex-col gap-3">
+              <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-3">
+                {BILLS.map((v) => {
+                  const c = BILL_COLORS[v] || BILL_FALLBACK;
+                  const count = cashPrefilled ? 0 : tally[v] || 0;
+                  const used = count > 0;
+                  return (
+                    <Button variant="outline"
+                      key={v}
+                      type="button"
+                      aria-label={t('payment.add_bill', { value: v })}
+                      onClick={() => tapBill(v)}
+                      disabled={locked}
+                      className="relative h-auto rounded-xl border-2 text-[60px] font-bold tracking-[-0.02em] select-none touch-manipulation"
+                      style={{ background: used ? c.solid : c.bg, borderColor: used ? c.solid : c.line, color: used ? '#FFFFFF' : c.fg }}
+                    >
+                      {v}
+                      {used && (
+                        <span
+                          className="absolute top-3 end-3 min-w-[32px] px-2.5 py-1 rounded-2xl bg-white text-xl font-bold tracking-normal"
+                          style={{ color: c.solid }}
+                          dir="ltr"
+                        >
+                          × {count}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button variant="outline"
+                type="button"
+                onClick={() => openKeypad({ kind: 'mode', mode: DEFAULT_PAYMENT_MODE })}
+                disabled={locked}
+                className="h-[60px] shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-lg font-semibold disabled:opacity-50"
+              >
+                {t('payment.other_amount')}
+              </Button>
+            </div>
+          ) : (
+            <div className="lg:flex-1" />
+          )}
+
+          {otherModes.map(modeRow)}
         </div>
 
-        {/* Right Column - Order Summary and Pay Button */}
-        <div className="md:w-1/2 p-6 overflow-y-auto">
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm">{error}</p>
+        {/* Right column: summary, change, pay */}
+        <div className="flex-1 min-w-0 px-7 py-6 flex flex-col gap-3.5 lg:overflow-y-auto">
+          <h3 className="h-12 shrink-0 flex items-center text-[22px] font-bold">{t('payment.order_summary')}</h3>
+          {tableLabel && (
+            <div className="flex justify-between text-lg text-gray-600">
+              <span>{t('tables.table_name')}</span>
+              <span className="font-medium text-gray-900">{tableLabel}</span>
             </div>
           )}
-
-          {/* Order Summary */}
-          <div className="space-y-3 mb-6">
-            <h3 className="text-lg font-semibold">{t('payment.order_summary')}</h3>
-            {tableLabel && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{t('tables.table_name')}</span>
-                <span className="font-medium">{tableLabel}</span>
-              </div>
-            )}
-            <div className="space-y-2 text-sm">
-              {/* Subtotal (Grand Total) */}
-              <div className="flex justify-between">
-                <span className="text-gray-600">{t('payment.subtotal')}</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              {/* Discount */}
-              {appliedDiscount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>{t('payment.discount')}</span>
-                  <span>-{formatCurrency(appliedDiscount)}</span>
-                </div>
-              )}
-              {/* Adjustment (if any) */}
-              {showFinalAdjustment && (
-                <div className="flex justify-between text-blue-600">
-                  <span>{t('payment.adjustment')}</span>
-                  <span>{roundedFinalAdjustment > 0 ? '+' : ''}{formatCurrency(roundedFinalAdjustment)}</span>
-                </div>
-              )}
-              {/* Final Total (Rounded) */}
-              <div className="border-t pt-2">
-                <div className="flex justify-between font-semibold text-lg">
-                  <span>{t('payment.total')}</span>
-                  <span>{formatCurrency(orderTotal)}</span>
-                </div>
-              </div>
-              {/* Patch 47: points used and what is left to pay */}
-              {loyaltyAmount > 0 && (
-                <>
-                  <div className="flex justify-between text-green-600">
-                    <span>{t('loyalty.points_used', { points: pointsUsed })}</span>
-                    <span>-{formatCurrency(loyaltyAmount)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>{t('loyalty.left_to_pay')}</span>
-                    <span>{formatCurrency(finalTotal)}</span>
-                  </div>
-                </>
-              )}
-            </div>
+          <div className="flex justify-between text-lg text-gray-600">
+            <span>{t('payment.subtotal')}</span>
+            <span>{formatCurrency(subtotal)}</span>
           </div>
 
-          {/* Payment Button */}
-          <Button
-            onClick={handlePayment}
-            disabled={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort}
-            variant={isProcessing || roundToHalf === null || paymentsSent.length === 0 || isShort ? "secondary" : "default"}
-            className="w-full"
+          {discountEnabled ? (
+            <div className="flex gap-2.5 h-14 shrink-0">
+              <Button variant="outline"
+                type="button"
+                onClick={() => openKeypad({ kind: 'discount' })}
+                disabled={locked}
+                className={`flex-1 min-w-0 h-14 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 text-[17px] font-semibold ${fieldBorder({ kind: 'discount' })} ${appliedDiscount > 0 ? 'text-green-700' : 'text-gray-900'}`}
+              >
+                <span className="truncate">
+                  {appliedDiscount > 0
+                    ? shownPercent !== null
+                      ? t('payment.discount_pct_label', { pct: round2(shownPercent) })
+                      : t('payment.discount')
+                    : t('payment.add_discount')}
+                </span>
+                {appliedDiscount > 0 && <span className="whitespace-nowrap">−{formatCurrency(appliedDiscount)}</span>}
+              </Button>
+              {appliedDiscount > 0 && (
+                <Button variant="outline"
+                  type="button"
+                  aria-label={t('payment.remove_discount')}
+                  onClick={() => { if (!locked) { removeDiscount(); if (keypad?.kind === 'discount') closeKeypad(); } }}
+                  disabled={locked}
+                  className="w-14 h-14 shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-red-700 flex items-center justify-center disabled:opacity-50"
+                >
+                  <CloseIcon strong />
+                </Button>
+              )}
+            </div>
+          ) : appliedDiscount > 0 ? (
+            <div className="flex justify-between text-lg text-green-700">
+              <span>{t('payment.discount')}</span>
+              <span>−{formatCurrency(appliedDiscount)}</span>
+            </div>
+          ) : null}
+
+          {showFinalAdjustment && (
+            <div className="flex justify-between text-base text-gray-600">
+              <span>{t('payment.adjustment')}</span>
+              <span>{finalAdjustment > 0 ? '+' : ''}{formatCurrency(finalAdjustment)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-baseline text-[26px] font-bold border-t border-gray-200 pt-3.5">
+            <span>{t('payment.total')}</span>
+            <span>{formatCurrency(orderTotal)}</span>
+          </div>
+          {/* Patch 47 / 54: loyalty points of the order's customer, keypad-edited */}
+          {loyalty && maxPoints > 0 && (
+            <div className="flex gap-2.5 h-14 shrink-0">
+              <Button variant="outline"
+                type="button"
+                onClick={() => openKeypad({ kind: 'points' })}
+                disabled={locked}
+                className={`flex-1 min-w-0 h-14 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 text-[15px] font-semibold ${fieldBorder({ kind: 'points' })} ${pointsUsed > 0 ? 'text-green-700' : 'text-gray-900'}`}
+              >
+                <span className="truncate">
+                  {pointsUsed > 0
+                    ? t('loyalty.points_used', { points: pointsUsed })
+                    : t('loyalty.available', { points: loyalty.points, amount: formatCurrency(loyalty.points * loyalty.conversion_factor) })}
+                </span>
+                {pointsUsed > 0 && <span className="whitespace-nowrap">−{formatCurrency(loyaltyAmount)}</span>}
+              </Button>
+              {pointsUsed > 0 ? (
+                <Button variant="outline"
+                  type="button"
+                  aria-label={t('loyalty.remove_points')}
+                  onClick={() => { if (!locked) setPointsWanted(0); }}
+                  disabled={locked}
+                  className="w-14 h-14 shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-red-700 flex items-center justify-center disabled:opacity-50"
+                >
+                  <CloseIcon strong />
+                </Button>
+              ) : (
+                <Button variant="outline"
+                  type="button"
+                  onClick={() => { if (!locked) setPointsWanted(maxPoints); }}
+                  disabled={locked}
+                  className="h-14 shrink-0 px-3 rounded-[10px] border border-gray-300 bg-gray-50 text-[15px] font-semibold disabled:opacity-50"
+                >
+                  {t('loyalty.use_max')}
+                </Button>
+              )}
+            </div>
+          )}
+          {loyaltyAmount > 0 && (
+            <div className="flex justify-between text-lg font-semibold">
+              <span>{t('loyalty.left_to_pay')}</span>
+              <span>{formatCurrency(finalTotal)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-lg text-gray-600">
+            <span>{t('payment.received')}</span>
+            <span>{formatCurrency(paymentsTotal)}</span>
+          </div>
+
+          <div className="flex-1 min-h-0 flex flex-col justify-end">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+          </div>
+
+          <div
+            className="h-[156px] min-h-[112px] shrink rounded-xl p-5 flex flex-col justify-center gap-1"
+            style={{ background: hero.bg, color: hero.fg }}
+            role="status"
           >
-            {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
+            <span className="text-[19px] font-semibold">{hero.label}</span>
+            {/* Long amounts drop to 44px so they fit the ~300px panel instead of being cut. */}
+            <span className={`font-bold tracking-[-0.02em] truncate ${formatCurrency(hero.value).length > 9 ? 'text-[44px] leading-[52px]' : 'text-[60px] leading-[68px]'}`}>{formatCurrency(hero.value)}</span>
+          </div>
+          <Button variant="default"
+            type="button"
+            onClick={handlePayment}
+            disabled={payDisabled}
+            className={`h-[76px] shrink-0 rounded-xl text-[22px] font-bold disabled:opacity-100 ${payDisabled ? 'bg-gray-200 text-gray-600' : 'bg-primary text-white'}`}
+          >
+            {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(finalTotal) })}
           </Button>
         </div>
       </DialogContent>
@@ -527,4 +724,4 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   );
 };
 
-export default PaymentDialog; 
+export default PaymentDialog;

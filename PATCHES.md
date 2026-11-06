@@ -262,6 +262,8 @@ line in the tab save/restore blocks and to the draft object built in
 
 ### Patch 07 — Payment dialog discount: send a percentage, add a fixed-amount mode
 
+> Superseded in `PaymentDialog.tsx` by Patch 54 (dialog rewritten for touch, no text inputs). Do not reapply this patch's PaymentDialog changes; its maths is kept in Patch 54.
+
 Bug fix plus feature (PRD 7.5, ticket 05): the fix is sending the percentage;
 the amount field is the amount entry the PRD asks for.
 
@@ -883,6 +885,8 @@ Backend only: restart, no build; translations need a clear-cache.
 
 ### Patch 19 — Payment amount replaced on typing, no unfinished Shift Brief
 
+> Superseded in `PaymentDialog.tsx` by Patch 54 (dialog rewritten for touch, no text inputs). Do not reapply this patch's PaymentDialog changes; its maths is kept in Patch 54.
+
 Bug fix (browser audit 2026-10-19, findings 6, 16 and 30).
 
 Files touched:
@@ -998,6 +1002,8 @@ Risk profile: low to medium (CaptainOrder.tsx is edited upstream). On a conflict
 keep the `t('...')` calls and `fetchPosProfile(true)`.
 
 ### Patch 23 — Cash amount replaced on the first keystroke, waiter no-shift message, wide waiter layout
+
+> Superseded in `PaymentDialog.tsx` by Patch 54 (dialog rewritten for touch, no text inputs). Do not reapply this patch's PaymentDialog changes; its maths is kept in Patch 54.
 
 Bug fix (browser retest 3, 2026-10-20, findings N1 and N3) and owner layout change.
 
@@ -2344,6 +2350,94 @@ criteria 2, 4 to 7. Known gap: a QZ print that never ends (waiting on QZ Tray's 
 keeps Payment blocked; Patch 53 only acts once the print fails.
 
 Patch file: `patches/53-pay-after-failed-print.patch`. Commit: 58994fbd.
+
+### Patch 54 — Touch payment dialog: bill buttons, keypad, remise
+
+Owner request 2026-11-06 (design handoff `docs/design/payment-prototype/HANDOFF.md` in the
+workspace, written as "Patch 41" before that number was taken). The till is a touchscreen with
+no keyboard: every number input in the payment dialog opened the system keyboard.
+
+Files touched: `pos/src/components/PaymentDialog.tsx` (rewritten layout and input handling),
+`pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`payment.*` keys for the new controls,
+`loyalty.points_exceed_max`, `loyalty.remove_points`; `payment.discount_placeholder`,
+`discount_amount_placeholder`, `amount_placeholder` removed, nothing else used them)
+
+What it does: no field in the dialog is a text input, so the system keyboard never opens.
+- Left column: cash row (amount button, `Exact`, clear), then either a 2×2 grid of bills
+  (`BILLS = [20, 50, 100, 200]`, a constant at the top of the file, coloured after the notes)
+  with `Autre montant`, or an on-screen keypad (`7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫` + tall
+  `Valider`); then one row per other payment method (amount button, `Reste`, clear).
+- Cash starts prefilled with what is left to pay (grey, "Montant exact") and follows the total,
+  the remise, points and other methods while prefilled. The first bill tap replaces it (68
+  order, tap 20 = 20), later taps add (`20 × 2 + 50`, white `× n` badge on the bill). A
+  validated cash amount or a bill tap ends the prefill: the amount is never overwritten again
+  (the old autofill effect overwrote it when the total changed). Prefilled cash is now derived
+  in render, not written by an effect. A second tap on the same bill within 150 ms is ignored
+  (double-firing touch panels).
+- `Reste` gives a method what the others leave (prefilled cash counts as 0 and becomes 0).
+- Remise (same condition as before: `enable_discount` and not a merged bill): one row button
+  opens the keypad with a `%` / currency switch (last unit kept while the dialog is open);
+  `> 100 %` or more than the base total shows the error in red in the keypad, which stays
+  open; empty or 0 removes the remise; an X removes it. Same maths as Patches 07 and 09:
+  `make_invoice` gets a percentage, a fixed amount converts with `value / baseTotal * 100`,
+  whole-cent discount, round-to-half total and the Ajustement line.
+- Loyalty points (Patch 47) use the same keypad (integers only, error above the maximum) with
+  `Tout utiliser` and an X; behaviour and payload unchanged.
+- Right column: Sous-total, remise, points, Total, Reçu, then a change panel: `À rendre` (green),
+  `Manque` (amber, Pay disabled) or `Compte juste` (grey); Pay reads `Payer {left to pay}`
+  (was the amount received, `Payer 100` on a 68 order).
+- Supersedes the select-on-focus / `prefilledId` typing logic of Patches 19 and 23 and the
+  two discount inputs of Patch 07. Patch 45 (hidden methods) and 47 (points, receipt print)
+  keep their behaviour. The payload to `make_invoice` is unchanged: cash sent is what was
+  tendered, as before.
+- Pay is disabled while the keypad is open, so a typed but not validated amount (remise, cash,
+  points) is never dropped silently: the cashier taps Valider or closes the keypad first.
+- Behaviour change: amounts can no longer be typed on a physical keyboard (Windows tills), only
+  tapped on the keypad. Keyboard input on the keypad would be a separate owner decision.
+- Keys left unused by the rewrite are kept in the locales (`payment.apply_discount`,
+  `payment_methods`, `total_entered`, `short_by`, `change_due`, `errors.invalid_discount`,
+  `loyalty.title`): harmless, and `common.apply` is shared.
+- Layout targets 1024×768 landscape (976×720 dialog); below 1024 px wide the two columns stack
+  and the dialog scrolls. The keypad stays left-to-right in Arabic.
+
+Why it can't be done in `erp_restaurant`: the dialog is rendered by the POS React app; no
+hook, field or API changes how it takes input.
+
+Risk profile: medium. PaymentDialog.tsx is fully rewritten (upstream changes to it will not
+merge; reapply by intent). Payment payload and server rules unchanged.
+
+Acceptance criteria (68 MAD order):
+1. Open: cash 68 grey "Montant exact", Pay enabled, "Compte juste".
+2. Tap 20: cash 20, Manque 48, Pay disabled.
+3. Tap 20, 20, 50: cash 90 `20 × 2 + 50`, À rendre 22.
+4. Tap 100, remise 10 %: total 61.20 (61.50 with round-to-half), cash still 100, change updates.
+5. Remise 5 in amount: total 63, `make_invoice` gets about 7.35 %.
+6. Remise 150 %: error, keypad stays open, nothing applied.
+7. Tap 50 then `Reste` on card: card 18, Compte juste.
+8. `Exact` after bills: back to 68 prefilled, badges cleared.
+9. No action in the dialog opens the system keyboard (touch device).
+10. Merged bill: no remise row.
+11. Customer with points: points via the keypad and `Tout utiliser`, receipt as Patch 47.
+12. Keypad open (remise typed, not validated): Pay disabled.
+13. French, Arabic (RTL), English.
+
+Manual test (test-dev, touch device or iPad, a `Test ...` item at 68 or any price):
+run criteria 1 to 8 on one order (Exact and the clear X between steps), pay it cash and check
+the POS Invoice payment rows (cash = tendered, change = À rendre). Pay one order split cash +
+card. Pay one with remise 10 % and check the invoice's discount percentage. Type a remise without Valider: criterion 12. Open a merged
+bill: criterion 10. If a draft can carry a discount saved on the invoice, remove it with the X
+and pay: the POS Invoice total must match the dialog (not checked whether ERPNext keeps the
+saved discount_amount when the percentage is 0). Scan a loyalty card on an order: criterion 11. Repeat 1 to 3 in Arabic and
+English. Cancel or refund the test orders.
+
+Local checks 2026-11-06 (Claude): eslint clean on the file, `tsc` no new errors (3 earlier ones
+in ProductDialog, TableMergeDialog, Table), `yarn build` OK. Rendered in a throwaway local page
+at 1024×768 with mocked data (no server): criteria 1 to 4, 6, 7 and Arabic seen as expected.
+Not run: payment on a server, criterion 5 payload, 9 to 12, English, round-to-half.
+fork-patch-guardian review 2026-11-06: Pay-with-keypad-open bug fixed, superseded notes added
+to Patches 07, 19 and 23.
+
+Patch file: `patches/54-touch-payment-dialog.patch`. Commit: not committed yet.
 
 ## Build and deploy
 

@@ -83,10 +83,7 @@
     "payment": {
         "title": "الدفع",
         "apply_discount": "تطبيق الخصم",
-        "discount_placeholder": "أدخل نسبة %",
-        "discount_amount_placeholder": "أدخل المبلغ",
         "payment_methods": "طرق الدفع",
-        "amount_placeholder": "المبلغ",
         "total_entered": "الإجمالي المدخل",
         "order_summary": "ملخص الطلب",
         "subtotal": "المجموع الفرعي",
@@ -109,7 +106,29 @@
         "paid_now_invalid": "أدخل مبلغًا أكبر من 0 ولا يتجاوز {{total}}.",
         "paid_now_rest": "ستدين {{platform}} بمبلغ {{amount}} (عمولة).",
         "paid_now_confirm": "تسجيل الدفع",
-        "paid_now_done": "تم تسجيل الدفع: استلام {{amount}}."
+        "paid_now_done": "تم تسجيل الدفع: استلام {{amount}}.",
+        "other_amount": "مبلغ آخر",
+        "exact": "بالضبط",
+        "rest": "الباقي",
+        "none": "لا شيء",
+        "exact_amount": "المبلغ بالضبط",
+        "validate": "تأكيد",
+        "add_discount": "إضافة خصم",
+        "remove_discount": "إزالة الخصم",
+        "discount_pct_label": "خصم {{pct}} %",
+        "keypad_cash": "المبلغ المستلم نقدًا",
+        "keypad_card": "المبلغ: {{mode}}",
+        "keypad_discount_pct": "خصم بالنسبة المئوية",
+        "keypad_discount_amount": "خصم بالمبلغ",
+        "close_keypad": "إغلاق لوحة الأرقام",
+        "add_bill": "إضافة ورقة {{value}}",
+        "clear_mode": "مسح {{mode}}",
+        "to_return": "الباقي للزبون",
+        "missing": "ناقص",
+        "exact_change": "المبلغ مضبوط",
+        "received": "المستلم",
+        "backspace": "حذف آخر رقم",
+        "close": "إغلاق"
     },
     "pos": {
         "not_opened_title": "نقطة البيع غير مفتوحة",
@@ -673,6 +692,8 @@
         "share_text": "بطاقة الوفاء الخاصة بك في {{restaurant}}: اعرض هذا الرمز عند الصندوق لكسب النقاط.",
         "share_unsupported": "المشاركة غير متاحة على هذا الجهاز: تم تحميل البطاقة.",
         "share_failed": "تعذرت مشاركة البطاقة: تم تحميلها بدلا من ذلك.",
-        "card_image_failed": "تعذر إنشاء صورة البطاقة: اطبعها بدلا من ذلك."
+        "card_image_failed": "تعذر إنشاء صورة البطاقة: اطبعها بدلا من ذلك.",
+        "points_exceed_max": "الحد الأقصى {{max}} نقطة في هذا الطلب.",
+        "remove_points": "عدم استعمال النقاط"
     }
 }

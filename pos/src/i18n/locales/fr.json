@@ -76,10 +76,7 @@
   "payment": {
     "title": "Paiement",
     "apply_discount": "Appliquer une remise",
-    "discount_placeholder": "Entrer %",
-    "discount_amount_placeholder": "Entrer le montant",
     "payment_methods": "Modes de paiement",
-    "amount_placeholder": "Montant",
     "total_entered": "Total saisi",
     "order_summary": "Résumé de la commande",
     "subtotal": "Sous-total",
@@ -102,7 +99,29 @@
     "paid_now_invalid": "Saisissez un montant supérieur à 0 et au plus {{total}}.",
     "paid_now_rest": "{{platform}} devra {{amount}} (commission).",
     "paid_now_confirm": "Enregistrer le paiement",
-    "paid_now_done": "Paiement enregistré : {{amount}} reçu."
+    "paid_now_done": "Paiement enregistré : {{amount}} reçu.",
+    "other_amount": "Autre montant",
+    "exact": "Exact",
+    "rest": "Reste",
+    "none": "Aucun",
+    "exact_amount": "Montant exact",
+    "validate": "Valider",
+    "add_discount": "Ajouter une remise",
+    "remove_discount": "Retirer la remise",
+    "discount_pct_label": "Remise {{pct}} %",
+    "keypad_cash": "Montant reçu en espèces",
+    "keypad_card": "Montant : {{mode}}",
+    "keypad_discount_pct": "Remise en pourcentage",
+    "keypad_discount_amount": "Remise en montant",
+    "close_keypad": "Fermer le pavé",
+    "add_bill": "Ajouter un billet de {{value}}",
+    "clear_mode": "Effacer {{mode}}",
+    "to_return": "À rendre",
+    "missing": "Manque",
+    "exact_change": "Compte juste",
+    "received": "Reçu",
+    "backspace": "Effacer le dernier chiffre",
+    "close": "Fermer"
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",
@@ -666,6 +685,8 @@
     "share_text": "Votre carte fidélité {{restaurant}} : montrez ce code à la caisse pour gagner des points.",
     "share_unsupported": "Le partage n'est pas disponible sur cet appareil : la carte a été téléchargée.",
     "share_failed": "La carte n'a pas pu être partagée : elle a été téléchargée.",
-    "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt."
+    "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt.",
+    "points_exceed_max": "Au plus {{max}} points sur cette commande.",
+    "remove_points": "Ne pas utiliser de points"
   }
 }

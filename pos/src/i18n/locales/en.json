@@ -76,10 +76,7 @@
   "payment": {
     "title": "Payment",
     "apply_discount": "Apply Discount",
-    "discount_placeholder": "Enter %",
-    "discount_amount_placeholder": "Enter amount",
     "payment_methods": "Payment Methods",
-    "amount_placeholder": "Amount",
     "total_entered": "Total Entered",
     "order_summary": "Order Summary",
     "subtotal": "Subtotal",
@@ -102,7 +99,29 @@
     "paid_now_invalid": "Enter an amount above 0 and at most {{total}}.",
     "paid_now_rest": "{{platform}} will owe {{amount}} (commission).",
     "paid_now_confirm": "Record the payment",
-    "paid_now_done": "Payment recorded: {{amount}} received."
+    "paid_now_done": "Payment recorded: {{amount}} received.",
+    "other_amount": "Other amount",
+    "exact": "Exact",
+    "rest": "Rest",
+    "none": "None",
+    "exact_amount": "Exact amount",
+    "validate": "Confirm",
+    "add_discount": "Add a discount",
+    "remove_discount": "Remove the discount",
+    "discount_pct_label": "Discount {{pct}} %",
+    "keypad_cash": "Cash received",
+    "keypad_card": "Amount: {{mode}}",
+    "keypad_discount_pct": "Discount as a percentage",
+    "keypad_discount_amount": "Discount as an amount",
+    "close_keypad": "Close the keypad",
+    "add_bill": "Add a {{value}} bill",
+    "clear_mode": "Clear {{mode}}",
+    "to_return": "Change to give",
+    "missing": "Missing",
+    "exact_change": "Exact change",
+    "received": "Received",
+    "backspace": "Delete the last digit",
+    "close": "Close"
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
@@ -666,6 +685,8 @@
     "share_text": "Your {{restaurant}} loyalty card: show this code at the till to earn points.",
     "share_unsupported": "Sharing is not available on this device: the card was downloaded.",
     "share_failed": "The card could not be shared: it was downloaded instead.",
-    "card_image_failed": "The card picture could not be made: print it instead."
+    "card_image_failed": "The card picture could not be made: print it instead.",
+    "points_exceed_max": "At most {{max}} points on this order.",
+    "remove_points": "Do not use points"
   }
 }
