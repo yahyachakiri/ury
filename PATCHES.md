@@ -2370,7 +2370,9 @@ What it does: no field in the dialog is a text input, so the system keyboard nev
   `Valider`); then one row per other payment method (amount button, `Reste`, clear).
 - Cash starts prefilled with what is left to pay (grey, "Montant exact") and follows the total,
   the remise, points and other methods while prefilled. The first bill tap replaces it (68
-  order, tap 20 = 20), later taps add (`20 × 2 + 50`, white `× n` badge on the bill). A
+  order, tap 20 = 20), later taps add (white `× n` badge on the bill; no breakdown text in the cash field, so a
+  long tally never hides the amount, owner 2026-11-06). "Montant exact" shows whenever cash equals what the other
+  methods leave, prefilled or reached with bills (70 order, 20 + 50). A
   validated cash amount or a bill tap ends the prefill: the amount is never overwritten again
   (the old autofill effect overwrote it when the total changed). Prefilled cash is now derived
   in render, not written by an effect. A second tap on the same bill within 150 ms is ignored
@@ -2415,7 +2417,7 @@ merge; reapply by intent). Payment payload and server rules unchanged.
 Acceptance criteria (68 MAD order):
 1. Open: cash 68 grey "Montant exact", Pay enabled, "Compte juste".
 2. Tap 20: cash 20, Manque 48, Pay disabled.
-3. Tap 20, 20, 50: cash 90 `20 × 2 + 50`, À rendre 22.
+3. Tap 20, 20, 50: cash 90, badges `× 2` on 20 and `× 1` on 50, À rendre 22.
 4. Tap 100, remise 10 %: total 61.20 (61.50 with round-to-half), cash still 100, change updates.
 5. Remise 5 in amount: total 63, `make_invoice` gets about 7.35 %.
 6. Remise 150 %: error, keypad stays open, nothing applied.

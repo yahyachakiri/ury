@@ -197,6 +197,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // Patch 54: prefilled cash is derived, so it follows the remise, points and other methods,
   // and a tapped or validated amount is never overwritten (the old autofill effect did).
   const cashAmount = !hasCash ? 0 : cashPrefilled ? Math.max(0, round2(finalTotal - otherSum)) : (amounts[cashMode] || 0);
+  // Patch 54: "Montant exact" when cash is exactly what the other methods leave, prefilled or tapped.
+  const cashIsExact = hasCash && cashAmount > 0 && Math.abs(cashAmount - round2(finalTotal - otherSum)) < 0.005;
   const amountOf = (id: string) => (id === cashMode ? cashAmount : amounts[id] || 0);
 
   const payments = modeIds
@@ -398,10 +400,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const sideButton = 'h-16 rounded-[10px] border border-gray-300 bg-gray-50 font-semibold text-gray-900 disabled:opacity-50';
   const clearButton = 'h-16 w-16 shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-red-700 flex items-center justify-center disabled:opacity-50';
 
-  const tallyNote = BILLS.filter((v) => tally[v])
-    .map((v) => (tally[v] > 1 ? `${v} × ${tally[v]}` : String(v)))
-    .join(' + ');
-
   const keypadHint = (() => {
     if (!keypad) return '';
     if (keypad.kind === 'mode') return keypad.mode === cashMode ? t('payment.keypad_cash') : t('payment.keypad_card', { mode: keypad.mode });
@@ -470,12 +468,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 disabled={locked}
                 className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 ${fieldBorder({ kind: 'mode', mode: cashMode })}`}
               >
-                <span className={`text-[26px] font-semibold truncate ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
+                {/* The amount never shrinks; the tapped bills show on their own badges, not here. */}
+                <span className={`text-[26px] font-semibold shrink-0 ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
                   {formatCurrency(cashAmount)}
                 </span>
-                <span className="text-[15px] font-medium text-gray-600 whitespace-nowrap truncate" dir="ltr">
-                  {cashPrefilled ? (cashAmount > 0 ? t('payment.exact_amount') : '') : tallyNote}
-                </span>
+                {cashIsExact && (
+                  <span className="text-[15px] font-medium text-gray-600 whitespace-nowrap truncate">{t('payment.exact_amount')}</span>
+                )}
               </Button>
               <Button variant="outline" type="button" onClick={setExactCash} disabled={locked} className={`${sideButton} w-[88px] shrink-0 text-[17px]`}>
                 {t('payment.exact')}

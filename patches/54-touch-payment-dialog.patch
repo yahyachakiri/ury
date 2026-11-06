@@ -1,5 +1,5 @@
 diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
-index 479c59d7..f7fd6fb7 100644
+index 479c59d7..ef464f7c 100644
 --- a/pos/src/components/PaymentDialog.tsx
 +++ b/pos/src/components/PaymentDialog.tsx
 @@ -1,12 +1,33 @@
@@ -223,7 +223,7 @@ index 479c59d7..f7fd6fb7 100644
    const orderTotal = !allowDiscount
      ? Math.round(discountedTotal)
      : roundToHalf
-@@ -183,80 +189,166 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -183,80 +189,168 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
    const maxPoints = loyalty && loyalty.conversion_factor > 0
      ? Math.min(loyalty.points, Math.floor(orderTotal / loyalty.conversion_factor + 1e-9))
      : 0;
@@ -248,6 +248,8 @@ index 479c59d7..f7fd6fb7 100644
 +  // Patch 54: prefilled cash is derived, so it follows the remise, points and other methods,
 +  // and a tapped or validated amount is never overwritten (the old autofill effect did).
 +  const cashAmount = !hasCash ? 0 : cashPrefilled ? Math.max(0, round2(finalTotal - otherSum)) : (amounts[cashMode] || 0);
++  // Patch 54: "Montant exact" when cash is exactly what the other methods leave, prefilled or tapped.
++  const cashIsExact = hasCash && cashAmount > 0 && Math.abs(cashAmount - round2(finalTotal - otherSum)) < 0.005;
 +  const amountOf = (id: string) => (id === cashMode ? cashAmount : amounts[id] || 0);
 +
 +  const payments = modeIds
@@ -453,7 +455,7 @@ index 479c59d7..f7fd6fb7 100644
    };
  
    const handlePayment = async () => {
-@@ -297,229 +389,344 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -297,229 +391,341 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
      }
    };
  
@@ -465,10 +467,6 @@ index 479c59d7..f7fd6fb7 100644
 +    isEditing(target) ? 'border-2 border-primary' : 'border border-gray-300';
 +  const sideButton = 'h-16 rounded-[10px] border border-gray-300 bg-gray-50 font-semibold text-gray-900 disabled:opacity-50';
 +  const clearButton = 'h-16 w-16 shrink-0 rounded-[10px] border border-gray-300 bg-gray-50 text-red-700 flex items-center justify-center disabled:opacity-50';
-+
-+  const tallyNote = BILLS.filter((v) => tally[v])
-+    .map((v) => (tally[v] > 1 ? `${v} × ${tally[v]}` : String(v)))
-+    .join(' + ');
 +
 +  const keypadHint = (() => {
 +    if (!keypad) return '';
@@ -573,12 +571,13 @@ index 479c59d7..f7fd6fb7 100644
 +                disabled={locked}
 +                className={`flex-1 min-w-0 h-16 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 ${fieldBorder({ kind: 'mode', mode: cashMode })}`}
 +              >
-+                <span className={`text-[26px] font-semibold truncate ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
++                {/* The amount never shrinks; the tapped bills show on their own badges, not here. */}
++                <span className={`text-[26px] font-semibold shrink-0 ${cashPrefilled ? 'text-gray-500' : 'text-gray-900'}`}>
 +                  {formatCurrency(cashAmount)}
 +                </span>
-+                <span className="text-[15px] font-medium text-gray-600 whitespace-nowrap truncate" dir="ltr">
-+                  {cashPrefilled ? (cashAmount > 0 ? t('payment.exact_amount') : '') : tallyNote}
-+                </span>
++                {cashIsExact && (
++                  <span className="text-[15px] font-medium text-gray-600 whitespace-nowrap truncate">{t('payment.exact_amount')}</span>
++                )}
 +              </Button>
 +              <Button variant="outline" type="button" onClick={setExactCash} disabled={locked} className={`${sideButton} w-[88px] shrink-0 text-[17px]`}>
 +                {t('payment.exact')}
@@ -992,7 +991,7 @@ index 479c59d7..f7fd6fb7 100644
            </Button>
          </div>
        </DialogContent>
-@@ -527,4 +734,4 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+@@ -527,4 +733,4 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
    );
  };
  
@@ -1000,7 +999,7 @@ index 479c59d7..f7fd6fb7 100644
 \ No newline at end of file
 +export default PaymentDialog;
 diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
-index f6842b68..1562023e 100644
+index f6842b68..79b69832 100644
 --- a/pos/src/i18n/locales/ar.json
 +++ b/pos/src/i18n/locales/ar.json
 @@ -83,10 +83,7 @@
@@ -1045,7 +1044,15 @@ index f6842b68..1562023e 100644
      },
      "pos": {
          "not_opened_title": "نقطة البيع غير مفتوحة",
-@@ -673,6 +692,8 @@
+@@ -306,6 +325,7 @@
+         "unexpected": "حدث خطأ. أعد المحاولة؛ وإذا تكرر ذلك، أخبر المسؤول.",
+         "print_draw": "تعذر تجهيز التذكرة للطابعة. أعد المحاولة.",
+         "printer_unreachable": "الطابعة لا تستجيب. تحقق من أنها مشغلة ومتصلة بالشبكة، ثم أعد الطباعة.",
++        "qz_not_running": "برنامج QZ Tray غير مشغل على هذا الجهاز، شغّله ثم أعد الطباعة",
+         "load_app": "تعذر تحميل الصندوق. أعد تحميل الصفحة.",
+         "load_profile": "تعذر تحميل إعدادات الصندوق. أعد تحميل الصفحة.",
+         "load_menu": "تعذر تحميل القائمة. أعد تحميل الصفحة.",
+@@ -673,6 +693,8 @@
          "share_text": "بطاقة الوفاء الخاصة بك في {{restaurant}}: اعرض هذا الرمز عند الصندوق لكسب النقاط.",
          "share_unsupported": "المشاركة غير متاحة على هذا الجهاز: تم تحميل البطاقة.",
          "share_failed": "تعذرت مشاركة البطاقة: تم تحميلها بدلا من ذلك.",
@@ -1056,7 +1063,7 @@ index f6842b68..1562023e 100644
      }
  }
 diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
-index 15e24232..ccb3ebd5 100644
+index 15e24232..ecbeee93 100644
 --- a/pos/src/i18n/locales/en.json
 +++ b/pos/src/i18n/locales/en.json
 @@ -76,10 +76,7 @@
@@ -1101,7 +1108,15 @@ index 15e24232..ccb3ebd5 100644
    },
    "pos": {
      "not_opened_title": "POS Not Opened",
-@@ -666,6 +685,8 @@
+@@ -299,6 +318,7 @@
+     "unexpected": "Something went wrong. Try again; if it happens again, tell your manager.",
+     "print_draw": "The ticket could not be prepared for the printer. Try again.",
+     "printer_unreachable": "The printer does not answer. Check that it is on and connected to the network, then print again.",
++    "qz_not_running": "QZ Tray is not running on this device, start it and print again",
+     "load_app": "The till could not load. Reload the page.",
+     "load_profile": "The till settings could not load. Reload the page.",
+     "load_menu": "The menu could not load. Reload the page.",
+@@ -666,6 +686,8 @@
      "share_text": "Your {{restaurant}} loyalty card: show this code at the till to earn points.",
      "share_unsupported": "Sharing is not available on this device: the card was downloaded.",
      "share_failed": "The card could not be shared: it was downloaded instead.",
@@ -1112,7 +1127,7 @@ index 15e24232..ccb3ebd5 100644
    }
  }
 diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
-index 0a8c9ee2..48708c8e 100644
+index 0a8c9ee2..9fa66d6a 100644
 --- a/pos/src/i18n/locales/fr.json
 +++ b/pos/src/i18n/locales/fr.json
 @@ -76,10 +76,7 @@
@@ -1157,7 +1172,15 @@ index 0a8c9ee2..48708c8e 100644
    },
    "pos": {
      "not_opened_title": "PDV non ouvert",
-@@ -666,6 +685,8 @@
+@@ -299,6 +318,7 @@
+     "unexpected": "Une erreur est survenue. Réessayez ; si cela se reproduit, prévenez votre responsable.",
+     "print_draw": "Le ticket n'a pas pu être préparé pour l'imprimante. Réessayez.",
+     "printer_unreachable": "L'imprimante ne répond pas. Vérifiez qu'elle est allumée et branchée au réseau, puis relancez l'impression.",
++    "qz_not_running": "QZ Tray n'est pas lancé sur cet appareil, démarrez-le puis réimprimez",
+     "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
+     "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
+     "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",
+@@ -666,6 +686,8 @@
      "share_text": "Votre carte fidélité {{restaurant}} : montrez ce code à la caisse pour gagner des points.",
      "share_unsupported": "Le partage n'est pas disponible sur cet appareil : la carte a été téléchargée.",
      "share_failed": "La carte n'a pas pu être partagée : elle a été téléchargée.",
