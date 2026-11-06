@@ -2620,6 +2620,9 @@ still opens /ury/dashboard.
 
 Patch file: `patches/57-switch-to-dashboard-translated.patch`. Commit: 2b20f509.
 
+Browser check 2026-11-06 (test-dev2, Claude in Chrome, salma.demo, French): the user menu shows "Ouvrir la
+gestion" (passed). Arabic and English not checked.
+
 ### Patch 58 — Table start time without zero padding
 
 Found in the e2e run of 2026-11-06 on test-dev2 (finding 10): a busy table's card showed
@@ -2651,6 +2654,10 @@ Not covered: the waiter app's elapsed time (`pos/src/captain/components/CaptainT
 (upstream behaviour, unchanged).
 
 Patch file: `patches/58-table-time-unpadded.patch`. Commit: 6c71435c.
+
+Browser check 2026-11-06 (test-dev2): T1 card "Démarré à : 20:15" (start second 52, the unpadded case not hit
+live); the deployed POS bundle carries the new pattern and not the old one. A table started at seconds 0-9:
+not checked.
 
 ## Build and deploy
 
