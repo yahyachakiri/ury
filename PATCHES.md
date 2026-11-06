@@ -2596,6 +2596,62 @@ no CANCELLED ticket. Kitchen printing only reached the "QZ Tray n'est pas lancé
 checked: Arabic / English (the till follows the user's language), waiter app, real printer, the new customer
 app (/order not rebuilt), shift closing.
 
+### Patch 57 — "Switch to Dashboard" translated in the till's user menu
+
+Found in the e2e run of 2026-11-06 on test-dev2 (manual-tests/e2e-test-dev2-2026-11-06.md, finding 9).
+
+Files touched: `pos/src/components/Header.tsx` (user menu entry that opens `/ury/dashboard`),
+`pos/src/i18n/locales/{en,fr,ar}.json` (`header.switch_to_dashboard`: "Switch to Dashboard",
+"Ouvrir la gestion", "الانتقال إلى لوحة الإدارة").
+
+What it does: the menu entry was hardcoded in English; it now goes through `t()` like its
+neighbours (`header.close_shift`, `header.switch_to_desk`).
+
+Why it can't be done in `erp_restaurant`: the text is rendered by the POS bundle; erp_restaurant
+server translations do not reach a hardcoded JSX string.
+
+Risk profile: low. One string in Header.tsx, a high-churn upstream file also touched by Patches 01 and 15
+(keep the conditional logo block); on a conflict, wrap the label in `t('header.switch_to_dashboard')` again.
+Locale keys only otherwise.
+
+Acceptance criteria: the till's user menu shows "Ouvrir la gestion" in French,
+"الانتقال إلى لوحة الإدارة" in Arabic (right to left), "Switch to Dashboard" in English; the entry
+still opens /ury/dashboard.
+
+Patch file: `patches/57-switch-to-dashboard-translated.patch`. Commit: 2b20f509.
+
+### Patch 58 — Table start time without zero padding
+
+Found in the e2e run of 2026-11-06 on test-dev2 (finding 10): a busy table's card showed
+"Démarré à : 19:00:3.152595".
+
+Files touched: `packages/core/src/format.ts` (`formatInvoiceTime`).
+
+What it does: Frappe sent the URY Table `latest_invoice_time` as "19:00:3.152595" (seconds not
+zero padded). `new Date()` rejects it and the time-only pattern required two digits, so the raw
+value was shown. The pattern now accepts one or two digits for minutes and seconds, and the card
+shows "19:00".
+
+Why it can't be done in `erp_restaurant`: the value is URY's own field, set by URY's POS Invoice
+hooks and formatted in the POS bundle; reshaping it on the server would mean rewriting URY Table on
+every order for a display problem.
+
+Risk profile: low. Shared `@ury/core` helper used by the POS (TableCard, LayoutView) and the
+management frontend (TableLayoutView): rebuild pos and frontend (`/ury` is not built by the deploy).
+`format.ts` is also changed by Patch 16 (`formatCurrency`, `formatCompactCurrency`): on a conflict keep
+both changes. The pattern only accepts more inputs; everything that matched before gives the same result.
+
+Acceptance criteria: a table with an open order shows "Démarré à : HH:MM" on the Tables page and
+in the layout view's side panel; an empty table still shows "—". The bug only shows when the order
+started at seconds 0 to 9: check in the desk that the URY Table's Latest Invoice Time has seconds below
+10 (else open another order) before reading the card.
+
+Not covered: the waiter app's elapsed time (`pos/src/captain/components/CaptainTableCard.tsx`
+`elapsedLabel`) passes the same time-only value to `new Date()` and gets nothing, padded or not
+(upstream behaviour, unchanged).
+
+Patch file: `patches/58-table-time-unpadded.patch`. Commit: 6c71435c.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

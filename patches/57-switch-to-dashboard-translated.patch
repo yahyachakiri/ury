@@ -1,0 +1,49 @@
+diff --git a/pos/src/components/Header.tsx b/pos/src/components/Header.tsx
+index 0f1a1d32..746a1daf 100644
+--- a/pos/src/components/Header.tsx
++++ b/pos/src/components/Header.tsx
+@@ -181,7 +181,7 @@ const Header = () => {
+                     onClick={() => window.location.href = '/ury/dashboard'}
+                   >
+                     <Monitor className="w-4 h-4 me-3" />
+-                    Switch to Dashboard
++                    {t('header.switch_to_dashboard')}
+                   </Button>
+                   <Button
+                     variant="ghost"
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 9811dd2f..c70351f1 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -41,6 +41,7 @@
+         "search_placeholder_menu": "ابحث في القائمة",
+         "close_shift": "إغلاق الوردية",
+         "switch_to_desk": "التبديل إلى المكتب",
++        "switch_to_dashboard": "الانتقال إلى لوحة الإدارة",
+         "clear_cache": "مسح ذاكرة التخزين المؤقت",
+         "logout": "تسجيل الخروج"
+     },
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 4c7b40c5..b373c1f9 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -34,6 +34,7 @@
+     "search_placeholder_menu": "Search Menu",
+     "close_shift": "Close Shift",
+     "switch_to_desk": "Switch To Desk",
++    "switch_to_dashboard": "Switch to Dashboard",
+     "clear_cache": "Clear Cache",
+     "logout": "Logout"
+   },
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 99409ba5..7816f2fa 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -34,6 +34,7 @@
+     "search_placeholder_menu": "Rechercher dans le menu",
+     "close_shift": "Clôturer la session",
+     "switch_to_desk": "Accéder au bureau",
++    "switch_to_dashboard": "Ouvrir la gestion",
+     "clear_cache": "Vider le cache",
+     "logout": "Déconnexion"
+   },
