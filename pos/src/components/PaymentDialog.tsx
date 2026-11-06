@@ -5,7 +5,7 @@ import { formatCurrency, call, parseFrappeError } from '@ury/core';
 import { Button, Dialog, DialogContent, showToast } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
-import { printOrder } from '../lib/print';
+import { printKitchenTickets, printOrder } from '../lib/print';
 
 // Patch 54: touch payment dialog. No field here is a text input, so the system keyboard never
 // opens: amounts are buttons that open an on-screen keypad, cash is tapped as bills.
@@ -357,7 +357,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setIsProcessing(true);
     setError(null);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+      const paid = await call.post<{ message?: { kitchen_tickets?: number; kitchen_ticket_failed?: number } | null }>('ury.ury.doctype.ury_order.ury_order.make_invoice', {
         additionalDiscount: appliedPercent > 0 ? appliedPercent : null,
         cashier,
         customer,
@@ -378,6 +378,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         printOrder({ orderId: invoice, posProfile: storePosProfile, printFormat: storePosProfile.print_format }).catch((err) =>
           showToast.error(t('loyalty.receipt_print_failed', { reason: err?.message || String(err) }))
         );
+      }
+      // Patch 10 (ticket 40): a customer QR pickup order reaches the kitchen once paid; erp_restaurant
+      // created its kitchen ticket with this payment. Printed like a confirmed order's ticket.
+      if (paid?.message?.kitchen_tickets && storePosProfile?.custom_auto_print_kitchen_ticket) {
+        printKitchenTickets({ invoice, posProfile: storePosProfile }).catch((err) =>
+          showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }))
+        );
+      }
+      if (paid?.message?.kitchen_ticket_failed) {
+        showToast.error(t('kitchen.not_created_on_payment'));
       }
       onClose();
       clearSelectedOrder();

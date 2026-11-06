@@ -597,7 +597,8 @@
         "nothing_to_print": "لا توجد تذكرة مطبخ لهذا الطلب",
         "print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. استخدم «إعادة طباعة تذكرة المطبخ» في الطلبات.",
         "qz_host_missing": "مضيف QZ غير محدد في ملف نقطة البيع",
-        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع"
+        "qz_disabled": "طباعة QZ غير مفعّلة في ملف نقطة البيع",
+        "not_created_on_payment": "تم تسجيل الدفع، لكن تعذّر إنشاء تذكرة المطبخ. أبلغ المطبخ بهذا الطلب."
     },
     "captain": {
         "load_context_failed": "تعذّر تحميل شاشة النادل",
@@ -667,7 +668,19 @@
     "self_order": {
         "new_order_table": "طلب QR: {{table}} (رقم {{number}})، {{qty}} صنف",
         "new_order_pickup": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف",
-        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})"
+        "bill_requested": "{{table}} تطلب الفاتورة (رقم {{number}})",
+        "new_order_pickup_pay_first": "طلب QR للسفري (رقم {{number}})، {{qty}} صنف: يُدفع قبل المطبخ",
+        "request_title": "طلب QR للتأكيد: {{table}}، {{qty}} صنف",
+        "accept": "تأكيد",
+        "refuse": "رفض",
+        "reason_placeholder": "السبب للزبون",
+        "confirm_refuse": "تأكيد الرفض",
+        "back": "رجوع",
+        "reason_required": "اذكر سبباً للزبون.",
+        "accepted": "تم تأكيد طلب QR: {{table}}",
+        "refused": "تم رفض طلب QR: {{table}}",
+        "decide_failed": "تعذّرت معالجة طلب QR. حاول مرة أخرى.",
+        "request_waiter": "يُؤكَّد عند الصندوق"
     },
     "loyalty": {
         "title": "نقاط الوفاء",

@@ -445,6 +445,8 @@ Files touched:
 - `pos/src/components/OrderActionsMenu.tsx`, `pos/src/pages/Orders.tsx`
   ("Reprint kitchen ticket" action; auto print after a successful
   `cancel_order`, ticket 37)
+- `pos/src/components/SelfOrderListener.tsx` (after Valider on a QR table order) and
+  `pos/src/components/PaymentDialog.tsx` (after paying a QR pickup order): ticket 40, Patch 56
 - `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`kitchen.*` keys)
 
 What it does: URY creates URY KOTs in `sync_order` (`kot_execute`: new
@@ -2499,6 +2501,57 @@ Browser check 2026-11-06 (test-dev, Claude, desktop without QZ Tray): cancelling
 réimprimez…" in French. Not checked: other messages, Arabic, English.
 
 Patch file: `patches/55-qz-not-running-message.patch`. Commit: 12b0a084.
+
+### Patch 56 — QR orders validated at the counter before the kitchen
+
+Ticket 40 (owner request 2026-11-06, choice B). Works with erp_restaurant `qr_validation.py`
+(QR Order Request DocType, `custom_kitchen_on_payment`). Extends Patches 10, 24 and 43.
+
+Files touched: `pos/src/components/SelfOrderListener.tsx` (Patch 43),
+`pos/src/components/PaymentDialog.tsx` (on top of Patches 07, 09, 45, 47, 54),
+`pos/src/i18n/locales/{en,fr,ar}.json` (`self_order.*`), `self-order/src/lib/api.ts`,
+`self-order/src/hooks/useOrderingSession.ts`, `self-order/src/layouts/MobileQRLayout.tsx`,
+`self-order/src/i18n.tsx` (Patch 24)
+
+What it does:
+1. Till (/pos): a customer QR table order no longer reaches the kitchen by itself. Its toast
+   lists the lines with Valider / Refuser; Refuser asks a reason for the customer. Valider
+   calls erp_restaurant `accept_qr_order` (URY's own add: lines on the table's order and the
+   kitchen ticket) and prints the new kitchen ticket when auto print is on (Patch 10).
+   Requests still waiting are loaded when the till starts, after a socket reconnect and after
+   one is handled (`get_pending_qr_orders`; at most 5 toasts at once); a request handled on one
+   till disappears from the others (`request_done` event). On the till the request toast has no
+   close button (it is the only place the request shows). The waiter app (/pos/order and
+   /pos/order/table/...; not /pos/orders) shows it without buttons, and the server refuses
+   Valider / Refuser without a cashier or manager role.
+2. A QR pickup order's toast says "à encaisser avant la cuisine". Its kitchen ticket is made
+   by the payment; when `make_invoice` answers `kitchen_tickets`, the payment dialog prints
+   it (auto print on). If the server could not create it (`kitchen_ticket_failed`; the payment
+   is saved), the cashier sees "Paiement enregistré, mais le ticket cuisine n'a pas pu être
+   créé. Prévenez la cuisine". Other orders: `make_invoice` answers nothing, nothing more prints.
+3. Customer app (/order, mobile layout): the latest three requests with "En attente de
+   validation au comptoir", "Validée par le comptoir" or "Refusée par le comptoir : <raison>";
+   checks for the answer every 8 s while one waits. Pickup: "Payez au comptoir pour lancer la
+   préparation." under the pickup code. Polling stops while the page is hidden and after
+   20 minutes. Kiosk and tablet layouts unchanged (not used).
+
+Why it can't be done in `erp_restaurant`: holding the order, accepting and the kitchen ticket
+at payment are server side there; only the POS bundle can show buttons on the till and print
+through QZ Tray after a payment, and only the customer app can show the waiting status (without
+it a customer would see the order vanish and send it again).
+
+Risk profile: medium. The payment dialog reads `make_invoice`'s answer (was ignored); the
+listener calls three new erp_restaurant methods. No store change.
+
+Acceptance criteria: ticket 40 (tasks/40-qr-orders-validated-at-counter.md), criteria 1 to 8.
+
+Manual test: ticket 40, "Manual test" steps 1 to 10 (test-dev, till with QZ Tray and kitchen
+printer, a phone for /order).
+
+Build: `self-order` is not built by the deploy script: `cd apps/ury/self-order && yarn build`
+on the server after this patch (as Patch 24).
+
+Patch file: `patches/56-qr-orders-validated-at-counter.patch`.
 
 ## Build and deploy
 

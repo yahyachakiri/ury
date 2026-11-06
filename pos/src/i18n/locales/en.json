@@ -590,7 +590,8 @@
     "nothing_to_print": "No kitchen ticket for this order",
     "print_failed": "Kitchen ticket not printed: {{reason}}. Use Reprint kitchen ticket in Orders.",
     "qz_host_missing": "QZ host is not set on the POS profile",
-    "qz_disabled": "QZ printing is not enabled on the POS profile"
+    "qz_disabled": "QZ printing is not enabled on the POS profile",
+    "not_created_on_payment": "Payment saved, but the kitchen ticket could not be created. Tell the kitchen about this order."
   },
   "captain": {
     "load_context_failed": "Unable to load the waiter screen",
@@ -660,7 +661,19 @@
   "self_order": {
     "new_order_table": "QR order: {{table}} (no. {{number}}), {{qty}} item(s)",
     "new_order_pickup": "QR take-away order (no. {{number}}), {{qty}} item(s)",
-    "bill_requested": "{{table}} asks for the bill (no. {{number}})"
+    "bill_requested": "{{table}} asks for the bill (no. {{number}})",
+    "new_order_pickup_pay_first": "QR take-away order (no. {{number}}), {{qty}} item(s): take payment before the kitchen",
+    "request_title": "QR order to confirm: {{table}}, {{qty}} item(s)",
+    "accept": "Accept",
+    "refuse": "Refuse",
+    "reason_placeholder": "Reason for the customer",
+    "confirm_refuse": "Confirm refusal",
+    "back": "Back",
+    "reason_required": "Give a reason for the customer.",
+    "accepted": "QR order accepted: {{table}}",
+    "refused": "QR order refused: {{table}}",
+    "decide_failed": "The QR order could not be handled. Try again.",
+    "request_waiter": "To be confirmed at the till"
   },
   "loyalty": {
     "title": "Loyalty points",

@@ -63,6 +63,11 @@ const en = {
   not_provisioned: 'This tablet is not provisioned. Please contact staff.',
   assign_failed: 'Could not assign this table. Please check the PIN and try again.',
   language: 'Language',
+  // Ticket 40: QR orders validated at the counter.
+  request_pending: 'Waiting for the counter to confirm',
+  request_accepted: 'Confirmed by the counter',
+  request_refused: 'Refused by the counter: {reason}',
+  pay_first: 'Pay at the counter to start the preparation.',
 }
 type Key = keyof typeof en
 
@@ -118,6 +123,10 @@ const fr: Record<Key, string> = {
   not_provisioned: "Cette tablette n'est pas configurée. Merci de prévenir le personnel.",
   assign_failed: "La table n'a pas pu être attribuée. Vérifiez le code et réessayez.",
   language: 'Langue',
+  request_pending: 'En attente de validation au comptoir',
+  request_accepted: 'Validée par le comptoir',
+  request_refused: 'Refusée par le comptoir : {reason}',
+  pay_first: 'Payez au comptoir pour lancer la préparation.',
 }
 
 const ar: Record<Key, string> = {
@@ -172,6 +181,10 @@ const ar: Record<Key, string> = {
   not_provisioned: 'هذا الجهاز اللوحي غير مُعدّ. يرجى إبلاغ الموظفين.',
   assign_failed: 'تعذّر تعيين الطاولة. تحقق من الرمز وأعد المحاولة.',
   language: 'اللغة',
+  request_pending: 'في انتظار تأكيد الصندوق',
+  request_accepted: 'تم التأكيد من الصندوق',
+  request_refused: 'رفضه الصندوق: {reason}',
+  pay_first: 'ادفع عند الصندوق لبدء التحضير.',
 }
 
 const MESSAGES: Record<Lang, Record<Key, string>> = { en, fr, ar }

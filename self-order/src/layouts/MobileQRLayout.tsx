@@ -79,6 +79,31 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
         <div className="mx-4 mt-3 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       )}
 
+      {order?.requests && order.requests.length > 0 && (
+        <section className="mx-4 mt-4 space-y-2">
+          {/* Ticket 40: table orders wait for the counter; the three latest answers are shown. */}
+          {order.requests.slice(0, 3).map((req) => (
+            <div
+              key={req.name}
+              className={`rounded-lg border p-3 text-sm ${
+                req.status === 'Refused' ? 'border-destructive text-destructive' : req.status === 'Pending' ? 'bg-muted' : ''
+              }`}
+            >
+              <p className="font-medium">
+                {req.status === 'Pending'
+                  ? t('request_pending')
+                  : req.status === 'Accepted'
+                    ? t('request_accepted')
+                    : t('request_refused', { reason: req.reason })}
+              </p>
+              <p className="text-muted-foreground">
+                {req.items.map((line) => `${Number(line.qty)} × ${line.item_name}`).join(', ')}
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
+
       {order && order.items.length > 0 && (
         <section className="mx-4 mt-4 rounded-lg border p-3">
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order_so_far')}</h2>
@@ -86,6 +111,9 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
             <p className="mb-2 rounded-md bg-muted p-2 text-center text-sm font-semibold">
               {t('pickup_code', { code: order.pickup_code })}
             </p>
+          )}
+          {isPickup && order.kitchen_on_payment && (
+            <p className="mb-2 text-center text-sm font-medium">{t('pay_first')}</p>
           )}
           <ul className="space-y-1 text-sm">
             {order.items.map((row, idx) => (

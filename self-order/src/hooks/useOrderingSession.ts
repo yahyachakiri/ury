@@ -97,6 +97,25 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Ticket 40: while an order waits for the counter, check every few seconds for its answer,
+  // only while the page is on screen, and for 20 minutes at most (each check keeps the session
+  // alive). Reopening the page loads the order again.
+  const waiting = !!order?.requests?.some((r) => r.status === 'Pending')
+  const session = context?.session
+  useEffect(() => {
+    if (!waiting || !session) return
+    const stopAt = Date.now() + 20 * 60 * 1000
+    const timer = window.setInterval(() => {
+      if (Date.now() > stopAt) {
+        window.clearInterval(timer)
+        return
+      }
+      if (document.hidden) return
+      loadOrder(session).catch(() => undefined)
+    }, 8000)
+    return () => window.clearInterval(timer)
+  }, [waiting, session, loadOrder])
+
   /**
    * Manual "start a fresh order" action — the MVP alternative to an
    * auto-idle-reset timer (not wired up yet). Always clears the cart and

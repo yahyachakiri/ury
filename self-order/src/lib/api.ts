@@ -63,6 +63,17 @@ export interface CustomerOrder {
   items: OrderItem[]
   grand_total: number
   billed: boolean
+  // Ticket 40 (erp_restaurant qr_validation): table orders waiting for the counter, newest
+  // first, and a pickup order whose kitchen ticket waits for the payment.
+  requests?: QrOrderRequest[]
+  kitchen_on_payment?: boolean
+}
+
+export interface QrOrderRequest {
+  name: string
+  status: 'Pending' | 'Accepted' | 'Refused'
+  reason: string
+  items: { item_name: string; qty: number }[]
 }
 
 export interface OrderStatus {
