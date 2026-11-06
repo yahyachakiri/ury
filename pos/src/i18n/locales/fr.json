@@ -34,6 +34,7 @@
     "search_placeholder_menu": "Rechercher dans le menu",
     "close_shift": "Clôturer la session",
     "switch_to_desk": "Accéder au bureau",
+    "switch_to_dashboard": "Ouvrir la gestion",
     "clear_cache": "Vider le cache",
     "logout": "Déconnexion"
   },
