@@ -2553,6 +2553,18 @@ on the server after this patch (as Patch 24).
 
 Patch file: `patches/56-qr-orders-validated-at-counter.patch`. Commit: e167b246.
 
+Browser check 2026-11-06 (test-dev, Administrator, Chrome without QZ Tray, French; erp_restaurant ea1725d):
+table QR order shows the till toast with Valider / Refuser and no close button, nothing on the table or in
+the kitchen until Valider; Valider adds the lines and creates one "New Order" kitchen ticket with only the
+new lines (addition to a running table: no cancel ticket); a second Valider is refused; Refuser asks for a
+reason, adds nothing; a pending request comes back after a reload and on /pos/orders with its buttons; Valider
+on one till removes the toast on the other; the cashier stays logged in after Valider / Refuser. Pickup: toast
+"à encaisser avant la cuisine", order held with no kitchen ticket, payment creates one ticket with both meals
+and clears the hold; the same customer ordering again after paying is held again; cancelling it unpaid makes
+no CANCELLED ticket. Kitchen printing only reached the "QZ Tray n'est pas lancé" message (no QZ here). Not
+checked: Arabic / English (the till follows the user's language), waiter app, real printer, the new customer
+app (/order not rebuilt), shift closing.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
