@@ -2576,6 +2576,14 @@ on the server after this patch (as Patch 24).
 
 Patch file: `patches/56-qr-orders-validated-at-counter.patch`. Commits: e167b246, 84234195 (toast opens the order, Print sends the pickup kitchen ticket).
 
+Browser check 2026-11-06, follow-up (test-dev, Administrator, French, no QZ Tray; erp_restaurant faf1066,
+ury 53c11e01): tapping the pickup toast opens Orders with that order selected; Print creates the
+kitchen ticket at that moment (one KOT, hold cleared) and shows "Appuyez à nouveau sur Imprimer avant
+d'encaisser" when the kitchen print fails; a second Print retries the kitchen print, still one KOT;
+payment adds no second KOT; a toast tapped while the payment dialog is open does nothing and stays;
+waiter app shows "à encaisser avant la cuisine" and a tap only closes the toast. Not checked: real
+kitchen printer, double tap during a QZ print, Arabic / English, cart kept after a tap from /pos.
+
 Browser check 2026-11-06 (test-dev, Administrator, Chrome without QZ Tray, French; erp_restaurant ea1725d):
 table QR order shows the till toast with Valider / Refuser and no close button, nothing on the table or in
 the kitchen until Valider; Valider adds the lines and creates one "New Order" kitchen ticket with only the
