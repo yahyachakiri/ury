@@ -1,0 +1,137 @@
+diff --git a/frontend/src/utils/format.ts b/frontend/src/utils/format.ts
+index 2394dd79..0c5f93d9 100644
+--- a/frontend/src/utils/format.ts
++++ b/frontend/src/utils/format.ts
+@@ -1,10 +1,10 @@
+-import { storage } from '@ury/core';
++import { storage, withSymbol } from '@ury/core';
+ 
+ export function formatCurrency(amount: number): string {
+   // Patch 16: site currency when the POS has not cached a symbol (was ₹), no Indian grouping.
+   const symbol = (storage as any)?.getItem?.('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
+   const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString() : amount;
+-  return `${symbol} ${formattedVal}`;
++  return withSymbol(symbol, formattedVal); // Patch 60: symbol after the amount when the Currency says so
+ }
+ 
+ export function formatInvoiceTime(timestamp: string | null): string {
+diff --git a/packages/core/src/format.ts b/packages/core/src/format.ts
+index 0d7bd3cf..d5e876bd 100644
+--- a/packages/core/src/format.ts
++++ b/packages/core/src/format.ts
+@@ -5,7 +5,14 @@ export function formatCurrency(amount: number): string {
+   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
+   const roundedAmount = flt(amount, 2);
+   const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
+-  return `${symbol} ${formattedVal}`;
++  return withSymbol(symbol, formattedVal); // Patch 60
++}
++
++// Patch 60: the Currency's "Show Currency Symbol on Right Side" (cached by the POS), e.g. "30 DH".
++// Wrapped in a left-to-right isolate so an Arabic (RTL) screen still reads "30 DH", not "DH 30".
++export function withSymbol(symbol: string, value: string | number): string {
++  if (!symbol) return `${value}`;
++  return storage.getItem('currencySymbolOnRight') === '1' ? `⁦${value} ${symbol}⁩` : `${symbol} ${value}`;
+ }
+ 
+ export function flt(v: number | string | null | undefined, decimals: number = 2): number {
+@@ -29,7 +36,7 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
+  */
+ export function formatCompactCurrency(amount: number): string {
+   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || ''; // Patch 16
+-  if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
++  if (typeof amount !== 'number' || isNaN(amount)) return withSymbol(symbol, amount); // Patch 60
+ 
+   const sign = amount < 0 ? '-' : '';
+   const abs = Math.abs(amount);
+@@ -39,10 +46,13 @@ export function formatCompactCurrency(amount: number): string {
+     return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+   };
+ 
+-  if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}Cr`;
+-  if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}L`;
+-  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}k`;
+-  return `${sign}${symbol}${trim(abs)}`;
++  // Patch 60: symbol after the amount when the Currency says so ("6.5k DH", left-to-right isolate).
++  const right = storage.getItem('currencySymbolOnRight') === '1';
++  const put = (v: string) => (right ? `⁦${sign}${v} ${symbol}⁩` : `${sign}${symbol}${v}`);
++  if (abs >= 1_00_00_000) return put(`${trim(abs / 1_00_00_000)}Cr`);
++  if (abs >= 1_00_000) return put(`${trim(abs / 1_00_000)}L`);
++  if (abs >= 1_000) return put(`${trim(abs / 1_000)}k`);
++  return put(trim(abs));
+ }
+ 
+ export const formatInvoiceTime = (timestamp: string | null) => {
+diff --git a/packages/core/src/index.ts b/packages/core/src/index.ts
+index 8354b276..fc7c130c 100644
+--- a/packages/core/src/index.ts
++++ b/packages/core/src/index.ts
+@@ -6,7 +6,7 @@ export { parseFrappeError, setErrorMessages } from './frappe/errors';
+ export type { ErrorMessages } from './frappe/errors';
+ export type { User, PosProfileCombined } from './types';
+ export { storage } from './storage';
+-export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt } from './format';
++export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt, withSymbol } from './format'; // Patch 60: withSymbol
+ export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
+ export { validateFieldValue } from './utils/validateField';
+ export type { ValidationMessages } from './utils/validateField';
+diff --git a/pos/src/lib/pos-profile-api.ts b/pos/src/lib/pos-profile-api.ts
+index faec9dde..76465726 100644
+--- a/pos/src/lib/pos-profile-api.ts
++++ b/pos/src/lib/pos-profile-api.ts
+@@ -98,6 +98,7 @@ export interface Currency {
+   fraction_units: number;
+   smallest_currency_fraction_value: number;
+   number_format: string;
++  symbol_on_right?: number; // Patch 60
+ }
+ 
+ export interface PosProfileFullResponse {
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index fea8a932..15942d3f 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -396,8 +396,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+           currency: profile.currency || 'INR',
+           selectedCustomer: get().selectedCustomer || getDefaultCustomer(profile, get().selectedOrderType),
+         });
++        // Patch 60: refresh the symbol at every load (a changed Currency showed only after clearing storage).
+         if (!storage.getItem('currencySymbol')) {
+           await get().fetchCurrencySymbol();
++        } else {
++          void get().fetchCurrencySymbol();
+         }
+         return;
+       }
+@@ -413,9 +416,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         selectedCustomer: get().selectedCustomer || getDefaultCustomer(combinedProfile, get().selectedOrderType),
+       });
+       
+-      if (!storage.getItem('currencySymbol')) {
+-        await get().fetchCurrencySymbol();
+-      }
++      await get().fetchCurrencySymbol(); // Patch 60: always refresh (was only when nothing was cached)
+     } catch (error) {
+       console.error('Error fetching POS profile:', error);
+       set({ 
+@@ -430,13 +431,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+       const currency = get().currency;
+       const response = await getCurrencyInfo(currency);
+       const { symbol } = response;
+-      
++
+       set({ currencySymbol: symbol });
+       storage.setItem('currencySymbol', symbol);
++      storage.setItem('currencySymbolOnRight', response.symbol_on_right ? '1' : '0'); // Patch 60
+     } catch (error) {
+       console.error('Error fetching currency symbol:', error);
+-      set({ currencySymbol: get().currency });
+-      storage.setItem('currencySymbol', get().currency);
++      // Patch 60: the refresh runs at every load; a failed request keeps the cached symbol and side.
++      if (!storage.getItem('currencySymbol')) {
++        set({ currencySymbol: get().currency });
++        storage.setItem('currencySymbol', get().currency);
++      }
+     }
+   },
+ 

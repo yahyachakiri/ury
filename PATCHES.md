@@ -2659,6 +2659,49 @@ Browser check 2026-11-06 (test-dev2): T1 card "Démarré à : 20:15" (start seco
 live); the deployed POS bundle carries the new pattern and not the old one. A table started at seconds 0-9:
 not checked.
 
+### Patch 60 — Currency symbol after the amount ("30 DH"), refreshed at each POS load
+
+Ticket 54 (owner 2026-11-09). Patch 59 is reserved for ticket 50.
+
+Files touched: `packages/core/src/format.ts` (`formatCurrency`, `formatCompactCurrency`, new exported
+`withSymbol`), `packages/core/src/index.ts` (export), `frontend/src/utils/format.ts` (`formatCurrency`),
+`pos/src/store/pos-store.ts` (`fetchPosProfile`, `fetchCurrencySymbol`), `pos/src/lib/pos-profile-api.ts`
+(`Currency.symbol_on_right`).
+
+What it does: erp_restaurant sets Currency MAD to symbol "DH" with "Show Currency Symbol on Right Side"
+(`setup/currency.py`, after_migrate and new sites). The POS stores `symbol_on_right` next to the cached
+symbol (localStorage `currencySymbolOnRight`) and `withSymbol` writes "30 DH" when it is on, wrapped in a
+left-to-right isolate (U+2066 / U+2069) so an Arabic till still reads "30 DH"; off, it keeps "DH 30". The
+symbol is refreshed at every POS load (in the background when one is cached): before, it was fetched only
+when nothing was cached, so a changed Currency never reached an existing till. A failed refresh keeps the
+cached symbol and side.
+
+Why it can't be done in `erp_restaurant`: every amount in the till, the waiter app and /ury goes through
+URY's formatter, which hard-codes `${symbol} ${value}`, and the cache lives in the browser; there is no
+runtime configuration point for the side, and erp_restaurant cannot inject code into `/pos`.
+
+Risk profile: medium. `pos-store.ts` is a high-risk file (small hunks in `fetchPosProfile` and
+`fetchCurrencySymbol` only). `format.ts` is also changed by Patch 16 (symbol fallback lines) and Patch 58
+(`formatInvoiceTime`, separate hunk): on a conflict keep Patch 16's fallback and Patch 60's side handling.
+Shared `@ury/core`: rebuild pos and frontend (/ury is not built by the deploy). One extra Currency request
+per POS tab load.
+
+Not covered: /ury on a browser that never opened /pos (no cached side: "MAD 30"); the QR customer app
+(customer phones have no cached keys); column labels using the currency code ("Prix (MAD)"); chart units
+L / Cr.
+
+Acceptance criteria:
+1. After migrate, an existing till tab that still had "د.م." cached shows "30 DH" after one reload, without
+   clearing storage: menu cards, order panel, payment dialog, Orders, Close Shift dialog.
+2. The waiter app shows "30 DH".
+3. /ury on the same browser shows amounts "1 234 DH" and chart axes "6.5k DH".
+4. A Currency with symbol_on_right = 0 still shows "DH 30".
+5. With the Currency request failing (DevTools, block the request), the cached "DH" and side are kept.
+6. Arabic till: amounts read "30 DH" (left-to-right isolate).
+7. No new strings (no en / fr / ar keys).
+
+Patch file: `patches/60-currency-symbol-on-right.patch`. Commit: 7d464d58.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
