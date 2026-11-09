@@ -396,8 +396,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           currency: profile.currency || 'INR',
           selectedCustomer: get().selectedCustomer || getDefaultCustomer(profile, get().selectedOrderType),
         });
+        // Patch 60: refresh the symbol at every load (a changed Currency showed only after clearing storage).
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
+        } else {
+          void get().fetchCurrencySymbol();
         }
         return;
       }
@@ -413,9 +416,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         selectedCustomer: get().selectedCustomer || getDefaultCustomer(combinedProfile, get().selectedOrderType),
       });
       
-      if (!storage.getItem('currencySymbol')) {
-        await get().fetchCurrencySymbol();
-      }
+      await get().fetchCurrencySymbol(); // Patch 60: always refresh (was only when nothing was cached)
     } catch (error) {
       console.error('Error fetching POS profile:', error);
       set({ 
@@ -430,13 +431,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const currency = get().currency;
       const response = await getCurrencyInfo(currency);
       const { symbol } = response;
-      
+
       set({ currencySymbol: symbol });
       storage.setItem('currencySymbol', symbol);
+      storage.setItem('currencySymbolOnRight', response.symbol_on_right ? '1' : '0'); // Patch 60
     } catch (error) {
       console.error('Error fetching currency symbol:', error);
-      set({ currencySymbol: get().currency });
-      storage.setItem('currencySymbol', get().currency);
+      // Patch 60: the refresh runs at every load; a failed request keeps the cached symbol and side.
+      if (!storage.getItem('currencySymbol')) {
+        set({ currencySymbol: get().currency });
+        storage.setItem('currencySymbol', get().currency);
+      }
     }
   },
 

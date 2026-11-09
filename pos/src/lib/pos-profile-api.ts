@@ -98,6 +98,7 @@ export interface Currency {
   fraction_units: number;
   smallest_currency_fraction_value: number;
   number_format: string;
+  symbol_on_right?: number; // Patch 60
 }
 
 export interface PosProfileFullResponse {

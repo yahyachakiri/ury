@@ -5,7 +5,14 @@ export function formatCurrency(amount: number): string {
   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
   const roundedAmount = flt(amount, 2);
   const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
-  return `${symbol} ${formattedVal}`;
+  return withSymbol(symbol, formattedVal); // Patch 60
+}
+
+// Patch 60: the Currency's "Show Currency Symbol on Right Side" (cached by the POS), e.g. "30 DH".
+// Wrapped in a left-to-right isolate so an Arabic (RTL) screen still reads "30 DH", not "DH 30".
+export function withSymbol(symbol: string, value: string | number): string {
+  if (!symbol) return `${value}`;
+  return storage.getItem('currencySymbolOnRight') === '1' ? `⁦${value} ${symbol}⁩` : `${symbol} ${value}`;
 }
 
 export function flt(v: number | string | null | undefined, decimals: number = 2): number {
@@ -29,7 +36,7 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
  */
 export function formatCompactCurrency(amount: number): string {
   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || ''; // Patch 16
-  if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
+  if (typeof amount !== 'number' || isNaN(amount)) return withSymbol(symbol, amount); // Patch 60
 
   const sign = amount < 0 ? '-' : '';
   const abs = Math.abs(amount);
@@ -39,10 +46,13 @@ export function formatCompactCurrency(amount: number): string {
     return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   };
 
-  if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}Cr`;
-  if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}L`;
-  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}k`;
-  return `${sign}${symbol}${trim(abs)}`;
+  // Patch 60: symbol after the amount when the Currency says so ("6.5k DH", left-to-right isolate).
+  const right = storage.getItem('currencySymbolOnRight') === '1';
+  const put = (v: string) => (right ? `⁦${sign}${v} ${symbol}⁩` : `${sign}${symbol}${v}`);
+  if (abs >= 1_00_00_000) return put(`${trim(abs / 1_00_00_000)}Cr`);
+  if (abs >= 1_00_000) return put(`${trim(abs / 1_00_000)}L`);
+  if (abs >= 1_000) return put(`${trim(abs / 1_000)}k`);
+  return put(trim(abs));
 }
 
 export const formatInvoiceTime = (timestamp: string | null) => {

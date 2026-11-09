@@ -1,10 +1,10 @@
-import { storage } from '@ury/core';
+import { storage, withSymbol } from '@ury/core';
 
 export function formatCurrency(amount: number): string {
   // Patch 16: site currency when the POS has not cached a symbol (was ₹), no Indian grouping.
   const symbol = (storage as any)?.getItem?.('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
   const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString() : amount;
-  return `${symbol} ${formattedVal}`;
+  return withSymbol(symbol, formattedVal); // Patch 60: symbol after the amount when the Currency says so
 }
 
 export function formatInvoiceTime(timestamp: string | null): string {
