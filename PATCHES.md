@@ -2793,6 +2793,8 @@ digits; in English: "1,234.5 DH"; (3) /ury after its manual build: same formats.
 
 Patch file: `patches/62-qr-currency-and-number-format.patch`. Commit: 13aa0fd5.
 
+Browser check 2026-11-10: not checked in the QR app (needs the manual self-order build on the dev bench); the server sends currency_symbol / symbol_on_right (erp_restaurant 9c9f05d). Till numbers: not re-checked after the number-format change.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
