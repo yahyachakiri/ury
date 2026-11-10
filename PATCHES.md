@@ -2791,7 +2791,7 @@ Manual test: (1) a phone or private window that never opened /pos scans a table 
 cart total "… DH"; (2) till in French: a large amount "1 234,5 DH"; in Arabic: "1 234,5 DH" with Western
 digits; in English: "1,234.5 DH"; (3) /ury after its manual build: same formats.
 
-Patch file: `patches/62-qr-currency-and-number-format.patch`. Commit: (pending).
+Patch file: `patches/62-qr-currency-and-number-format.patch`. Commit: 13aa0fd5.
 
 ## Build and deploy
 
