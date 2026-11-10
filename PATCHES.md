@@ -2753,6 +2753,8 @@ Acceptance criteria:
 
 Patch file: `patches/61-till-texts-and-busy-table.patch`. Commit: 6a998f34.
 
+Browser check 2026-11-10 (test-dev, Administrator, French, Chrome on a laptop): Orders "6 nov., 17:25" and "61,2 DH" — passed; busy table T5: ⋮ menu opens without leaving the page — passed; a tap on T5's body opens its existing order (table T5, Cheese Burger 30 DH, "Mettre à jour la commande", no new order) — passed; cart tab "Commande 1" — passed; order type "Plateforme…" (cut off at the edge: ticket 55 item 11). Not checked: Close Shift texts on screen, ⌘ K on an iPad, Arabic and English, a restricted user, merge / transfer dialogs.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
