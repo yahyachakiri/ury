@@ -2864,7 +2864,7 @@ Acceptance criteria and manual test:
     refusal as before. Waiter app with the option on: reducing a sent item opens the same reason window, then
     the order is updated.
 
-Patch file: `patches/63-till-layout-and-small-fixes.patch`. Commit: (pending).
+Patch file: `patches/63-till-layout-and-small-fixes.patch`. Commit: 38f123d4.
 
 ## Build and deploy
 
