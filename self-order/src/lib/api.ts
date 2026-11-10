@@ -1,5 +1,5 @@
 import { activeLang } from '../i18n'
-import { call } from '@ury/core'
+import { call, storage } from '@ury/core'
 
 const M = 'ury.ury.api.self_ordering'
 
@@ -24,6 +24,9 @@ export interface OrderingContext {
   table: string | null
   layout: OrderingLayout
   capabilities: OrderingCapabilities
+  // Patch 62: the site currency's symbol and side, sent by erp_restaurant ("30 DH" like the till).
+  currency_symbol?: string | null
+  symbol_on_right?: number
 }
 
 export interface MenuItem {
@@ -109,6 +112,11 @@ export function getStoredContext(): OrderingContext | null {
 function storeContext(context: OrderingContext) {
   sessionStorage.setItem(SESSION_KEY, context.session)
   sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
+  // Patch 62: @ury/core formatCurrency reads these keys (Patch 60); a customer's phone has none cached.
+  if (context.currency_symbol) {
+    storage.setItem('currencySymbol', context.currency_symbol)
+    storage.setItem('currencySymbolOnRight', context.symbol_on_right ? '1' : '0')
+  }
 }
 
 // Every whitelisted Frappe method response is wrapped as {"message": <actual

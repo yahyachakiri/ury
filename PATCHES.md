@@ -2755,6 +2755,44 @@ Patch file: `patches/61-till-texts-and-busy-table.patch`. Commit: 6a998f34.
 
 Browser check 2026-11-10 (test-dev, Administrator, French, Chrome on a laptop): Orders "6 nov., 17:25" and "61,2 DH" — passed; busy table T5: ⋮ menu opens without leaving the page — passed; a tap on T5's body opens its existing order (table T5, Cheese Burger 30 DH, "Mettre à jour la commande", no new order) — passed; cart tab "Commande 1" — passed; order type "Plateforme…" (cut off at the edge: ticket 55 item 11). Not checked: Close Shift texts on screen, ⌘ K on an iPad, Arabic and English, a restricted user, merge / transfer dialogs.
 
+### Patch 62 — QR app prices like the till ("30 DH"), till numbers as in the owner app
+
+Ticket 55 batch 2 (owner 2026-11-10).
+
+Files touched: `self-order/src/lib/api.ts` (`OrderingContext`, `storeContext`), `packages/core/src/format.ts`
+(new exported `numberLocale`, used by `formatCurrency`), `packages/core/src/index.ts` (export),
+`frontend/src/utils/format.ts` (`formatCurrency`).
+
+What it does:
+1. QR customer app: erp_restaurant's `get_ordering_context` wrapper now returns the site currency's
+   `currency_symbol` and `symbol_on_right`; the app stores them under the keys `@ury/core` formatCurrency
+   reads (Patch 60), so a customer's phone shows "30 DH" (before: "DH 30" or no symbol, nothing cached).
+2. Numbers in the till, the waiter app, /ury and the QR app use the owner app's format: space thousands,
+   comma decimals, Western digits ("1 234,5"), also on an Arabic screen (`numberLocale`: fr and ar
+   fr-FR, en en-GB). Patch 61's `uiLocale` keeps the dates in the screen's language (fr-FR / ar-MA / en-GB;
+   fr-FR instead of fr-MA, same French dates).
+
+Why it can't be done in `erp_restaurant`: the QR app formats prices in the browser from local storage only;
+the server can send the symbol (erp_restaurant does) but only the app can store it. Number formatting is
+in URY's shared formatter.
+
+Risk profile: low. `self-order/src/lib/api.ts`: one helper and an optional field. Shared core: rebuild pos
+and frontend; /ury and /order by hand on the server. /order and /pos share the same localStorage keys: on a
+site whose till uses another currency than the site default, an open till tab shows the QR app's symbol
+until its next reload (Patch 60 refreshes it on load); not the case on a MAD site. A QR session stored
+before the deploy keeps no symbol until the customer scans again.
+
+Acceptance criteria:
+1. A phone that never opened the till, scanning a QR code: menu prices "30 DH", cart total "45 DH".
+2. Till in French or Arabic: "1 234,5 DH" for a large amount, "26,5 DH" for a half dirham.
+3. No new strings.
+
+Manual test: (1) a phone or private window that never opened /pos scans a table QR code: menu "30 DH",
+cart total "… DH"; (2) till in French: a large amount "1 234,5 DH"; in Arabic: "1 234,5 DH" with Western
+digits; in English: "1,234.5 DH"; (3) /ury after its manual build: same formats.
+
+Patch file: `patches/62-qr-currency-and-number-format.patch`. Commit: (pending).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

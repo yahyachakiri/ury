@@ -1,9 +1,9 @@
-import { storage, uiLocale, withSymbol } from '@ury/core';
+import { storage, numberLocale, withSymbol } from '@ury/core';
 
 export function formatCurrency(amount: number): string {
   // Patch 16: site currency when the POS has not cached a symbol (was ₹), no Indian grouping.
   const symbol = (storage as any)?.getItem?.('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
-  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString(uiLocale()) : amount; // Patch 61: the screen's language
+  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString(numberLocale()) : amount; // Patch 61, 62: the screen's language
   return withSymbol(symbol, formattedVal); // Patch 60: symbol after the amount when the Currency says so
 }
 

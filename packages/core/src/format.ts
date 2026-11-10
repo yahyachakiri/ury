@@ -2,17 +2,23 @@ import { storage } from './storage';
 
 // Patch 61: numbers and dates in the screen's language (set on <html lang> by the POS), not the
 // browser's: a French till writes "26,5 DH" and "9 nov., 15:01" even in an English browser.
-const UI_LOCALES: Record<string, string> = { fr: 'fr-MA', ar: 'ar-MA', en: 'en-GB' };
+const UI_LOCALES: Record<string, string> = { fr: 'fr-FR', ar: 'ar-MA', en: 'en-GB' };
+// Patch 62: numbers as in the owner app ("1 234,5": space thousands, comma decimals, Western digits),
+// also on an Arabic till; dates keep the screen's language (uiLocale).
+const NUMBER_LOCALES: Record<string, string> = { fr: 'fr-FR', ar: 'fr-FR', en: 'en-GB' };
+const screenLang = () => ((typeof document !== 'undefined' && document.documentElement.lang) || '').split('-')[0];
 export function uiLocale(): string | undefined {
-  const lang = (typeof document !== 'undefined' && document.documentElement.lang) || '';
-  return UI_LOCALES[lang.split('-')[0]] || undefined;
+  return UI_LOCALES[screenLang()] || undefined;
+}
+export function numberLocale(): string | undefined {
+  return NUMBER_LOCALES[screenLang()] || undefined;
 }
 
 export function formatCurrency(amount: number): string {
   // Patch 16: site currency when no symbol is cached (was ₹), no Indian grouping.
   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
   const roundedAmount = flt(amount, 2);
-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString(uiLocale()) : roundedAmount; // Patch 61
+  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString(numberLocale()) : roundedAmount; // Patch 61, 62
   return withSymbol(symbol, formattedVal); // Patch 60
 }
 
