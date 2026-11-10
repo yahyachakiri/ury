@@ -1,10 +1,18 @@
 import { storage } from './storage';
 
+// Patch 61: numbers and dates in the screen's language (set on <html lang> by the POS), not the
+// browser's: a French till writes "26,5 DH" and "9 nov., 15:01" even in an English browser.
+const UI_LOCALES: Record<string, string> = { fr: 'fr-MA', ar: 'ar-MA', en: 'en-GB' };
+export function uiLocale(): string | undefined {
+  const lang = (typeof document !== 'undefined' && document.documentElement.lang) || '';
+  return UI_LOCALES[lang.split('-')[0]] || undefined;
+}
+
 export function formatCurrency(amount: number): string {
   // Patch 16: site currency when no symbol is cached (was ₹), no Indian grouping.
   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
   const roundedAmount = flt(amount, 2);
-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
+  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString(uiLocale()) : roundedAmount; // Patch 61
   return withSymbol(symbol, formattedVal); // Patch 60
 }
 
@@ -60,7 +68,7 @@ export const formatInvoiceTime = (timestamp: string | null) => {
 
     const parsedDate = new Date(timestamp);
     if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
+      return parsedDate.toLocaleTimeString(uiLocale(), { hour: 'numeric', minute: 'numeric' }); // Patch 61
     }
 
     // Frappe can send a Time without zero padding ("19:00:3.152595"): one or two digits each.
@@ -69,7 +77,7 @@ export const formatInvoiceTime = (timestamp: string | null) => {
       const [, hours, minutes, seconds] = timeOnlyMatch;
       const date = new Date();
       date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
-      const formatted = date.toLocaleTimeString(undefined, {
+      const formatted = date.toLocaleTimeString(uiLocale(), { // Patch 61
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,

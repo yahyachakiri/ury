@@ -161,7 +161,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
                 disabled={disabled}
                 className="focus:outline-none"
               >
-                {tab.name}
+                {/^Tab (\d+)$/.test(tab.name) ? t('order_tabs.tab', { number: tab.name.slice(4) }) : tab.name}
               </button>
               
               <button

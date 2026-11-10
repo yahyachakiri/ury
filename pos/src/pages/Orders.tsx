@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency, parseFrappeError } from '@ury/core';
+import { formatCurrency, parseFrappeError, uiLocale } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -205,12 +205,14 @@ export default function Orders() {
 
   // Function to format the date and time
   const formatDateTime = (date: string, time: string) => {
-    const formattedDate = new Date(date + ' ' + time).toLocaleString('en-US', {
+    // Patch 61: in the till's language ("9 nov., 15:01"), 24-hour except in English.
+    const locale = uiLocale();
+    const formattedDate = new Date(date + ' ' + time).toLocaleString(locale ?? 'en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: 'numeric',
-      hour12: true
+      hour12: !locale || locale.startsWith('en')
     });
     return formattedDate;
   };

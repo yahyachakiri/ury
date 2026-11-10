@@ -54,16 +54,18 @@ const TableCard = ({
   return (
     <div
       role={isOccupied ? 'group' : 'button'}
-      tabIndex={isOccupied ? -1 : 0}
+      tabIndex={isOccupied || isRestricted ? -1 : 0}
       onClick={() => {
-        if (!isOccupied && !isRestricted) {
+        // Patch 61: a tap on a busy table opens its order too (was only the eye button). The actions menu
+        // and the footer buttons stop their own clicks.
+        if (!isRestricted) {
           onNavigate();
         }
       }}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
         isOccupied
-          ? TABLE_STATE_STYLES.occupied
+          ? cn(TABLE_STATE_STYLES.occupied, !isRestricted && 'cursor-pointer hover:shadow-md')
           : isRestricted
             ? TABLE_STATE_STYLES.restricted
             : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
@@ -85,6 +87,8 @@ const TableCard = ({
             <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
+            {/* Patch 61: clicks in the actions menu must not open the table's order. */}
+            <span onClick={(event) => event.stopPropagation()}>
             <TableActionsMenu
               table={table}
               isOpen={menuOpen}
@@ -95,6 +99,7 @@ const TableCard = ({
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
             />
+            </span>
           </div>
         </div>
 
@@ -138,7 +143,9 @@ const TableCard = ({
         </div>
       </div>
 
+      {/* Patch 61: the eye and print buttons (also while disabled) never open the order through the card. */}
       <div
+        onClick={(event) => event.stopPropagation()}
         className={cn(
           'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
           isOccupied ? 'border-amber-200' : 'border-transparent'

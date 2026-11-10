@@ -2702,6 +2702,57 @@ Acceptance criteria:
 
 Patch file: `patches/60-currency-symbol-on-right.patch`. Commit: 7d464d58.
 
+### Patch 61 — Till texts from the cashier course: language of dates and numbers, busy table opens its order
+
+Ticket 55 batch 1 (owner 2026-11-10). Patch 59 was reserved for ticket 50, which needed no fork patch (unused).
+
+Files touched: `packages/core/src/format.ts` (new exported `uiLocale`, `formatCurrency`, `formatInvoiceTime`),
+`packages/core/src/index.ts` (export), `packages/ui/src/components/dialog.tsx` (hidden "Close" label),
+`frontend/src/utils/format.ts` (`formatCurrency`), `pos/src/pages/Orders.tsx` (`formatDateTime`),
+`pos/src/components/POSOpeningScreen.tsx` (`sessionStart`), `pos/src/components/TableCard.tsx` (card click),
+`pos/src/components/OrderTabs.tsx` (tab label), `pos/src/components/Header.tsx` (shortcut hint),
+`pos/src/i18n/locales/{en,fr,ar}.json`.
+
+What it does:
+1. Dates and amounts in the till's language (the `<html lang>` the POS and /ury already set), not the
+   browser's: `uiLocale()` maps fr / ar / en to fr-MA / ar-MA / en-GB (the owner app's mapping). A French till
+   in an English browser writes "26,5 DH" and "9 nov., 15:01" (Orders), the opening dialog's time, table
+   start times; the Orders list uses a 12-hour clock only in English ("9 Nov, 3:01 pm"), table start times
+   stay 24-hour. The QR customer app (/order) uses the same `formatCurrency`: its next manual build formats
+   amounts in the customer app's language too.
+2. A tap anywhere on a busy table opens its order (was: only the eye button), like a free table. The actions
+   menu is wrapped so its clicks do not open the order; the eye and print buttons
+   already stop their clicks, and the card footer stops any click on them (also a disabled print button
+   on an iPad). A tap on the card while its menu is open still opens the order (the menu closes first).
+   Restricted users (no dine-in) still cannot open it. A busy card keeps role="group" (its buttons stay
+   separate for screen readers).
+3. Close Shift texts with their accents (cloture, etre, ecriture, irreversible, deja ete, controle) and
+   "pour ce service" in the opening help; "Agrégateurs" renamed "Plateformes" / "Platforms" / "منصات" and
+   its "select a platform" message (owner decision 2026-11-09); QR toasts "articles : 2" instead of
+   "2 article(s)".
+4. Cart tabs shown as "Commande 1" / "Order 1" / "الطلب 1" (the stored name stays "Tab 1", so saved tabs and
+   the store are unchanged); the "⌘ K" hint only on devices with a mouse (not on an iPad); the hidden "Close"
+   label of every dialog's × in the screen's language (fr / ar, else English).
+
+Why it can't be done in `erp_restaurant`: all of these are rendered by URY's React apps from their own code
+and locale files; there is no runtime configuration point for the formatting locale, the table click or
+these labels.
+
+Risk profile: low to medium. Shared `@ury/core` and `@ury/ui` (rebuild pos and frontend; /ury and /order by
+hand). `format.ts` is also changed by Patches 16, 58 and 60 (separate lines). `pos/src/components/Header.tsx`
+is a high-conflict file (third patch on it, see the actively edited list): one hunk, the shortcut hint's class.
+`TableCard.tsx`: check the merge / transfer menu and the footer after an upstream change there.
+
+Acceptance criteria:
+1. French till in an English browser: Orders "9 nov., 15:01", a Glovo price "26,5 DH", the opening dialog
+   date in French; Arabic till: dates in Arabic with Latin digits; English: Orders "9 Nov, 3:01 pm".
+2. Tables: a tap on a busy table opens its order in the cart; the actions menu (merge, transfer) still opens
+   and acts without opening the order; a free table still opens a new order.
+3. Close Shift dialog and its confirmation with accents; order type "Plateformes"; QR toast "articles : 2".
+4. Cart tab "Commande 1"; no "⌘ K" on an iPad; screen reader reads "Fermer" on the ×.
+
+Patch file: `patches/61-till-texts-and-busy-table.patch`. Commit: (pending).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

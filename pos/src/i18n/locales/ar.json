@@ -1,4 +1,5 @@
 {
+    "order_tabs": { "tab": "الطلب {{number}}" },
     "_meta": {
         "language_code": "ar",
         "translation_method": "machine_translated",
@@ -275,7 +276,7 @@
         "user_not_logged_in": "المستخدم غير مسجل الدخول",
         "failed_load_rooms": "فشل في تحميل القاعات",
         "failed_load_tables": "فشل في تحميل الطاولات",
-        "select_aggregator": "يرجى تحديد منصة التجميع (aggregator) قبل المتابعة",
+        "select_aggregator": "اختر منصة التوصيل قبل المتابعة",
         "select_customer": "يرجى تحديد عميل قبل المتابعة",
         "select_table": "يرجى تحديد طاولة للطلبات من نوع {{order_type}}",
         "failed_logout": "فشل في تسجيل الخروج. يرجى المحاولة مرة أخرى.",
@@ -526,7 +527,7 @@
         "take_away": "سفري",
         "delivery": "توصيل",
         "phone_in": "طلب هاتفي",
-        "aggregators": "منصات تجميع"
+        "aggregators": "منصات"
     },
     "order_status_types": {
         "draft": "مسودة",

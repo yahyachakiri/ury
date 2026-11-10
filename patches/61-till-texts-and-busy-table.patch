@@ -1,0 +1,369 @@
+diff --git a/frontend/src/utils/format.ts b/frontend/src/utils/format.ts
+index 0c5f93d9..cb291ae9 100644
+--- a/frontend/src/utils/format.ts
++++ b/frontend/src/utils/format.ts
+@@ -1,9 +1,9 @@
+-import { storage, withSymbol } from '@ury/core';
++import { storage, uiLocale, withSymbol } from '@ury/core';
+ 
+ export function formatCurrency(amount: number): string {
+   // Patch 16: site currency when the POS has not cached a symbol (was ₹), no Indian grouping.
+   const symbol = (storage as any)?.getItem?.('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
+-  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString() : amount;
++  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString(uiLocale()) : amount; // Patch 61: the screen's language
+   return withSymbol(symbol, formattedVal); // Patch 60: symbol after the amount when the Currency says so
+ }
+ 
+diff --git a/packages/core/src/format.ts b/packages/core/src/format.ts
+index d5e876bd..b048801b 100644
+--- a/packages/core/src/format.ts
++++ b/packages/core/src/format.ts
+@@ -1,10 +1,18 @@
+ import { storage } from './storage';
+ 
++// Patch 61: numbers and dates in the screen's language (set on <html lang> by the POS), not the
++// browser's: a French till writes "26,5 DH" and "9 nov., 15:01" even in an English browser.
++const UI_LOCALES: Record<string, string> = { fr: 'fr-MA', ar: 'ar-MA', en: 'en-GB' };
++export function uiLocale(): string | undefined {
++  const lang = (typeof document !== 'undefined' && document.documentElement.lang) || '';
++  return UI_LOCALES[lang.split('-')[0]] || undefined;
++}
++
+ export function formatCurrency(amount: number): string {
+   // Patch 16: site currency when no symbol is cached (was ₹), no Indian grouping.
+   const symbol = storage.getItem('currencySymbol') || (window as any).frappe?.boot?.sysdefaults?.currency || '';
+   const roundedAmount = flt(amount, 2);
+-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString() : roundedAmount;
++  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString(uiLocale()) : roundedAmount; // Patch 61
+   return withSymbol(symbol, formattedVal); // Patch 60
+ }
+ 
+@@ -60,7 +68,7 @@ export const formatInvoiceTime = (timestamp: string | null) => {
+ 
+     const parsedDate = new Date(timestamp);
+     if (!Number.isNaN(parsedDate.getTime())) {
+-      return parsedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
++      return parsedDate.toLocaleTimeString(uiLocale(), { hour: 'numeric', minute: 'numeric' }); // Patch 61
+     }
+ 
+     // Frappe can send a Time without zero padding ("19:00:3.152595"): one or two digits each.
+@@ -69,7 +77,7 @@ export const formatInvoiceTime = (timestamp: string | null) => {
+       const [, hours, minutes, seconds] = timeOnlyMatch;
+       const date = new Date();
+       date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
+-      const formatted = date.toLocaleTimeString(undefined, {
++      const formatted = date.toLocaleTimeString(uiLocale(), { // Patch 61
+         hour: '2-digit',
+         minute: '2-digit',
+         hour12: false,
+diff --git a/packages/core/src/index.ts b/packages/core/src/index.ts
+index fc7c130c..3555ae60 100644
+--- a/packages/core/src/index.ts
++++ b/packages/core/src/index.ts
+@@ -6,7 +6,7 @@ export { parseFrappeError, setErrorMessages } from './frappe/errors';
+ export type { ErrorMessages } from './frappe/errors';
+ export type { User, PosProfileCombined } from './types';
+ export { storage } from './storage';
+-export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt, withSymbol } from './format'; // Patch 60: withSymbol
++export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt, withSymbol, uiLocale } from './format'; // Patch 60: withSymbol; Patch 61: uiLocale
+ export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
+ export { validateFieldValue } from './utils/validateField';
+ export type { ValidationMessages } from './utils/validateField';
+diff --git a/packages/ui/src/components/dialog.tsx b/packages/ui/src/components/dialog.tsx
+index 82b49a3d..4a49e22b 100644
+--- a/packages/ui/src/components/dialog.tsx
++++ b/packages/ui/src/components/dialog.tsx
+@@ -3,6 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority"
+ import { cn } from "../lib/cn"
+ import { X } from "lucide-react"
+ 
++// Patch 61: the hidden label of the × in the screen's language (<html lang>), for screen readers.
++const closeLabel = () =>
++  ({ fr: "Fermer", ar: "إغلاق" } as Record<string, string>)[
++    (typeof document !== "undefined" ? document.documentElement.lang : "").split("-")[0]
++  ] ?? "Close"
++
+ const dialogVariants = cva(
+   "fixed inset-0 z-50 flex items-center justify-center",
+   {
+@@ -217,7 +223,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+           className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none"
+         >
+           <X className="h-4 w-4" />
+-          <span className="sr-only">Close</span>
++          <span className="sr-only">{closeLabel()}</span>
+         </button>
+       )}
+       {children}
+diff --git a/pos/src/components/Header.tsx b/pos/src/components/Header.tsx
+index 746a1daf..02b8ad9b 100644
+--- a/pos/src/components/Header.tsx
++++ b/pos/src/components/Header.tsx
+@@ -134,7 +134,8 @@ const Header = () => {
+               value={searchValue}
+               onChange={searchOnChange}
+             />
+-            <div className="flex items-center gap-2 text-gray-400">
++            {/* Patch 61: the keyboard shortcut hint only where there is a keyboard and mouse, not on an iPad. */}
++            <div className="hidden items-center gap-2 text-gray-400 [@media(pointer:fine)]:flex">
+               <Command className="w-4 h-4" />
+               <span>K</span>
+             </div>
+diff --git a/pos/src/components/OrderTabs.tsx b/pos/src/components/OrderTabs.tsx
+index 96b3a425..6601bcd2 100644
+--- a/pos/src/components/OrderTabs.tsx
++++ b/pos/src/components/OrderTabs.tsx
+@@ -161,7 +161,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
+                 disabled={disabled}
+                 className="focus:outline-none"
+               >
+-                {tab.name}
++                {/^Tab (\d+)$/.test(tab.name) ? t('order_tabs.tab', { number: tab.name.slice(4) }) : tab.name}
+               </button>
+               
+               <button
+diff --git a/pos/src/components/POSOpeningScreen.tsx b/pos/src/components/POSOpeningScreen.tsx
+index 5f85f558..ac28db79 100644
+--- a/pos/src/components/POSOpeningScreen.tsx
++++ b/pos/src/components/POSOpeningScreen.tsx
+@@ -1,7 +1,7 @@
+ import { useEffect, useMemo, useState } from 'react';
+ import { Store, RefreshCw, AlertTriangle, Lock } from 'lucide-react';
+ import { Button, Badge, Select, SelectItem, Spinner, showToast } from '@ury/ui';
+-import { formatCurrency } from '@ury/core';
++import { formatCurrency, uiLocale } from '@ury/core';
+ import { useRootStore } from '../store/root-store';
+ import {
+   createPOSOpening,
+@@ -48,7 +48,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
+ 
+   const sessionStart = useMemo(() => {
+     const timestamp = context?.session_start || new Date().toISOString();
+-    return new Date(timestamp).toLocaleString();
++    return new Date(timestamp).toLocaleString(uiLocale()); // Patch 61
+   }, [context?.session_start]);
+ 
+   const loadContext = async (posProfile?: string) => {
+diff --git a/pos/src/components/TableCard.tsx b/pos/src/components/TableCard.tsx
+index 1e26837d..c01e60e1 100644
+--- a/pos/src/components/TableCard.tsx
++++ b/pos/src/components/TableCard.tsx
+@@ -54,16 +54,18 @@ const TableCard = ({
+   return (
+     <div
+       role={isOccupied ? 'group' : 'button'}
+-      tabIndex={isOccupied ? -1 : 0}
++      tabIndex={isOccupied || isRestricted ? -1 : 0}
+       onClick={() => {
+-        if (!isOccupied && !isRestricted) {
++        // Patch 61: a tap on a busy table opens its order too (was only the eye button). The actions menu
++        // and the footer buttons stop their own clicks.
++        if (!isRestricted) {
+           onNavigate();
+         }
+       }}
+       className={cn(
+         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
+         isOccupied
+-          ? TABLE_STATE_STYLES.occupied
++          ? cn(TABLE_STATE_STYLES.occupied, !isRestricted && 'cursor-pointer hover:shadow-md')
+           : isRestricted
+             ? TABLE_STATE_STYLES.restricted
+             : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
+@@ -85,6 +87,8 @@ const TableCard = ({
+             <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
+               {isOccupied ? t('tables.occupied') : t('tables.available')}
+             </Badge>
++            {/* Patch 61: clicks in the actions menu must not open the table's order. */}
++            <span onClick={(event) => event.stopPropagation()}>
+             <TableActionsMenu
+               table={table}
+               isOpen={menuOpen}
+@@ -95,6 +99,7 @@ const TableCard = ({
+               onTransferCaptain={onTransferCaptain}
+               showCaptainTransfer={showCaptainTransfer}
+             />
++            </span>
+           </div>
+         </div>
+ 
+@@ -138,7 +143,9 @@ const TableCard = ({
+         </div>
+       </div>
+ 
++      {/* Patch 61: the eye and print buttons (also while disabled) never open the order through the card. */}
+       <div
++        onClick={(event) => event.stopPropagation()}
+         className={cn(
+           'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
+           isOccupied ? 'border-amber-200' : 'border-transparent'
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index c70351f1..a10f8e97 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -1,4 +1,5 @@
+ {
++    "order_tabs": { "tab": "الطلب {{number}}" },
+     "_meta": {
+         "language_code": "ar",
+         "translation_method": "machine_translated",
+@@ -275,7 +276,7 @@
+         "user_not_logged_in": "المستخدم غير مسجل الدخول",
+         "failed_load_rooms": "فشل في تحميل القاعات",
+         "failed_load_tables": "فشل في تحميل الطاولات",
+-        "select_aggregator": "يرجى تحديد منصة التجميع (aggregator) قبل المتابعة",
++        "select_aggregator": "اختر منصة التوصيل قبل المتابعة",
+         "select_customer": "يرجى تحديد عميل قبل المتابعة",
+         "select_table": "يرجى تحديد طاولة للطلبات من نوع {{order_type}}",
+         "failed_logout": "فشل في تسجيل الخروج. يرجى المحاولة مرة أخرى.",
+@@ -526,7 +527,7 @@
+         "take_away": "سفري",
+         "delivery": "توصيل",
+         "phone_in": "طلب هاتفي",
+-        "aggregators": "منصات تجميع"
++        "aggregators": "منصات"
+     },
+     "order_status_types": {
+         "draft": "مسودة",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index b373c1f9..2749d5b5 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -1,4 +1,5 @@
+ {
++  "order_tabs": { "tab": "Order {{number}}" },
+   "common": {
+     "loading": "Loading...",
+     "cancel": "Cancel",
+@@ -268,7 +269,7 @@
+     "user_not_logged_in": "User not logged in",
+     "failed_load_rooms": "Failed to load rooms",
+     "failed_load_tables": "Failed to load tables",
+-    "select_aggregator": "Please select an aggregator before proceeding",
++    "select_aggregator": "Please choose a platform before continuing",
+     "select_customer": "Please select a customer before proceeding",
+     "select_table": "Please select a table for {{order_type}} orders",
+     "failed_logout": "Failed to logout. Please try again.",
+@@ -519,7 +520,7 @@
+     "take_away": "Take Away",
+     "delivery": "Delivery",
+     "phone_in": "Phone In",
+-    "aggregators": "Aggregators"
++    "aggregators": "Platforms"
+   },
+   "order_status_types": {
+     "draft": "Draft",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 7816f2fa..7b405e37 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -1,4 +1,5 @@
+ {
++  "order_tabs": { "tab": "Commande {{number}}" },
+   "common": {
+     "loading": "Chargement...",
+     "cancel": "Annuler",
+@@ -183,7 +184,7 @@
+     "retry": "Réessayer",
+     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
+     "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
+-    "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
++    "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces / par mode de paiement que vous déclarez pour ce service. Il sert à rapprocher les ventes à la clôture.",
+     "zero_balance_warning": "Vous ouvrez avec 0 sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+     "confirm_zero_balance": "Confirmer et ouvrir",
+     "session_opened_success": "Session PDV ouverte"
+@@ -204,18 +205,18 @@
+     "submit": "Clôturer le PDV",
+     "submit_failed": "Échec de la clôture du PDV",
+     "load_failed": "Échec du chargement des détails de clôture",
+-    "help_expected": "Le montant attendu par le systeme pour ce mode de paiement, base sur les factures du jour.",
+-    "help_closing": "Saisissez le montant reel compte pour ce mode de paiement.",
+-    "help_difference": "Montant compte moins montant attendu. Positif signifie un excedent, negatif un manque.",
+-    "validation_missing_rows": "Saisissez un montant de cloture pour chaque mode de paiement avant de valider.",
+-    "validation_all_zero": "Le montant total de cloture ne peut pas etre nul. Saisissez les montants comptes.",
+-    "validation_zero_row_warning": "Un ou plusieurs modes de paiement sont restes a 0 alors qu'il y a eu de l'activite aujourd'hui. Verifiez avant de valider.",
+-    "confirm_title": "Confirmer la cloture PDV",
+-    "confirm_message": "Cette action soumettra l'ecriture de cloture et est irreversible. Voulez-vous vraiment continuer ?",
+-    "confirm_submit": "Oui, cloturer le PDV",
++    "help_expected": "Le montant attendu par le système pour ce mode de paiement, d'après les factures du jour.",
++    "help_closing": "Saisissez le montant réellement compté pour ce mode de paiement.",
++    "help_difference": "Montant compté moins montant attendu. Positif : excédent ; négatif : manque.",
++    "validation_missing_rows": "Saisissez un montant de clôture pour chaque mode de paiement avant de valider.",
++    "validation_all_zero": "Le montant total de clôture ne peut pas être nul. Saisissez les montants comptés.",
++    "validation_zero_row_warning": "Un ou plusieurs modes de paiement sont restés à 0 alors qu'il y a eu de l'activité aujourd'hui. Vérifiez avant de valider.",
++    "confirm_title": "Confirmer la clôture du PDV",
++    "confirm_message": "Cette action enregistre la clôture et est irréversible. Voulez-vous vraiment continuer ?",
++    "confirm_submit": "Oui, clôturer le PDV",
+     "confirm_back": "Retour",
+     "checklist_skip": "Ignorer pour l'instant",
+-    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard.",
++    "checklist_skip_hint": "La clôture du PDV a déjà été enregistrée. Vous pourrez terminer cette liste de contrôle plus tard.",
+     "col_payment_mode": "Mode de paiement",
+     "col_opening": "Ouverture",
+     "col_expected": "Attendu",
+@@ -268,7 +269,7 @@
+     "user_not_logged_in": "Utilisateur non connecté",
+     "failed_load_rooms": "Échec du chargement des salles",
+     "failed_load_tables": "Échec du chargement des tables",
+-    "select_aggregator": "Veuillez sélectionner un agrégateur avant de continuer",
++    "select_aggregator": "Choisissez une plateforme avant de continuer",
+     "select_customer": "Veuillez sélectionner un client avant de continuer",
+     "select_table": "Veuillez sélectionner une table pour les commandes {{order_type}}",
+     "failed_logout": "Échec de la déconnexion. Veuillez réessayer.",
+@@ -519,7 +520,7 @@
+     "take_away": "À emporter",
+     "delivery": "Livraison",
+     "phone_in": "Commande par téléphone",
+-    "aggregators": "Agrégateurs"
++    "aggregators": "Plateformes"
+   },
+   "order_status_types": {
+     "draft": "Brouillon",
+@@ -662,12 +663,12 @@
+     "select": "Choisir une plateforme de livraison"
+   },
+   "self_order": {
+-    "new_order_table": "Commande QR : {{table}} (n° {{number}}), {{qty}} article(s)",
+-    "new_order_pickup": "Commande QR à emporter (n° {{number}}), {{qty}} article(s)",
++    "new_order_table": "Commande QR : {{table}} (n° {{number}}), articles : {{qty}}",
++    "new_order_pickup": "Commande QR à emporter (n° {{number}}), articles : {{qty}}",
+     "bill_requested": "{{table}} demande l'addition (n° {{number}})",
+-    "new_order_pickup_pay_first": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : à encaisser avant la cuisine",
+-    "new_order_pickup_open": "Commande QR à emporter (n° {{number}}), {{qty}} article(s) : touchez pour l'ouvrir, l'impression du ticket l'envoie en cuisine",
+-    "request_title": "Commande QR à valider : {{table}}, {{qty}} article(s)",
++    "new_order_pickup_pay_first": "Commande QR à emporter (n° {{number}}), articles : {{qty}}, à encaisser avant la cuisine",
++    "new_order_pickup_open": "Commande QR à emporter (n° {{number}}), articles : {{qty}}. Touchez pour l'ouvrir ; l'impression du ticket l'envoie en cuisine",
++    "request_title": "Commande QR à valider : {{table}}, articles : {{qty}}",
+     "accept": "Valider",
+     "refuse": "Refuser",
+     "reason_placeholder": "Raison pour le client",
+diff --git a/pos/src/pages/Orders.tsx b/pos/src/pages/Orders.tsx
+index 999ec1b7..77c48018 100644
+--- a/pos/src/pages/Orders.tsx
++++ b/pos/src/pages/Orders.tsx
+@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
+ import { showToast } from '@ury/ui';
+ import OrderStatusSidebar from '../components/OrderStatusSidebar';
+ import { useRootStore } from '../store/root-store';
+-import { formatCurrency, parseFrappeError } from '@ury/core';
++import { formatCurrency, parseFrappeError, uiLocale } from '@ury/core';
+ import { Spinner } from '@ury/ui';
+ import { Textarea } from '@ury/ui';
+ import { usePOSStore } from '../store/pos-store';
+@@ -205,12 +205,14 @@ export default function Orders() {
+ 
+   // Function to format the date and time
+   const formatDateTime = (date: string, time: string) => {
+-    const formattedDate = new Date(date + ' ' + time).toLocaleString('en-US', {
++    // Patch 61: in the till's language ("9 nov., 15:01"), 24-hour except in English.
++    const locale = uiLocale();
++    const formattedDate = new Date(date + ' ' + time).toLocaleString(locale ?? 'en-US', {
+       month: 'short',
+       day: 'numeric',
+       hour: 'numeric',
+       minute: 'numeric',
+-      hour12: true
++      hour12: !locale || locale.startsWith('en')
+     });
+     return formattedDate;
+   };

@@ -3,6 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../lib/cn"
 import { X } from "lucide-react"
 
+// Patch 61: the hidden label of the × in the screen's language (<html lang>), for screen readers.
+const closeLabel = () =>
+  ({ fr: "Fermer", ar: "إغلاق" } as Record<string, string>)[
+    (typeof document !== "undefined" ? document.documentElement.lang : "").split("-")[0]
+  ] ?? "Close"
+
 const dialogVariants = cva(
   "fixed inset-0 z-50 flex items-center justify-center",
   {
@@ -217,7 +223,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none"
         >
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{closeLabel()}</span>
         </button>
       )}
       {children}

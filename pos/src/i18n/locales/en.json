@@ -1,4 +1,5 @@
 {
+  "order_tabs": { "tab": "Order {{number}}" },
   "common": {
     "loading": "Loading...",
     "cancel": "Cancel",
@@ -268,7 +269,7 @@
     "user_not_logged_in": "User not logged in",
     "failed_load_rooms": "Failed to load rooms",
     "failed_load_tables": "Failed to load tables",
-    "select_aggregator": "Please select an aggregator before proceeding",
+    "select_aggregator": "Please choose a platform before continuing",
     "select_customer": "Please select a customer before proceeding",
     "select_table": "Please select a table for {{order_type}} orders",
     "failed_logout": "Failed to logout. Please try again.",
@@ -519,7 +520,7 @@
     "take_away": "Take Away",
     "delivery": "Delivery",
     "phone_in": "Phone In",
-    "aggregators": "Aggregators"
+    "aggregators": "Platforms"
   },
   "order_status_types": {
     "draft": "Draft",

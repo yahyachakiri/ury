@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Store, RefreshCw, AlertTriangle, Lock } from 'lucide-react';
 import { Button, Badge, Select, SelectItem, Spinner, showToast } from '@ury/ui';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, uiLocale } from '@ury/core';
 import { useRootStore } from '../store/root-store';
 import {
   createPOSOpening,
@@ -48,7 +48,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
 
   const sessionStart = useMemo(() => {
     const timestamp = context?.session_start || new Date().toISOString();
-    return new Date(timestamp).toLocaleString();
+    return new Date(timestamp).toLocaleString(uiLocale()); // Patch 61
   }, [context?.session_start]);
 
   const loadContext = async (posProfile?: string) => {

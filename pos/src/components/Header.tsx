@@ -134,7 +134,8 @@ const Header = () => {
               value={searchValue}
               onChange={searchOnChange}
             />
-            <div className="flex items-center gap-2 text-gray-400">
+            {/* Patch 61: the keyboard shortcut hint only where there is a keyboard and mouse, not on an iPad. */}
+            <div className="hidden items-center gap-2 text-gray-400 [@media(pointer:fine)]:flex">
               <Command className="w-4 h-4" />
               <span>K</span>
             </div>
