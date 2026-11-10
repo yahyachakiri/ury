@@ -87,6 +87,8 @@ export interface SyncOrderRequest {
   last_invoice: string | null;
   last_modified_time?: string;
   comments?: string | null;
+  // Patch 63: why sent items are taken off (erp_restaurant removal_reason.py asks for it).
+  removal_reason?: string;
   room?: string;
 }
 

@@ -393,15 +393,18 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
               )}
             </Button>
 
-            <Button
-              onClick={() => loadContext(context?.selected_profile || undefined)}
-              disabled={isLoading || isSubmitting}
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {t('pos_opening.retry')}
-            </Button>
+            {/* Patch 63: "Réessayer" only after a failed load, not on a fresh dialog. */}
+            {error && (
+              <Button
+                onClick={() => loadContext(context?.selected_profile || undefined)}
+                disabled={isLoading || isSubmitting}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {t('pos_opening.retry')}
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -396,6 +396,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       console.error('Payment failed:', err);
       // parseFrappeError extracts human-readable message from _server_messages (e.g. stock validation error)
       setError(parseFrappeError(err, t('errors.payment_failed')));
+      // Patch 63: a discount above the cashier's limit is refused (erp_restaurant DiscountLimitError): the
+      // summary goes back to the order's own discount instead of showing the refused one and its change.
+      const e = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
+      const response = (e.response && typeof e.response === 'object' ? e.response : {}) as Record<string, unknown>;
+      const refusedDiscount = [e.exc_type, e.exception, response.exc_type, response.exception].some((v) =>
+        String(v ?? '').includes('DiscountLimitError')
+      );
+      if (refusedDiscount) {
+        setAppliedDiscount(discountAmount || 0);
+        setAppliedPercent(discountAmount ? effectivePercentage : 0);
+        setShownPercent(discountAmount && discountPercentage ? discountPercentage : null);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -672,7 +684,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 disabled={locked}
                 className={`flex-1 min-w-0 h-14 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 text-[15px] font-semibold ${fieldBorder({ kind: 'points' })} ${pointsUsed > 0 ? 'text-green-700' : 'text-gray-900'}`}
               >
-                <span className="truncate">
+                {/* Patch 63: the label wraps on two lines instead of "166 points disponibles (…" */}
+                <span className="line-clamp-2 text-start text-[14px] leading-tight">
                   {pointsUsed > 0
                     ? t('loyalty.points_used', { points: pointsUsed })
                     : t('loyalty.available', { points: loyalty.points, amount: formatCurrency(loyalty.points * loyalty.conversion_factor) })}

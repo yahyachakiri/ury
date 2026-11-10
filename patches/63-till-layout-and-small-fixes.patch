@@ -1,0 +1,628 @@
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index 40a139b1..a959bcc6 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -169,7 +169,11 @@ export default function CaptainOrder() {
+     setNoteEditingLine(null);
+   };
+ 
+-  const handleSend = async () => {
++  // Patch 63: the same reason prompt as the till when a sent item is reduced (erp_restaurant
++  // RemovalReasonRequired); the order is sent again with the reason.
++  const [askRemovalReason, setAskRemovalReason] = useState(false);
++
++  const handleSend = async (removalReason?: string) => {
+     if (!table) return;
+     try {
+       if (!posProfile) {
+@@ -221,6 +225,7 @@ export default function CaptainOrder() {
+         invoice: isUpdatingOrder ? orderId : null,
+         waiter: user.name,
+         comments: orderComment || undefined,
++        removal_reason: removalReason?.trim() || undefined,
+       };
+ 
+       const result = await syncOrder(orderData);
+@@ -238,6 +243,11 @@ export default function CaptainOrder() {
+       showToast.success(isUpdatingOrder ? t('captain.order_updated') : t('captain.order_sent'));
+       navigate('/order');
+     } catch (error) {
++      const e = (error && typeof error === 'object' ? error : {}) as Record<string, unknown>;
++      if ([e.exc_type, e.exception].some((v) => String(v ?? '').includes('RemovalReasonRequired'))) {
++        setAskRemovalReason(true); // Patch 63
++        return;
++      }
+       console.error('Failed to sync order:', error);
+       showToast.error(parseFrappeError(error, t('captain.send_failed'))); // Patch 46
+     } finally {
+@@ -607,7 +617,7 @@ export default function CaptainOrder() {
+               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+             </div>
+             <Button
+-              onClick={handleSend}
++              onClick={() => void handleSend()}
+               variant="default"
+               size="lg"
+               className="w-full h-12 text-base"
+@@ -636,7 +646,7 @@ export default function CaptainOrder() {
+             <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+           </div>
+           <Button
+-            onClick={handleSend}
++            onClick={() => void handleSend()}
+             variant="default"
+             size="lg"
+             className="w-full h-12 text-base"
+@@ -670,6 +680,19 @@ export default function CaptainOrder() {
+         />
+       )}
+ 
++      <CommentDialog
++        key={askRemovalReason ? 'removal-open' : 'removal-closed'} // a new, empty reason each time
++        isOpen={askRemovalReason}
++        onClose={() => setAskRemovalReason(false)}
++        onSave={(reason) => void handleSend(reason)}
++        title={t('removal_reason.title')}
++        label={t('removal_reason.label')}
++        placeholder={t('removal_reason.placeholder')}
++        saveLabel={t('removal_reason.send')}
++        required
++        maxLength={140}
++      />
++
+       <CommentDialog
+         isOpen={noteEditingLine !== null}
+         onClose={() => setNoteEditingLine(null)}
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index 2dcb0573..b3b09f86 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -13,7 +13,8 @@ import {
+ import CaptainTableCard, {
+   type CaptainTableOwnership,
+ } from '../components/CaptainTableCard';
+-import { t } from '../../i18n';
++import { getActiveLanguage, t } from '../../i18n';
++import { call } from '@ury/core';
+ 
+ /**
+  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
+@@ -190,9 +191,12 @@ export default function CaptainTables() {
+       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
+         <div className="flex items-center justify-between gap-2">
+           <h1 className="text-lg font-bold text-gray-900">{t('footer.tables')}</h1>
+-          <Button variant="ghost" size="sm" onClick={refresh}>
+-            {t('captain.refresh')}
+-          </Button>
++          <div className="flex items-center gap-1">
++            <WaiterLanguageSwitch />
++            <Button variant="ghost" size="sm" onClick={refresh}>
++              {t('captain.refresh')}
++            </Button>
++          </div>
+         </div>
+ 
+         {branchRooms.length > 0 && (
+@@ -259,3 +263,41 @@ export default function CaptainTables() {
+     </div>
+   );
+ }
++
++// Patch 63: a waiter chooses the app's language (their own User language, set by erp_restaurant
++// owner_app.set_language, which only changes the logged-in user), then the app reloads in it.
++const WAITER_LANGS: { code: string; label: string; name: string }[] = [
++  { code: 'fr', label: 'FR', name: 'Français' },
++  { code: 'ar', label: 'ع', name: 'العربية' },
++  { code: 'en', label: 'EN', name: 'English' },
++];
++
++function WaiterLanguageSwitch() {
++  const active = getActiveLanguage();
++  const choose = async (code: string) => {
++    if (code === active) return;
++    try {
++      await call.post('erp_restaurant.erp_restaurant.api.owner_app.set_language', { lang: code });
++      window.location.reload();
++    } catch {
++      showToast.error(t('errors.language_change_failed'));
++    }
++  };
++  return (
++    <div className="flex items-center rounded-md border border-gray-200 text-xs" dir="ltr">
++      {WAITER_LANGS.map((l) => (
++        <Button
++          key={l.code}
++          variant="ghost"
++          size="sm"
++          aria-pressed={l.code === active}
++          aria-label={l.name}
++          onClick={() => void choose(l.code)}
++          className={l.code === active ? 'h-7 px-2 font-semibold text-primary-700' : 'h-7 px-2 text-gray-600'}
++        >
++          {l.label}
++        </Button>
++      ))}
++    </div>
++  );
++}
+diff --git a/pos/src/components/CommentDialog.tsx b/pos/src/components/CommentDialog.tsx
+index e948ffbd..57da1065 100644
+--- a/pos/src/components/CommentDialog.tsx
++++ b/pos/src/components/CommentDialog.tsx
+@@ -8,12 +8,31 @@ interface CommentDialogProps {
+   onClose: () => void;
+   onSave: (comment: string) => void;
+   initialComment?: string;
++  // Patch 63: reused for the reason of an item taken off after the kitchen ticket.
++  title?: string;
++  label?: string;
++  placeholder?: string;
++  saveLabel?: string;
++  required?: boolean;
++  maxLength?: number;
+ }
+ 
+-const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: CommentDialogProps) => {
++const CommentDialog = ({
++  isOpen,
++  onClose,
++  onSave,
++  initialComment = '',
++  title,
++  label,
++  placeholder,
++  saveLabel,
++  required = false,
++  maxLength,
++}: CommentDialogProps) => {
+   const [comment, setComment] = useState(initialComment);
+ 
+   const handleSave = () => {
++    if (required && !comment.trim()) return;
+     onSave(comment);
+     onClose();
+   };
+@@ -32,7 +51,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
+           <div className="flex items-center gap-2">
+             <MessageSquare className="w-5 h-5 text-blue-600" />
+             <h2 className="text-lg font-semibold text-gray-900">
+-              {t('comment.title')}
++              {title ?? t('comment.title')}
+             </h2>
+           </div>
+           <Button
+@@ -47,13 +66,14 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
+         
+         <div className="mb-6">
+           <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
+-            {t('comment.label')}
++            {label ?? t('comment.label')}
+           </label>
+           <textarea
+             id="comment"
+             value={comment}
+             onChange={(e) => setComment(e.target.value)}
+-            placeholder={t('comment.placeholder')}
++            placeholder={placeholder ?? t('comment.placeholder')}
++            maxLength={maxLength}
+             className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+             autoFocus
+           />
+@@ -69,9 +89,10 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
+           </Button>
+           <Button
+             onClick={handleSave}
++            disabled={required && !comment.trim()}
+             className="px-4 py-2 bg-blue-600 hover:bg-blue-700"
+           >
+-            {t('comment.save_button')}
++            {saveLabel ?? t('comment.save_button')}
+           </Button>
+         </div>
+       </div>
+diff --git a/pos/src/components/OrderPanel.tsx b/pos/src/components/OrderPanel.tsx
+index 57dff572..b025c762 100644
+--- a/pos/src/components/OrderPanel.tsx
++++ b/pos/src/components/OrderPanel.tsx
+@@ -78,7 +78,12 @@ const OrderPanel = () => {
+     setOrderComment(comment);
+   };
+ 
+-  const handleSubmit = async () => {
++  // Patch 63: erp_restaurant refuses an update that takes off items already sent to the kitchen without a
++  // reason (RemovalReasonRequired, when the till allows removals); the cashier gives it and the order is
++  // sent again with it.
++  const [askRemovalReason, setAskRemovalReason] = useState(false);
++
++  const handleSubmit = async (removalReason?: string) => {
+     try {
+       if (!posProfile) {
+         throw new Error(t('errors.pos_profile_not_found'));
+@@ -129,7 +134,8 @@ const OrderPanel = () => {
+         last_modified_time: isUpdatingOrder ? (lastModifiedTime || undefined) : undefined,
+         invoice: isUpdatingOrder ? orderId : null,
+         waiter: user.name,
+-        comments: orderComment || undefined
++        comments: orderComment || undefined,
++        removal_reason: removalReason?.trim() || undefined
+       };
+ 
+       const result = await syncOrder(orderData);
+@@ -170,6 +176,11 @@ const OrderPanel = () => {
+         navigate('/orders');
+       }
+     } catch (error) {
++      const e = (error && typeof error === 'object' ? error : {}) as Record<string, unknown>;
++      if ([e.exc_type, e.exception].some((v) => String(v ?? '').includes('RemovalReasonRequired'))) {
++        setAskRemovalReason(true); // Patch 63
++        return;
++      }
+       console.error('Failed to sync order:', error);
+       showToast.error(parseFrappeError(error, t('errors.failed_process_order')));
+     } finally {
+@@ -222,7 +233,9 @@ const OrderPanel = () => {
+   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
+ 
+   return (
+-    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
++    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] fixed end-0 z-10">
++      {/* Patch 63: the visible height (dvh), so on an iPad the cart's last lines and "Vider le panier" are not
++          under the browser's bars. */}
+       <div className="p-4 border-b border-gray-200 flex-shrink-0">
+         <OrderTabs disabled={isInteractionDisabled} />
+         <OrderTypeSelect disabled={isInteractionDisabled} />
+@@ -355,7 +368,8 @@ const OrderPanel = () => {
+             )}
+           </div>
+           
+-          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
++          {/* Patch 63: a shadow on the Total footer shows the list scrolls behind it. */}
++          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.15)]">
+             <div className="flex justify-between items-center mb-4">
+               <div className="flex items-center gap-2">
+                 <Button
+@@ -376,7 +390,7 @@ const OrderPanel = () => {
+               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+             </div>
+             <Button
+-              onClick={handleSubmit}
++              onClick={() => void handleSubmit()}
+               variant="default"
+               size="default"
+               className="w-full"
+@@ -412,6 +426,19 @@ const OrderPanel = () => {
+         />
+       )}
+ 
++      <CommentDialog
++        key={askRemovalReason ? 'removal-open' : 'removal-closed'} // a new, empty reason each time
++        isOpen={askRemovalReason}
++        onClose={() => setAskRemovalReason(false)}
++        onSave={(reason) => void handleSubmit(reason)}
++        title={t('removal_reason.title')}
++        label={t('removal_reason.label')}
++        placeholder={t('removal_reason.placeholder')}
++        saveLabel={t('removal_reason.send')}
++        required
++        maxLength={140}
++      />
++
+       <CommentDialog
+         isOpen={showCommentDialog}
+         onClose={() => setShowCommentDialog(false)}
+diff --git a/pos/src/components/OrderTypeSelect.tsx b/pos/src/components/OrderTypeSelect.tsx
+index 6287fa4e..244b6220 100644
+--- a/pos/src/components/OrderTypeSelect.tsx
++++ b/pos/src/components/OrderTypeSelect.tsx
+@@ -55,7 +55,8 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
+ 
+   return (
+     <div>
+-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
++      {/* Patch 63: the order types wrap instead of scrolling, so the last one ("Plateformes") is never cut. */}
++      <div className="flex flex-wrap gap-2 pb-2">
+         {ORDER_TYPES.map(({ value, icon: Icon }) => {
+           const isDineIn = value === DINE_IN;
+           
+diff --git a/pos/src/components/POSClosingDialog.tsx b/pos/src/components/POSClosingDialog.tsx
+index 0777ed70..cdf646b3 100644
+--- a/pos/src/components/POSClosingDialog.tsx
++++ b/pos/src/components/POSClosingDialog.tsx
+@@ -101,6 +101,7 @@ interface AggregatedTotals {
+   grandTotal: number;
+   netTotal: number;
+   totalQty: number;
++  loyalty: number; // Patch 63
+ }
+ 
+ /**
+@@ -115,13 +116,15 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
+   totals: AggregatedTotals;
+   expectedByMode: Record<string, number>;
+ } {
+-  const totals: AggregatedTotals = { grandTotal: 0, netTotal: 0, totalQty: 0 };
++  const totals: AggregatedTotals = { grandTotal: 0, netTotal: 0, totalQty: 0, loyalty: 0 };
+   const expectedByMode: Record<string, number> = {};
+ 
+   invoices.forEach((invoice) => {
+     totals.grandTotal += Number(invoice.grand_total) || 0;
+     totals.netTotal += Number(invoice.net_total) || 0;
+     totals.totalQty += Number(invoice.total_qty) || 0;
++    // Patch 63: points are not a payment method, so they have no row below; shown under the total instead.
++    totals.loyalty += Number(invoice.loyalty_amount) || 0;
+ 
+     (invoice.payments || []).forEach((payment) => {
+       let amount = Number(payment.amount) || 0;
+@@ -186,7 +189,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
+   const [isSubCashier, setIsSubCashier] = useState(false);
+   const [periodEndDate, setPeriodEndDate] = useState<Date>(new Date());
+   const [invoiceCount, setInvoiceCount] = useState(0);
+-  const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0 });
++  const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0, loyalty: 0 });
+   const [rows, setRows] = useState<ClosingPaymentSummary[]>([]);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [submitError, setSubmitError] = useState<string | null>(null);
+@@ -535,6 +538,11 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
+                   <p className="text-lg font-semibold text-gray-900">
+                     {formatCurrency(totals.grandTotal)}
+                   </p>
++                  {totals.loyalty > 0 && (
++                    <p className="text-xs text-gray-500">
++                      {t('pos_closing.loyalty_part', { amount: formatCurrency(totals.loyalty) })}
++                    </p>
++                  )}
+                 </div>
+                 <div className="rounded-lg border border-gray-200 p-3">
+                   <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
+diff --git a/pos/src/components/POSOpeningScreen.tsx b/pos/src/components/POSOpeningScreen.tsx
+index ac28db79..403ef602 100644
+--- a/pos/src/components/POSOpeningScreen.tsx
++++ b/pos/src/components/POSOpeningScreen.tsx
+@@ -393,15 +393,18 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
+               )}
+             </Button>
+ 
+-            <Button
+-              onClick={() => loadContext(context?.selected_profile || undefined)}
+-              disabled={isLoading || isSubmitting}
+-              variant="outline"
+-              className="w-full sm:w-auto"
+-            >
+-              <RefreshCw className="w-4 h-4 mr-2" />
+-              {t('pos_opening.retry')}
+-            </Button>
++            {/* Patch 63: "Réessayer" only after a failed load, not on a fresh dialog. */}
++            {error && (
++              <Button
++                onClick={() => loadContext(context?.selected_profile || undefined)}
++                disabled={isLoading || isSubmitting}
++                variant="outline"
++                className="w-full sm:w-auto"
++              >
++                <RefreshCw className="w-4 h-4 mr-2" />
++                {t('pos_opening.retry')}
++              </Button>
++            )}
+           </div>
+         </div>
+       </div>
+diff --git a/pos/src/components/PaymentDialog.tsx b/pos/src/components/PaymentDialog.tsx
+index 5aa9e328..f88691cb 100644
+--- a/pos/src/components/PaymentDialog.tsx
++++ b/pos/src/components/PaymentDialog.tsx
+@@ -396,6 +396,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+       console.error('Payment failed:', err);
+       // parseFrappeError extracts human-readable message from _server_messages (e.g. stock validation error)
+       setError(parseFrappeError(err, t('errors.payment_failed')));
++      // Patch 63: a discount above the cashier's limit is refused (erp_restaurant DiscountLimitError): the
++      // summary goes back to the order's own discount instead of showing the refused one and its change.
++      const e = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
++      const response = (e.response && typeof e.response === 'object' ? e.response : {}) as Record<string, unknown>;
++      const refusedDiscount = [e.exc_type, e.exception, response.exc_type, response.exception].some((v) =>
++        String(v ?? '').includes('DiscountLimitError')
++      );
++      if (refusedDiscount) {
++        setAppliedDiscount(discountAmount || 0);
++        setAppliedPercent(discountAmount ? effectivePercentage : 0);
++        setShownPercent(discountAmount && discountPercentage ? discountPercentage : null);
++      }
+     } finally {
+       setIsProcessing(false);
+     }
+@@ -672,7 +684,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
+                 disabled={locked}
+                 className={`flex-1 min-w-0 h-14 rounded-[10px] bg-white px-3.5 flex items-center justify-between gap-2 text-[15px] font-semibold ${fieldBorder({ kind: 'points' })} ${pointsUsed > 0 ? 'text-green-700' : 'text-gray-900'}`}
+               >
+-                <span className="truncate">
++                {/* Patch 63: the label wraps on two lines instead of "166 points disponibles (…" */}
++                <span className="line-clamp-2 text-start text-[14px] leading-tight">
+                   {pointsUsed > 0
+                     ? t('loyalty.points_used', { points: pointsUsed })
+                     : t('loyalty.available', { points: loyalty.points, amount: formatCurrency(loyalty.points * loyalty.conversion_factor) })}
+diff --git a/pos/src/components/ProductDialog.tsx b/pos/src/components/ProductDialog.tsx
+index 14ec30ea..166b1534 100644
+--- a/pos/src/components/ProductDialog.tsx
++++ b/pos/src/components/ProductDialog.tsx
+@@ -386,12 +386,13 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+         showCloseButton={false}
+       >
+         {/* Left Column - Image  */}
++        {/* Patch 63: a 10rem photo on a phone (waiter app), so the options are not squeezed below it. */}
+         <div className="md:w-1/3 relative">
+           {itemDoc?.image ? (
+             <img
+               src={itemDoc.image}
+               alt={itemDoc.name}
+-              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
++              className="w-full h-40 md:min-h-96 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
+               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
+               onError={(e) => {
+                 const target = e.target as HTMLImageElement;
+@@ -399,14 +400,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+                 const parent = target.parentElement;
+                 if (parent) {
+                   const placeholder = document.createElement('div');
+-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
++                  placeholder.className = 'w-full h-40 md:h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
+                   placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
+                   parent.insertBefore(placeholder, target);
+                 }
+               }}
+             />
+           ) : (
+-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
++            <div className="w-full h-40 md:min-h-96 md:h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+               {itemDoc?.name.slice(0, 2).toUpperCase()}
+             </div>
+           )}
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index a10f8e97..0c7533fb 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -1,4 +1,5 @@
+ {
++    "removal_reason": {"title": "سبب الحذف", "label": "يتم حذف منتجات أُرسلت إلى المطبخ. لماذا؟", "placeholder": "مثال: غيّر الزبون رأيه، خطأ في الإدخال", "send": "إرسال مع هذا السبب"},
+     "order_tabs": { "tab": "الطلب {{number}}" },
+     "_meta": {
+         "language_code": "ar",
+@@ -197,6 +198,7 @@
+         "session_opened_success": "تم فتح جلسة نقطة البيع"
+     },
+     "pos_closing": {
++        "loyalty_part": "منها {{amount}} بنقاط الولاء",
+         "title": "إغلاق نقطة البيع",
+         "description": "راجع مبيعات جلستك وأدخل مبالغ الإغلاق الفعلية.",
+         "loading": "جاري تحميل تفاصيل الإغلاق...",
+@@ -271,6 +273,7 @@
+         "save_button": "حفظ التعليق"
+     },
+     "errors": {
++        "language_change_failed": "تعذر تغيير اللغة. حاول مرة أخرى.",
+         "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",
+         "pos_profile_not_loaded": "لم يتم تحميل ملف تعريف نقطة البيع بعد",
+         "user_not_logged_in": "المستخدم غير مسجل الدخول",
+@@ -511,7 +514,7 @@
+     },
+     "product_dialog": {
+         "special_instructions": "تعليمات خاصة",
+-        "special_instructions_placeholder": "أضف أي تعليمات خاصة أو ملاحظات لهذا العنصر...",
++        "special_instructions_placeholder": "مثال: بدون بصل، مطهو جيدًا",
+         "quantity": "الكمية",
+         "variants": "الخيارات",
+         "addons": "الإضافات",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 2749d5b5..423d664c 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -1,4 +1,5 @@
+ {
++  "removal_reason": {"title": "Reason for removal", "label": "Items already sent to the kitchen are being removed. Why?", "placeholder": "E.g. customer changed their mind, entry mistake", "send": "Send with this reason"},
+   "order_tabs": { "tab": "Order {{number}}" },
+   "common": {
+     "loading": "Loading...",
+@@ -190,6 +191,7 @@
+     "session_opened_success": "POS session opened"
+   },
+   "pos_closing": {
++    "loyalty_part": "incl. {{amount}} in loyalty points",
+     "title": "Close POS",
+     "description": "Review sales for your session and enter the actual closing amounts.",
+     "loading": "Loading closing details...",
+@@ -264,6 +266,7 @@
+     "save_button": "Save Comment"
+   },
+   "errors": {
++    "language_change_failed": "Could not change the language. Try again.",
+     "pos_profile_not_found": "POS Profile not found",
+     "pos_profile_not_loaded": "POS profile not loaded yet",
+     "user_not_logged_in": "User not logged in",
+@@ -504,7 +507,7 @@
+   },
+   "product_dialog": {
+     "special_instructions": "Special Instructions",
+-    "special_instructions_placeholder": "Add any special instructions or notes for this item...",
++    "special_instructions_placeholder": "E.g. no onions, well done",
+     "quantity": "Quantity",
+     "variants": "Variants",
+     "addons": "Add-ons",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 7b405e37..440d55f0 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -1,4 +1,5 @@
+ {
++  "removal_reason": {"title": "Motif du retrait", "label": "Des articles déjà envoyés en cuisine sont retirés. Pourquoi ?", "placeholder": "Ex. : client a changé d'avis, erreur de saisie", "send": "Envoyer avec ce motif"},
+   "order_tabs": { "tab": "Commande {{number}}" },
+   "common": {
+     "loading": "Chargement...",
+@@ -190,6 +191,7 @@
+     "session_opened_success": "Session PDV ouverte"
+   },
+   "pos_closing": {
++    "loyalty_part": "dont {{amount}} en points fidélité",
+     "title": "Clôturer le PDV",
+     "description": "Vérifiez les ventes de votre session et saisissez les montants réels de clôture.",
+     "loading": "Chargement des détails de clôture...",
+@@ -264,6 +266,7 @@
+     "save_button": "Enregistrer le commentaire"
+   },
+   "errors": {
++    "language_change_failed": "Impossible de changer la langue. Réessayez.",
+     "pos_profile_not_found": "Profil PDV introuvable",
+     "pos_profile_not_loaded": "Le profil PDV n'est pas encore chargé",
+     "user_not_logged_in": "Utilisateur non connecté",
+@@ -504,7 +507,7 @@
+   },
+   "product_dialog": {
+     "special_instructions": "Instructions spéciales",
+-    "special_instructions_placeholder": "Ajoutez des instructions spéciales ou des notes pour cet article...",
++    "special_instructions_placeholder": "Ex. : sans oignons, bien cuit",
+     "quantity": "Quantité",
+     "variants": "Variantes",
+     "addons": "Suppléments",
+diff --git a/pos/src/lib/order-api.ts b/pos/src/lib/order-api.ts
+index 937be9de..a5d0c0c0 100644
+--- a/pos/src/lib/order-api.ts
++++ b/pos/src/lib/order-api.ts
+@@ -87,6 +87,8 @@ export interface SyncOrderRequest {
+   last_invoice: string | null;
+   last_modified_time?: string;
+   comments?: string | null;
++  // Patch 63: why sent items are taken off (erp_restaurant removal_reason.py asks for it).
++  removal_reason?: string;
+   room?: string;
+ }
+ 
+diff --git a/pos/src/lib/pos-closing-api.ts b/pos/src/lib/pos-closing-api.ts
+index 7fb10946..80beca2c 100644
+--- a/pos/src/lib/pos-closing-api.ts
++++ b/pos/src/lib/pos-closing-api.ts
+@@ -51,6 +51,8 @@ export interface POSClosingInvoice {
+   total_qty: number;
+   change_amount: number;
+   account_for_change_amount: string;
++  // Patch 63: the part of the total paid with loyalty points (ERPNext POS Invoice.loyalty_amount).
++  loyalty_amount?: number;
+   taxes: POSClosingTax[];
+   payments: POSClosingPayment[];
+ }
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index 15942d3f..01af6d9c 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -902,6 +902,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         orderComment: targetTabState.orderComment,
+         originalCartHash: targetTabState.originalCartHash,
+         lastModifiedTime: targetTabState.lastModifiedTime ?? null,
++        noOfPax: 1, // Patch 63: covers do not carry over from the order just sent
+         selectedItem: null,
+         orderLoading: false,
+         error: null,
+@@ -925,6 +926,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         orderComment: '',
+         originalCartHash: '',
+         lastModifiedTime: null,
++        noOfPax: 1, // Patch 63: covers do not carry over from the order just sent
+         selectedItem: null,
+         orderLoading: false,
+         error: null,

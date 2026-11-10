@@ -8,12 +8,31 @@ interface CommentDialogProps {
   onClose: () => void;
   onSave: (comment: string) => void;
   initialComment?: string;
+  // Patch 63: reused for the reason of an item taken off after the kitchen ticket.
+  title?: string;
+  label?: string;
+  placeholder?: string;
+  saveLabel?: string;
+  required?: boolean;
+  maxLength?: number;
 }
 
-const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: CommentDialogProps) => {
+const CommentDialog = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialComment = '',
+  title,
+  label,
+  placeholder,
+  saveLabel,
+  required = false,
+  maxLength,
+}: CommentDialogProps) => {
   const [comment, setComment] = useState(initialComment);
 
   const handleSave = () => {
+    if (required && !comment.trim()) return;
     onSave(comment);
     onClose();
   };
@@ -32,7 +51,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-semibold text-gray-900">
-              {t('comment.title')}
+              {title ?? t('comment.title')}
             </h2>
           </div>
           <Button
@@ -47,13 +66,14 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
         
         <div className="mb-6">
           <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
-            {t('comment.label')}
+            {label ?? t('comment.label')}
           </label>
           <textarea
             id="comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder={t('comment.placeholder')}
+            placeholder={placeholder ?? t('comment.placeholder')}
+            maxLength={maxLength}
             className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
             autoFocus
           />
@@ -69,9 +89,10 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
           </Button>
           <Button
             onClick={handleSave}
+            disabled={required && !comment.trim()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700"
           >
-            {t('comment.save_button')}
+            {saveLabel ?? t('comment.save_button')}
           </Button>
         </div>
       </div>

@@ -2795,6 +2795,77 @@ Patch file: `patches/62-qr-currency-and-number-format.patch`. Commit: 13aa0fd5.
 
 Browser check 2026-11-10: not checked in the QR app (needs the manual self-order build on the dev bench); the server sends currency_symbol / symbol_on_right (erp_restaurant 9c9f05d). Till numbers: not re-checked after the number-format change.
 
+### Patch 63 — Till layout and small fixes from the cashier course, reason for removed items (ticket 55 batch 3)
+
+Ticket 55 (owner "fix all", 2026-11-10).
+
+Files touched: `pos/src/components/OrderTypeSelect.tsx` (order types wrap), `pos/src/components/PaymentDialog.tsx`
+(loyalty label on two lines; refused discount put back), `pos/src/components/OrderPanel.tsx` (cart height in dvh,
+footer shadow; removal reason: `handleSubmit(removalReason)`, the RemovalReasonRequired check, a second comment
+window), `pos/src/components/ProductDialog.tsx` (10rem photo on a phone), `pos/src/components/POSClosingDialog.tsx`
+and `pos/src/lib/pos-closing-api.ts` (loyalty points under the total), `pos/src/components/POSOpeningScreen.tsx`
+("Réessayer" only after an error), `pos/src/store/pos-store.ts` (`resetOrderState`: covers back to 1),
+`pos/src/captain/pages/CaptainTables.tsx` (waiter language switch), `pos/src/captain/pages/CaptainOrder.tsx`
+(the same removal reason prompt in the waiter app), `pos/src/components/CommentDialog.tsx` and
+`pos/src/lib/order-api.ts` (removal reason), `pos/src/i18n/locales/{en,fr,ar}.json`.
+
+What it does:
+1. Order types wrap on a second line instead of scrolling, so "Plateformes" is never cut.
+2. Payment window: the loyalty button's label wraps on two lines ("166 points disponibles (83 DH)") instead of
+   "166 points disponibles (…". A discount refused by the server (erp_restaurant `DiscountLimitError`, above the
+   cashier's limit) puts the order's own discount back, so the summary no longer shows the refused remise, total
+   and change; other errors leave the discount as typed.
+3. Cart: the panel uses the visible height (`100dvh` where the browser supports it, through Tailwind's
+   `supports-[height:100dvh]:` variant; `100vh` otherwise), so on an iPad the
+   last lines and "Vider le panier" are not under the browser's bars; the Total footer has a shadow that shows
+   the list scrolls behind it. The note placeholder is a short example ("Ex. : sans oignons, bien cuit").
+4. Dish window: on a phone (waiter app) the photo is 10rem high, so a menu's options are not squeezed below it.
+5. Close Shift: the part paid with loyalty points shows under "Total général" ("dont 38 DH en points
+   fidélité"): points are not a payment method, so the rows below never added up to the total.
+6. Opening window: "Réessayer" only after a failed load.
+7. After an order is sent, the next cart starts at 1 cover (was the previous table's covers).
+8. Waiter app: FR / ع / EN switch on the Tables screen; it sets the waiter's own language through
+   erp_restaurant `owner_app.set_language` (the logged-in user only) and reloads.
+9. Reason for items taken off after the kitchen ticket (ticket 55 item 8, owner 2026-11-10: allowed with a
+   reason). With the till's "remove items" option on, erp_restaurant's sync_order wrapper refuses an update
+   that reduces a sent item without `removal_reason` (`RemovalReasonRequired`, removal_reason.py); the cart
+   then opens the comment window as "Motif du retrait" (required, 140 characters) and sends the order again
+   with the reason, which erp_restaurant writes on the "Partially cancelled" kitchen tickets and the daily
+   closing shows. `CommentDialog` gets optional title / label / placeholder / button text and a required mode.
+
+Why it can't be done in `erp_restaurant`: all of it is the React till's own layout, state and labels; the
+server only gets the distinct DiscountLimitError type (erp_restaurant pos_invoice_discount.py). For item 9 the
+rule, the stored reason (URY KOT.custom_removal_reason) and the closing are in erp_restaurant
+(removal_reason.py, sync_order wrapper); the fork only renders the prompt and resends.
+
+Risk profile: medium. `pos-store.ts` is high-risk (two one-line hunks in `resetOrderState`); `OrderPanel.tsx` is
+high-conflict (two class changes plus logic in `handleSubmit` and a second `CommentDialog` in the JSX).
+The waiter app asks for the reason the same way (owner 2026-11-10). A stale tab that sends no
+invoice for an occupied table is not checked (URY then picks the table's draft itself). Check the cart height on an iPad and a laptop after an upstream change there.
+
+Acceptance criteria and manual test:
+1. Till order panel: "Sur place", "À emporter", "Plateformes" all visible; payment window with a loyalty member:
+   the label on two lines, not cut.
+2. As a cashier capped at 10 %, a 20 % discount: the refusal message, then the summary shows no remise.
+3. iPad: five lines in the cart: scroll to "Vider le panier"; the footer shadow is visible.
+4. Waiter app on a phone: a menu with choices: the photo is small and the options are readable.
+5. Close Shift on a day with a payment in points: "dont … en points fidélité" under the total.
+6. Opening window: no "Réessayer" on a fresh dialog.
+7. Till only (the waiter app never calls resetOrderState): a table order for 2 covers sent, then a new
+   order: covers 1. Known gap, not a regression: a held tab updating a table order comes back with 1 cover
+   (tabs do not store covers).
+9. A dish's note field shows "Ex. : sans oignons, bien cuit".
+10. A payment refused for another reason (e.g. stock) keeps the typed discount.
+8. Waiter app: tap ع: the app reloads in Arabic; tap FR: back to French.
+11. Till option "remove items" on (owner app Paramètres > Caisses): a table order with 3 burgers sent, change to
+    1, send: the "Motif du retrait" window; empty reason: the button stays off; "erreur de saisie": the order is
+    updated, the kitchen gets its cancel ticket, /admin closing shows "Motif : erreur de saisie" under the
+    removed burgers; the "New Order" ticket of items added in the same send has no reason. Option off: URY's
+    refusal as before. Waiter app with the option on: reducing a sent item opens the same reason window, then
+    the order is updated.
+
+Patch file: `patches/63-till-layout-and-small-fixes.patch`. Commit: (pending).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

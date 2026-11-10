@@ -51,6 +51,8 @@ export interface POSClosingInvoice {
   total_qty: number;
   change_amount: number;
   account_for_change_amount: string;
+  // Patch 63: the part of the total paid with loyalty points (ERPNext POS Invoice.loyalty_amount).
+  loyalty_amount?: number;
   taxes: POSClosingTax[];
   payments: POSClosingPayment[];
 }

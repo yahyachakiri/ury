@@ -1,4 +1,5 @@
 {
+  "removal_reason": {"title": "Reason for removal", "label": "Items already sent to the kitchen are being removed. Why?", "placeholder": "E.g. customer changed their mind, entry mistake", "send": "Send with this reason"},
   "order_tabs": { "tab": "Order {{number}}" },
   "common": {
     "loading": "Loading...",
@@ -190,6 +191,7 @@
     "session_opened_success": "POS session opened"
   },
   "pos_closing": {
+    "loyalty_part": "incl. {{amount}} in loyalty points",
     "title": "Close POS",
     "description": "Review sales for your session and enter the actual closing amounts.",
     "loading": "Loading closing details...",
@@ -264,6 +266,7 @@
     "save_button": "Save Comment"
   },
   "errors": {
+    "language_change_failed": "Could not change the language. Try again.",
     "pos_profile_not_found": "POS Profile not found",
     "pos_profile_not_loaded": "POS profile not loaded yet",
     "user_not_logged_in": "User not logged in",
@@ -504,7 +507,7 @@
   },
   "product_dialog": {
     "special_instructions": "Special Instructions",
-    "special_instructions_placeholder": "Add any special instructions or notes for this item...",
+    "special_instructions_placeholder": "E.g. no onions, well done",
     "quantity": "Quantity",
     "variants": "Variants",
     "addons": "Add-ons",

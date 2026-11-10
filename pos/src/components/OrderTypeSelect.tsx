@@ -55,7 +55,8 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
 
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
+      {/* Patch 63: the order types wrap instead of scrolling, so the last one ("Plateformes") is never cut. */}
+      <div className="flex flex-wrap gap-2 pb-2">
         {ORDER_TYPES.map(({ value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
           

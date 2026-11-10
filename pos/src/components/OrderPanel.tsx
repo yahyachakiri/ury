@@ -78,7 +78,12 @@ const OrderPanel = () => {
     setOrderComment(comment);
   };
 
-  const handleSubmit = async () => {
+  // Patch 63: erp_restaurant refuses an update that takes off items already sent to the kitchen without a
+  // reason (RemovalReasonRequired, when the till allows removals); the cashier gives it and the order is
+  // sent again with it.
+  const [askRemovalReason, setAskRemovalReason] = useState(false);
+
+  const handleSubmit = async (removalReason?: string) => {
     try {
       if (!posProfile) {
         throw new Error(t('errors.pos_profile_not_found'));
@@ -129,7 +134,8 @@ const OrderPanel = () => {
         last_modified_time: isUpdatingOrder ? (lastModifiedTime || undefined) : undefined,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
-        comments: orderComment || undefined
+        comments: orderComment || undefined,
+        removal_reason: removalReason?.trim() || undefined
       };
 
       const result = await syncOrder(orderData);
@@ -170,6 +176,11 @@ const OrderPanel = () => {
         navigate('/orders');
       }
     } catch (error) {
+      const e = (error && typeof error === 'object' ? error : {}) as Record<string, unknown>;
+      if ([e.exc_type, e.exception].some((v) => String(v ?? '').includes('RemovalReasonRequired'))) {
+        setAskRemovalReason(true); // Patch 63
+        return;
+      }
       console.error('Failed to sync order:', error);
       showToast.error(parseFrappeError(error, t('errors.failed_process_order')));
     } finally {
@@ -222,7 +233,9 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] fixed end-0 z-10">
+      {/* Patch 63: the visible height (dvh), so on an iPad the cart's last lines and "Vider le panier" are not
+          under the browser's bars. */}
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <OrderTabs disabled={isInteractionDisabled} />
         <OrderTypeSelect disabled={isInteractionDisabled} />
@@ -355,7 +368,8 @@ const OrderPanel = () => {
             )}
           </div>
           
-          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          {/* Patch 63: a shadow on the Total footer shows the list scrolls behind it. */}
+          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.15)]">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <Button
@@ -376,7 +390,7 @@ const OrderPanel = () => {
               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
             </div>
             <Button
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
               variant="default"
               size="default"
               className="w-full"
@@ -411,6 +425,19 @@ const OrderPanel = () => {
           itemToReplace={editingItem}
         />
       )}
+
+      <CommentDialog
+        key={askRemovalReason ? 'removal-open' : 'removal-closed'} // a new, empty reason each time
+        isOpen={askRemovalReason}
+        onClose={() => setAskRemovalReason(false)}
+        onSave={(reason) => void handleSubmit(reason)}
+        title={t('removal_reason.title')}
+        label={t('removal_reason.label')}
+        placeholder={t('removal_reason.placeholder')}
+        saveLabel={t('removal_reason.send')}
+        required
+        maxLength={140}
+      />
 
       <CommentDialog
         isOpen={showCommentDialog}

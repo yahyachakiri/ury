@@ -101,6 +101,7 @@ interface AggregatedTotals {
   grandTotal: number;
   netTotal: number;
   totalQty: number;
+  loyalty: number; // Patch 63
 }
 
 /**
@@ -115,13 +116,15 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
   totals: AggregatedTotals;
   expectedByMode: Record<string, number>;
 } {
-  const totals: AggregatedTotals = { grandTotal: 0, netTotal: 0, totalQty: 0 };
+  const totals: AggregatedTotals = { grandTotal: 0, netTotal: 0, totalQty: 0, loyalty: 0 };
   const expectedByMode: Record<string, number> = {};
 
   invoices.forEach((invoice) => {
     totals.grandTotal += Number(invoice.grand_total) || 0;
     totals.netTotal += Number(invoice.net_total) || 0;
     totals.totalQty += Number(invoice.total_qty) || 0;
+    // Patch 63: points are not a payment method, so they have no row below; shown under the total instead.
+    totals.loyalty += Number(invoice.loyalty_amount) || 0;
 
     (invoice.payments || []).forEach((payment) => {
       let amount = Number(payment.amount) || 0;
@@ -186,7 +189,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   const [isSubCashier, setIsSubCashier] = useState(false);
   const [periodEndDate, setPeriodEndDate] = useState<Date>(new Date());
   const [invoiceCount, setInvoiceCount] = useState(0);
-  const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0 });
+  const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0, loyalty: 0 });
   const [rows, setRows] = useState<ClosingPaymentSummary[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -535,6 +538,11 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                   <p className="text-lg font-semibold text-gray-900">
                     {formatCurrency(totals.grandTotal)}
                   </p>
+                  {totals.loyalty > 0 && (
+                    <p className="text-xs text-gray-500">
+                      {t('pos_closing.loyalty_part', { amount: formatCurrency(totals.loyalty) })}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-lg border border-gray-200 p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>

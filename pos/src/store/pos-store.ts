@@ -902,6 +902,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         orderComment: targetTabState.orderComment,
         originalCartHash: targetTabState.originalCartHash,
         lastModifiedTime: targetTabState.lastModifiedTime ?? null,
+        noOfPax: 1, // Patch 63: covers do not carry over from the order just sent
         selectedItem: null,
         orderLoading: false,
         error: null,
@@ -925,6 +926,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         orderComment: '',
         originalCartHash: '',
         lastModifiedTime: null,
+        noOfPax: 1, // Patch 63: covers do not carry over from the order just sent
         selectedItem: null,
         orderLoading: false,
         error: null,

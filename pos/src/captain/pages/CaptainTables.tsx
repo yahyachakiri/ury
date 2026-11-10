@@ -13,7 +13,8 @@ import {
 import CaptainTableCard, {
   type CaptainTableOwnership,
 } from '../components/CaptainTableCard';
-import { t } from '../../i18n';
+import { getActiveLanguage, t } from '../../i18n';
+import { call } from '@ury/core';
 
 /**
  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
@@ -190,9 +191,12 @@ export default function CaptainTables() {
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-gray-900">{t('footer.tables')}</h1>
-          <Button variant="ghost" size="sm" onClick={refresh}>
-            {t('captain.refresh')}
-          </Button>
+          <div className="flex items-center gap-1">
+            <WaiterLanguageSwitch />
+            <Button variant="ghost" size="sm" onClick={refresh}>
+              {t('captain.refresh')}
+            </Button>
+          </div>
         </div>
 
         {branchRooms.length > 0 && (
@@ -256,6 +260,44 @@ export default function CaptainTables() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Patch 63: a waiter chooses the app's language (their own User language, set by erp_restaurant
+// owner_app.set_language, which only changes the logged-in user), then the app reloads in it.
+const WAITER_LANGS: { code: string; label: string; name: string }[] = [
+  { code: 'fr', label: 'FR', name: 'Français' },
+  { code: 'ar', label: 'ع', name: 'العربية' },
+  { code: 'en', label: 'EN', name: 'English' },
+];
+
+function WaiterLanguageSwitch() {
+  const active = getActiveLanguage();
+  const choose = async (code: string) => {
+    if (code === active) return;
+    try {
+      await call.post('erp_restaurant.erp_restaurant.api.owner_app.set_language', { lang: code });
+      window.location.reload();
+    } catch {
+      showToast.error(t('errors.language_change_failed'));
+    }
+  };
+  return (
+    <div className="flex items-center rounded-md border border-gray-200 text-xs" dir="ltr">
+      {WAITER_LANGS.map((l) => (
+        <Button
+          key={l.code}
+          variant="ghost"
+          size="sm"
+          aria-pressed={l.code === active}
+          aria-label={l.name}
+          onClick={() => void choose(l.code)}
+          className={l.code === active ? 'h-7 px-2 font-semibold text-primary-700' : 'h-7 px-2 text-gray-600'}
+        >
+          {l.label}
+        </Button>
+      ))}
     </div>
   );
 }

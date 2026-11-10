@@ -386,12 +386,13 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         showCloseButton={false}
       >
         {/* Left Column - Image  */}
+        {/* Patch 63: a 10rem photo on a phone (waiter app), so the options are not squeezed below it. */}
         <div className="md:w-1/3 relative">
           {itemDoc?.image ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
+              className="w-full h-40 md:min-h-96 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -399,14 +400,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 const parent = target.parentElement;
                 if (parent) {
                   const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
+                  placeholder.className = 'w-full h-40 md:h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
                   placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
                   parent.insertBefore(placeholder, target);
                 }
               }}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="w-full h-40 md:min-h-96 md:h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}

@@ -169,7 +169,11 @@ export default function CaptainOrder() {
     setNoteEditingLine(null);
   };
 
-  const handleSend = async () => {
+  // Patch 63: the same reason prompt as the till when a sent item is reduced (erp_restaurant
+  // RemovalReasonRequired); the order is sent again with the reason.
+  const [askRemovalReason, setAskRemovalReason] = useState(false);
+
+  const handleSend = async (removalReason?: string) => {
     if (!table) return;
     try {
       if (!posProfile) {
@@ -221,6 +225,7 @@ export default function CaptainOrder() {
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
         comments: orderComment || undefined,
+        removal_reason: removalReason?.trim() || undefined,
       };
 
       const result = await syncOrder(orderData);
@@ -238,6 +243,11 @@ export default function CaptainOrder() {
       showToast.success(isUpdatingOrder ? t('captain.order_updated') : t('captain.order_sent'));
       navigate('/order');
     } catch (error) {
+      const e = (error && typeof error === 'object' ? error : {}) as Record<string, unknown>;
+      if ([e.exc_type, e.exception].some((v) => String(v ?? '').includes('RemovalReasonRequired'))) {
+        setAskRemovalReason(true); // Patch 63
+        return;
+      }
       console.error('Failed to sync order:', error);
       showToast.error(parseFrappeError(error, t('captain.send_failed'))); // Patch 46
     } finally {
@@ -607,7 +617,7 @@ export default function CaptainOrder() {
               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
             </div>
             <Button
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               variant="default"
               size="lg"
               className="w-full h-12 text-base"
@@ -636,7 +646,7 @@ export default function CaptainOrder() {
             <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
           </div>
           <Button
-            onClick={handleSend}
+            onClick={() => void handleSend()}
             variant="default"
             size="lg"
             className="w-full h-12 text-base"
@@ -669,6 +679,19 @@ export default function CaptainOrder() {
           itemToReplace={editingItem}
         />
       )}
+
+      <CommentDialog
+        key={askRemovalReason ? 'removal-open' : 'removal-closed'} // a new, empty reason each time
+        isOpen={askRemovalReason}
+        onClose={() => setAskRemovalReason(false)}
+        onSave={(reason) => void handleSend(reason)}
+        title={t('removal_reason.title')}
+        label={t('removal_reason.label')}
+        placeholder={t('removal_reason.placeholder')}
+        saveLabel={t('removal_reason.send')}
+        required
+        maxLength={140}
+      />
 
       <CommentDialog
         isOpen={noteEditingLine !== null}

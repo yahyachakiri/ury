@@ -1,4 +1,5 @@
 {
+    "removal_reason": {"title": "سبب الحذف", "label": "يتم حذف منتجات أُرسلت إلى المطبخ. لماذا؟", "placeholder": "مثال: غيّر الزبون رأيه، خطأ في الإدخال", "send": "إرسال مع هذا السبب"},
     "order_tabs": { "tab": "الطلب {{number}}" },
     "_meta": {
         "language_code": "ar",
@@ -197,6 +198,7 @@
         "session_opened_success": "تم فتح جلسة نقطة البيع"
     },
     "pos_closing": {
+        "loyalty_part": "منها {{amount}} بنقاط الولاء",
         "title": "إغلاق نقطة البيع",
         "description": "راجع مبيعات جلستك وأدخل مبالغ الإغلاق الفعلية.",
         "loading": "جاري تحميل تفاصيل الإغلاق...",
@@ -271,6 +273,7 @@
         "save_button": "حفظ التعليق"
     },
     "errors": {
+        "language_change_failed": "تعذر تغيير اللغة. حاول مرة أخرى.",
         "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",
         "pos_profile_not_loaded": "لم يتم تحميل ملف تعريف نقطة البيع بعد",
         "user_not_logged_in": "المستخدم غير مسجل الدخول",
@@ -511,7 +514,7 @@
     },
     "product_dialog": {
         "special_instructions": "تعليمات خاصة",
-        "special_instructions_placeholder": "أضف أي تعليمات خاصة أو ملاحظات لهذا العنصر...",
+        "special_instructions_placeholder": "مثال: بدون بصل، مطهو جيدًا",
         "quantity": "الكمية",
         "variants": "الخيارات",
         "addons": "الإضافات",

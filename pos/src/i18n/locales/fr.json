@@ -1,4 +1,5 @@
 {
+  "removal_reason": {"title": "Motif du retrait", "label": "Des articles déjà envoyés en cuisine sont retirés. Pourquoi ?", "placeholder": "Ex. : client a changé d'avis, erreur de saisie", "send": "Envoyer avec ce motif"},
   "order_tabs": { "tab": "Commande {{number}}" },
   "common": {
     "loading": "Chargement...",
@@ -190,6 +191,7 @@
     "session_opened_success": "Session PDV ouverte"
   },
   "pos_closing": {
+    "loyalty_part": "dont {{amount}} en points fidélité",
     "title": "Clôturer le PDV",
     "description": "Vérifiez les ventes de votre session et saisissez les montants réels de clôture.",
     "loading": "Chargement des détails de clôture...",
@@ -264,6 +266,7 @@
     "save_button": "Enregistrer le commentaire"
   },
   "errors": {
+    "language_change_failed": "Impossible de changer la langue. Réessayez.",
     "pos_profile_not_found": "Profil PDV introuvable",
     "pos_profile_not_loaded": "Le profil PDV n'est pas encore chargé",
     "user_not_logged_in": "Utilisateur non connecté",
@@ -504,7 +507,7 @@
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",
-    "special_instructions_placeholder": "Ajoutez des instructions spéciales ou des notes pour cet article...",
+    "special_instructions_placeholder": "Ex. : sans oignons, bien cuit",
     "quantity": "Quantité",
     "variants": "Variantes",
     "addons": "Suppléments",
