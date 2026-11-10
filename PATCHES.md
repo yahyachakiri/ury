@@ -2751,7 +2751,7 @@ Acceptance criteria:
 3. Close Shift dialog and its confirmation with accents; order type "Plateformes"; QR toast "articles : 2".
 4. Cart tab "Commande 1"; no "⌘ K" on an iPad; screen reader reads "Fermer" on the ×.
 
-Patch file: `patches/61-till-texts-and-busy-table.patch`. Commit: (pending).
+Patch file: `patches/61-till-texts-and-busy-table.patch`. Commit: 6a998f34.
 
 ## Build and deploy
 
