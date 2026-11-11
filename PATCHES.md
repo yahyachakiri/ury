@@ -2923,7 +2923,7 @@ Acceptance criteria and manual test:
 3. Payment with loyalty points on a QZ till: receipt still prints after the redirect.
 4. Back to Orders: the paid order is under Recently Paid.
 
-Patch file: `patches/65-orders-back-to-till-after-payment.patch`.
+Patch file: `patches/65-orders-back-to-till-after-payment.patch`. Commit: 879bcaa2.
 
 ## Build and deploy
 
