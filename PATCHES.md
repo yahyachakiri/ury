@@ -2866,6 +2866,35 @@ Acceptance criteria and manual test:
 
 Patch file: `patches/63-till-layout-and-small-fixes.patch`. Commit: 38f123d4.
 
+### Patch 64 — French: "Adresse" instead of "Succursale"
+
+Ticket 61 (owner 2026-11-11: the product says "Adresse" / "Adresses" for a branch in French, like the owner app).
+
+Files touched: `pos/src/i18n/locales/fr.json` (4 values), `frontend/src/i18n.ts` (13 values). Text only, no
+key and no code changes; English and Arabic unchanged.
+
+What it does: every French "succursale(s)" in the till, the waiter app and /ury reads "adresse(s)" ("Adresse",
+"Aucune adresse sur le profil PDV", "Sélectionner l’adresse active", "Nom de l’adresse"...). In /ury the
+branch form's postal address field becomes "Adresse postale", so the form does not show two "Adresse" fields.
+/ury values in single quotes use the typographic apostrophe (’), as the file already does elsewhere.
+
+Why it can't be done in `erp_restaurant`: these texts are compiled into the till and /ury bundles from the
+fork's locale files; erp_restaurant's Frappe translations only reach server messages and the desk. The
+owner app and the server messages are renamed in erp_restaurant (frontend/src/locales/fr.ts, translations/fr.csv).
+
+Risk profile: low. Locale values only; an upstream change to those keys shows as a conflict in the same lines.
+
+Acceptance criteria and manual test:
+1. Till in French: the opening window's branch line reads "Adresse"; the messages "Aucune adresse sur le profil
+   PDV", "Aucun profil PDV … à cette adresse" and the platform payment message ("… à cette adresse") say
+   "adresse".
+2. /ury in French (after its manual `yarn build` in apps/ury/frontend): branch selector and branch form read
+   "Adresse", "Nom de l’adresse", "Adresse postale".
+3. Waiter app in French (shares fr.json): no "succursale".
+4. English and Arabic unchanged.
+
+Patch file: `patches/64-french-adresse-instead-of-succursale.patch`. Commit: (after commit).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
