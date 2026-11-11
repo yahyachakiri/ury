@@ -1010,6 +1010,7 @@ export default function Orders() {
           discountPercentage={selectedOrder.additional_discount_percentage}
           discountAmount={selectedOrder.discount_amount}
           allowDiscount={!isMergedBill(selectedOrder)}
+          onPaid={() => navigate('/pos')}
         />
       )}
       {selectedOrder && (

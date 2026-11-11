@@ -2900,6 +2900,31 @@ adresse sur le profil PDV" and no "succursale" (bundle read, the till screens th
 checked: the opening window and the waiter app on screen, /ury (needs its manual `yarn build` on the server),
 English and Arabic.
 
+### Patch 65 — Orders goes back to the till after a payment
+
+Owner request 2026-11-11: once a payment is confirmed on /pos/orders, the cashier lands on /pos for the next order.
+
+Files touched: `pos/src/components/PaymentDialog.tsx` (optional `onPaid` prop, called after a successful
+`make_invoice` instead of reloading the order list), `pos/src/pages/Orders.tsx` (passes `onPaid={() => navigate('/pos')}`).
+
+What it does: after the success toast, the receipt print (Patch 47) and the QR pickup kitchen ticket print
+(Patch 10) have started, the dialog closes and the till opens /pos. A failed payment keeps the dialog open with its
+error, as before. Prints already started keep running (they are not tied to the Orders page).
+
+Why it can't be done in `erp_restaurant`: page navigation inside the POS React app after a payment; no server
+response or configuration point controls it.
+
+Risk profile: low. One optional prop; Orders is the only caller of PaymentDialog.
+
+Acceptance criteria and manual test:
+1. Orders, select a printed order, Payment, confirm: success toast, the till's order screen opens (URL /pos/pos)
+   with an empty cart. An order also open as a held tab stays held (as before).
+2. Payment refused (e.g. discount above the cashier's limit): dialog stays open with the error, still on Orders.
+3. Payment with loyalty points on a QZ till: receipt still prints after the redirect.
+4. Back to Orders: the paid order is under Recently Paid.
+
+Patch file: `patches/65-orders-back-to-till-after-payment.patch`.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

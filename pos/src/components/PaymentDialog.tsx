@@ -47,6 +47,8 @@ interface PaymentDialogProps {
   // Patch 07: false for merged bills. make_invoice applies the percentage to the
   // primary invoice only, while grandTotal here is the combined total.
   allowDiscount?: boolean;
+  // Patch 65: called once the payment is saved (Orders goes back to the till).
+  onPaid?: () => void;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -69,7 +71,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   clearSelectedOrder,
   discountPercentage,
   discountAmount,
-  allowDiscount = true
+  allowDiscount = true,
+  onPaid
 }) => {
   const { paymentModes: allPaymentModes, fetchPaymentModes, posProfile: storePosProfile, currencySymbol, currency } = usePOSStore();
   // Patch 45: methods this customer may not use (the company account method for a customer
@@ -391,6 +394,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       }
       onClose();
       clearSelectedOrder();
+      if (onPaid) {
+        onPaid();
+        return;
+      }
       await fetchOrders();
     } catch (err) {
       console.error('Payment failed:', err);
