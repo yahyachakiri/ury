@@ -2893,7 +2893,7 @@ Acceptance criteria and manual test:
 3. Waiter app in French (shares fr.json): no "succursale".
 4. English and Arabic unchanged.
 
-Patch file: `patches/64-french-adresse-instead-of-succursale.patch`. Commit: (after commit).
+Patch file: `patches/64-french-adresse-instead-of-succursale.patch`. Commit: 64bf1178.
 
 ## Build and deploy
 
