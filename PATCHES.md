@@ -2925,6 +2925,12 @@ Acceptance criteria and manual test:
 
 Patch file: `patches/65-orders-back-to-till-after-payment.patch`. Commit: 879bcaa2.
 
+Browser check 2026-11-11 (test-dev, after the dev deploy, ury e5cc58f8, French): takeaway order INV-00078 (Coca-Cola
+8 DH) confirmed, Orders opened on it, printed, paid in cash: toast "Paiement réussi : 8 DH reçu" and the till opened
+/pos/pos with an empty cart (step 1 passed); back in Orders, INV-00078 under "Payé récemment" (step 4 passed). Refunded
+from /admin/pos afterwards (INV-00079). Not checked: a refused payment (step 2), a points payment with the receipt on a
+QZ till (step 3), Arabic and English (no new text), iPad.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
