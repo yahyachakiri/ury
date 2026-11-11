@@ -2895,6 +2895,11 @@ Acceptance criteria and manual test:
 
 Patch file: `patches/64-french-adresse-instead-of-succursale.patch`. Commit: 64bf1178.
 
+Browser check 2026-11-11 (test-dev, after the dev deploy, ury 98869fd8): the till's French chunk contains "Aucune
+adresse sur le profil PDV" and no "succursale" (bundle read, the till screens themselves not opened). Not
+checked: the opening window and the waiter app on screen, /ury (needs its manual `yarn build` on the server),
+English and Arabic.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
