@@ -47,6 +47,8 @@
   },
   "pos_sidebar": {
     "categories": "Categories",
+    "hide_categories": "Hide categories",
+    "show_categories": "Show categories",
     "all_items": "All Items"
   },
   "cart": {

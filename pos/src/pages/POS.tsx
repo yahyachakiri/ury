@@ -1,4 +1,4 @@
-import { Star, TrendingUp } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Star, TrendingUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import InitialLoader from '../components/InitialLoader';
@@ -11,6 +11,8 @@ import { cn } from '@ury/ui';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 
+const CATEGORIES_OPEN_KEY = 'pos_categories_open'; // Patch 67
+
 export default function POS() {
   const {
     quickFilter,
@@ -21,7 +23,39 @@ export default function POS() {
     error,
     isMenuInteractionDisabled,
     isInitializing,
+    categories,
+    selectedCategory,
+    setSelectedCategory,
   } = usePOSStore();
+
+  // Patch 67: the categories column can be closed to leave its width to the dishes (iPad).
+  // Closed, the categories are chips in the filter row. The choice is kept on the device;
+  // without one, the column starts closed on screens narrower than 1280 px.
+  const [categoriesOpen, setCategoriesOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CATEGORIES_OPEN_KEY);
+      if (saved !== null) return saved === '1';
+    } catch {
+      // storage unavailable: fall back to the screen width
+    }
+    return window.innerWidth >= 1280;
+  });
+  const toggleCategories = () => {
+    setCategoriesOpen((open) => {
+      try {
+        localStorage.setItem(CATEGORIES_OPEN_KEY, open ? '0' : '1');
+      } catch {
+        // not kept; the column still toggles
+      }
+      return !open;
+    });
+  };
+  const chipClass = (active: boolean) =>
+    cn(
+      'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0',
+      active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+      isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
+    );
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -65,13 +99,7 @@ export default function POS() {
   }) => (
     <button
       onClick={() => setQuickFilter(filter)}
-      className={cn(
-        'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-        quickFilter === filter
-          ? 'bg-blue-100 text-blue-700'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-        isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
-      )}
+      className={chipClass(quickFilter === filter)}
       disabled={isMenuInteractionDisabled()}
     >
       <Icon className="w-4 h-4" />
@@ -121,7 +149,10 @@ export default function POS() {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      <Sidebar disabled={isMenuInteractionDisabled()} />
+      {/* Patch 67: hidden, not unmounted */}
+      <div className={categoriesOpen ? 'contents' : 'hidden'}>
+        <Sidebar disabled={isMenuInteractionDisabled()} />
+      </div>
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="p-4 bg-white border-b border-gray-200">
           <div className="max-w-screen-xl mx-auto space-y-3">
@@ -134,8 +165,49 @@ export default function POS() {
                 disabled={isMenuInteractionDisabled()}
               /> */}
               
+              {/* Patch 67 */}
+              <button
+                type="button"
+                onClick={toggleCategories}
+                aria-expanded={categoriesOpen}
+                aria-label={t(categoriesOpen ? 'pos_sidebar.hide_categories' : 'pos_sidebar.show_categories')}
+                title={t(categoriesOpen ? 'pos_sidebar.hide_categories' : 'pos_sidebar.show_categories')}
+                className="flex items-center justify-center h-8 w-8 shrink-0 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                {categoriesOpen ? (
+                  <PanelLeftClose className="w-4 h-4 rtl:-scale-x-100" />
+                ) : (
+                  <PanelLeftOpen className="w-4 h-4 rtl:-scale-x-100" />
+                )}
+              </button>
               <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
               <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
+              {!categoriesOpen && (
+                <>
+                  <span className="h-5 w-px bg-gray-200 shrink-0" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('')}
+                    className={chipClass(selectedCategory === '')}
+                    disabled={isMenuInteractionDisabled()}
+                    aria-pressed={selectedCategory === ''}
+                  >
+                    {t('pos_sidebar.all_items')}
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.name}
+                      onClick={() => setSelectedCategory(category.name)}
+                      className={chipClass(selectedCategory === category.name)}
+                      disabled={isMenuInteractionDisabled()}
+                      aria-pressed={selectedCategory === category.name}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>

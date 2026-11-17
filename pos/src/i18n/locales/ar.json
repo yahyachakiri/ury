@@ -54,6 +54,8 @@
     },
     "pos_sidebar": {
         "categories": "فئات",
+        "hide_categories": "إخفاء الفئات",
+        "show_categories": "إظهار الفئات",
         "all_items": "جميع الأصناف"
     },
     "cart": {

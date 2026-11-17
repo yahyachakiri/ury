@@ -2977,6 +2977,40 @@ Acceptance criteria and manual test (iPad simulator or iPad with the Reflowgo ap
 
 Patch file: `patches/66-print-through-reflowgo-app.patch`. Commit: a87002dc.
 
+### Patch 67 — The till's categories column can be closed
+
+Ticket 90 (owner request 2026-11-17): on an iPad the categories column (256 px) and the order panel (384 px)
+leave too little width for the dishes on /pos/pos.
+
+Files touched: `pos/src/pages/POS.tsx` (`categoriesOpen`, `toggleCategories`, `chipClass`, the button and the
+category chips in the filter row, a wrapper around `<Sidebar>`), `pos/src/i18n/locales/en.json`,
+`fr.json`, `ar.json` (`pos_sidebar.hide_categories`, `pos_sidebar.show_categories`)
+
+What it does: a round button at the start of the filter row closes and reopens the categories column. Closed, the
+column is hidden with CSS (a wrapper `div`, `contents` when open) and the categories show as chips after the "All" / "Special" filters ("All Items" plus
+one chip per category, same `selectedCategory` state, row scrolls sideways). The choice is kept in localStorage
+(`pos_categories_open`); without one the column starts closed below 1280 px and open from 1280 px. The icon is
+mirrored in Arabic. The existing filter buttons now take their classes from the shared `chipClass`
+(`whitespace-nowrap shrink-0` added, so they keep their width when the row scrolls). On wide screens the only
+difference is the button itself, always shown (32 px, the chips' height). A 12.9" iPad in landscape (1366 px)
+starts open. The till's "clear cache" (`localStorage.clear()` in `Header.tsx`) resets the choice to the width
+default.
+
+Why it can't be done in `erp_restaurant`: page layout inside the POS React app; no server setting or injected
+style can add the button and the chips.
+
+Risk profile: low. `POS.tsx` only (store fields read, filter row, `<Sidebar>` line; also carried by Patches 37
+and 40); no store or order code touched.
+
+Acceptance criteria and manual test (test-dev, /pos/pos):
+1. iPad landscape, first visit: column closed, chips filter the dishes.
+2. The button opens and closes the column; the choice survives a reload.
+3. 1280 px or wider, first visit: column open as before.
+4. Arabic: button at the right end, icon mirrored.
+5. Menu disabled (no open shift): chips disabled.
+
+Patch file: `patches/67-till-categories-toggle.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
