@@ -3054,6 +3054,8 @@ Acceptance criteria and manual test (test-dev):
 
 Patch file: `patches/68-table-transfer-sticky-buttons.patch`. Commit: b033c808.
 
+Browser check 2026-11-17 (test-dev, Chrome window 500 px wide, French, Administrator, after the dev deploy, ury 447034c8): waiter app, order of table T3, ⋮ > "Transférer la table": 12 free tables in two rooms, "Transférer" and "Annuler" visible under the list at opening and still there after scrolling to the last table, a divider line above them (step 1 passed); picking TR1 turns "Transférer" blue (step 2 up to the button: the move was not confirmed, the order on T3 was not a test order of this check); "Annuler" closes the window, nothing moved. Not checked: the till's Tables page (step 3: at 500 px the till shows its "Desktop Only" screen), a refused move (step 4), Arabic (step 5), a real phone, landscape, the keyboard open on the search field.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
