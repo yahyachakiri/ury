@@ -3100,6 +3100,8 @@ Acceptance criteria and manual test (test-dev, till "Test Dev" with auto-print a
 
 Patch file: `patches/69-waiter-app-prints-kitchen-ticket.patch`. Commit: 6cff7d7f.
 
+Browser check 2026-11-17 (test-dev, Chrome on the owner's Mac with QZ Tray, French, Administrator, till "Test Dev": auto-print on, Kitchen Printer "SPRT 80mm Series"): waiter app, free table T1, 1 Frites sent: back on the tables at once, the console shows the QZ Tray connection 2 seconds after the send and the ticket KOT-URY-00053 is marked printed 7 seconds after it; no failure message (step 3, first half: passed up to the print job; paper not seen by Claude). The order was cancelled from the till's Orders (its "Cancelled" ticket marked printed too), T1 free. Not checked: paper, an added item (step 2), the Reflowgo app (step 1), printer off or QZ Tray closed (step 4), auto-print off (step 5), a till send (step 6), Arabic and English (step 7), a waiter's login (Administrator holds every role), a phone browser without QZ Tray.
+
 ### Patch 70 — The waiter app has a logout button
 
 Ticket 93 (owner report 2026-11-17: "there is nowhere for the waiter to log out"). The till's logout is in its
@@ -3136,7 +3138,9 @@ Acceptance criteria and manual test (test-dev, /pos/order as a waiter):
 4. Arabic: icon mirrored, "تسجيل الخروج"; English: "Logout".
 5. Inside the Reflowgo app: same, and the app's login page shows afterwards.
 
-Patch file: `patches/70-waiter-app-logout.patch`. Commit: 801da0d4.
+Patch file: `patches/70-waiter-app-logout.patch`. Commit: 801da0d4. Follow-up 03ac6833 (label red under hover).
+
+Browser check 2026-11-17 (test-dev, Chrome 1920 px wide, French, Administrator, ury 51f88479): the logout icon is at the end of the waiter Tables header after "Actualiser"; one tap shows "Déconnexion" next to the icon and it goes back to the icon after 4 seconds, still logged in (step 2, wide screen only). Without the mouse over it the label is red; under the mouse it was dark (the button's hover colour): fixed in 03ac6833 (`hover:text-red-600`), deployed, not looked at again. Not checked: the second tap and the login page (step 3: it would have logged the owner's browser out of test-dev), 360 px in French and Arabic, Arabic, English, the Reflowgo app, a failed logout.
 
 ## Build and deploy
 
