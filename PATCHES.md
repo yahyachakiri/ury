@@ -3009,7 +3009,7 @@ Acceptance criteria and manual test (test-dev, /pos/pos):
 4. Arabic: button at the right end, icon mirrored.
 5. Menu disabled (no open shift): chips disabled.
 
-Patch file: `patches/67-till-categories-toggle.patch`. Commit: pending.
+Patch file: `patches/67-till-categories-toggle.patch`. Commit: c02ef230.
 
 ## Build and deploy
 
