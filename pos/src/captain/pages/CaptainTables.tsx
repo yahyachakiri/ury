@@ -302,7 +302,7 @@ function WaiterLogoutButton() {
       aria-label={t('header.logout')}
       disabled={busy}
       onClick={() => void onClick()}
-      className={confirming ? 'h-8 gap-1 px-2 text-red-600' : 'h-8 px-2 text-gray-600'}
+      className={confirming ? 'h-8 gap-1 px-2 text-red-600 hover:text-red-600' : 'h-8 px-2 text-gray-600'}
     >
       <LogOut className="h-4 w-4 rtl:-scale-x-100" />
       {confirming && <span>{t('header.logout')}</span>}
