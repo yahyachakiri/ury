@@ -3100,6 +3100,44 @@ Acceptance criteria and manual test (test-dev, till "Test Dev" with auto-print a
 
 Patch file: `patches/69-waiter-app-prints-kitchen-ticket.patch`. Commit: pending.
 
+### Patch 70 — The waiter app has a logout button
+
+Ticket 93 (owner report 2026-11-17: "there is nowhere for the waiter to log out"). The till's logout is in its
+header menu (`pos/src/components/Header.tsx`), which the waiter app does not show; a waiter could only log out by
+typing another address, and a shared phone or tablet stayed on the previous waiter's account.
+
+Files touched: `pos/src/captain/pages/CaptainTables.tsx` (`WaiterLogoutButton`, placed after "Actualiser" in the
+header; imports `LogOut` and `logout`)
+
+What it does: an icon button at the end of the waiter Tables header (label "Déconnexion" for screen readers).
+Two taps, so a slip on a phone does not log the waiter out in the middle of a service: the first tap turns it
+red with the word "Déconnexion" for 4 seconds, the second calls `@ury/core` `logout()` (as the till does),
+clears the tab's sessionStorage (the saved till profile, as `POSOpeningScreen.tsx` does, so the next user of a
+shared device starts fresh) and opens plain `/login`: erp_restaurant `staff_routes` sends whoever logs in next to
+their own screen, so a cashier using the device after a waiter is not left in the waiter app. The button is
+disabled while the logout request runs. A failed logout shows the till's existing message. No new text
+(`header.logout`, `errors.failed_logout`); the icon is mirrored in Arabic. The header's button group now wraps
+(`flex-wrap justify-end`), because the red label does not fit beside the title, the language switch and
+"Actualiser" on a 360 px phone in French or Arabic (estimated from the classes, not measured).
+
+Why it can't be done in `erp_restaurant`: a button inside a page of the POS React app; nothing on the server
+decides what that header shows.
+
+Risk profile: low. One component added to `CaptainTables.tsx` (also carried by Patches 17, 46 and 63), no store
+or order code.
+
+Acceptance criteria and manual test (test-dev, /pos/order as a waiter):
+1. The Tables header shows the logout icon after "Actualiser", on a phone too (nothing wraps or is cut).
+2. One tap: the button turns red with "Déconnexion"; no tap for 4 seconds: it goes back to the icon, still logged in.
+   At 360 px wide in French and Arabic the red label is fully visible (the buttons may go on two lines), with no
+   sideways scroll.
+3. Second tap within 4 seconds: the login page opens; logging in again as the waiter lands on /pos/order, as a
+   cashier on /pos.
+4. Arabic: icon mirrored, "تسجيل الخروج"; English: "Logout".
+5. Inside the Reflowgo app: same, and the app's login page shows afterwards.
+
+Patch file: `patches/70-waiter-app-logout.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

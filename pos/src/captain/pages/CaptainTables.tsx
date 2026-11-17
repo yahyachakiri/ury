@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Square } from 'lucide-react';
+import { AlertTriangle, LogOut, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
@@ -14,7 +14,7 @@ import CaptainTableCard, {
   type CaptainTableOwnership,
 } from '../components/CaptainTableCard';
 import { getActiveLanguage, t } from '../../i18n';
-import { call } from '@ury/core';
+import { call, logout } from '@ury/core';
 
 /**
  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
@@ -191,11 +191,12 @@ export default function CaptainTables() {
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-gray-900">{t('footer.tables')}</h1>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1">
             <WaiterLanguageSwitch />
             <Button variant="ghost" size="sm" onClick={refresh}>
               {t('captain.refresh')}
             </Button>
+            <WaiterLogoutButton />
           </div>
         </div>
 
@@ -261,6 +262,51 @@ export default function CaptainTables() {
         )}
       </div>
     </div>
+  );
+}
+
+// Patch 70: the waiter app had no way to log out (the till's header menu is not shown here).
+// Two taps, so a slip on a phone does not log the waiter out: the first shows "Déconnexion"
+// for 4 seconds, the second logs out and opens the login page (plain /login: erp_restaurant
+// staff_routes sends whoever logs in next to their own screen). The tab's saved till data is
+// cleared, as POSOpeningScreen does, so the next user of a shared device starts fresh.
+function WaiterLogoutButton() {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = window.setTimeout(() => setConfirming(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [confirming]);
+  const onClick = async () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await logout();
+    } catch {
+      setBusy(false);
+      setConfirming(false);
+      showToast.error(t('errors.failed_logout'));
+      return;
+    }
+    sessionStorage.clear();
+    window.location.href = '/login';
+  };
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-label={t('header.logout')}
+      disabled={busy}
+      onClick={() => void onClick()}
+      className={confirming ? 'h-8 gap-1 px-2 text-red-600' : 'h-8 px-2 text-gray-600'}
+    >
+      <LogOut className="h-4 w-4 rtl:-scale-x-100" />
+      {confirming && <span>{t('header.logout')}</span>}
+    </Button>
   );
 }
 
