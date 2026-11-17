@@ -111,7 +111,7 @@ const TableTransferDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 pb-2">
+        <div className="px-6 pb-4">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             {t('tables.current_table')}
           </label>
@@ -179,6 +179,8 @@ const TableTransferDialog = ({
           )}
         </div>
 
+        {/* Patch 68: the error and the buttons stay in view while the table list scrolls. */}
+        <div className="sticky bottom-0 z-10 rounded-b-xl border-t border-gray-200 bg-card pt-4">
         {error && <p className="px-6 pb-2 text-sm text-red-600">{error}</p>}
 
         <DialogFooter>
@@ -189,6 +191,7 @@ const TableTransferDialog = ({
             {isSubmitting ? t('common.loading') : t('tables.transfer_confirm')}
           </Button>
         </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -3020,6 +3020,40 @@ mirrored, chips right to left, column on the right when open (layout of step 4 p
 default on an iPad or a narrow window, real Arabic texts, chips while the menu is disabled (step 5), the till
 inside the Reflowgo app.
 
+### Patch 68 — Table transfer window: the buttons stay in view
+
+Ticket 92 follow-up (owner request 2026-11-17): in the waiter app on a phone the "Transférer la table" window
+lists every free table of the address, so "Annuler" and "Transférer" were below the list and the waiter had to
+scroll to the end after picking a table.
+
+Files touched: `pos/src/components/TableTransferDialog.tsx` (a wrapper around the error line and `DialogFooter`;
+`pb-4` on the list block)
+
+What it does: the error line and the footer buttons sit in a `sticky bottom-0` block (white background, top
+border, the window's bottom corners) inside the window, which is already the scrolling box
+(`overflow-y-auto` on `DialogContent`). The table list scrolls under it; the buttons are always visible, with a
+short list too (nothing moves then). Same component in the till's Tables page and in the waiter app
+(`captain/pages/CaptainOrder.tsx`), so both get it. No text, no logic and no shared `@ury/ui` file changed.
+
+Why it can't be done in `erp_restaurant`: layout of a window inside the POS React app. `erp_restaurant` could
+inject a stylesheet into /pos (as release_watch.py injects its script), but the error line and the footer are two
+siblings with no wrapper and no stable selector (Tailwind utility classes only): a rule keyed on compiled class
+names would hit every dialog footer of the till, could not pin the error line with the buttons, and would break
+silently on a rebuild or a pin bump.
+
+Risk profile: low. One component, classes only (also carried by Patch 46 for its texts). With a short list the
+only visible difference, in the till too, is a divider line and more space above the buttons.
+
+Acceptance criteria and manual test (test-dev):
+1. Waiter app on a phone (or a narrow window), an order sent on a table, ⋮ > "Transférer la table" with more free
+   tables than fit: "Annuler" and "Transférer" are visible without scrolling and stay while the list scrolls.
+2. Pick a table at the top of the list: "Transférer" is enabled and moves the order without scrolling.
+3. Till, Tables page, ⋮ > "Transférer la table": same window, same behaviour.
+4. A refused move (for example the destination taken meanwhile): the red message shows above the buttons.
+5. Arabic: buttons mirrored as before, still pinned.
+
+Patch file: `patches/68-table-transfer-sticky-buttons.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
