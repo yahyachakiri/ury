@@ -2975,7 +2975,7 @@ Acceptance criteria and manual test (iPad simulator or iPad with the Reflowgo ap
 5. An empty printer and `192.168.1.50:9101` give the message of step 3; check it in Arabic (RTL) and English.
 6. Loyalty card print and the receipt after a points payment print through the app too.
 
-Patch file: `patches/66-print-through-reflowgo-app.patch`. Commit: pending.
+Patch file: `patches/66-print-through-reflowgo-app.patch`. Commit: a87002dc.
 
 ## Build and deploy
 
