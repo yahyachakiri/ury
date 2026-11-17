@@ -3098,7 +3098,7 @@ Acceptance criteria and manual test (test-dev, till "Test Dev" with auto-print a
 6. The till's own sends still print once (Patch 10 unchanged).
 7. Arabic and English: the failure message.
 
-Patch file: `patches/69-waiter-app-prints-kitchen-ticket.patch`. Commit: pending.
+Patch file: `patches/69-waiter-app-prints-kitchen-ticket.patch`. Commit: 6cff7d7f.
 
 ### Patch 70 — The waiter app has a logout button
 
@@ -3136,7 +3136,7 @@ Acceptance criteria and manual test (test-dev, /pos/order as a waiter):
 4. Arabic: icon mirrored, "تسجيل الخروج"; English: "Logout".
 5. Inside the Reflowgo app: same, and the app's login page shows afterwards.
 
-Patch file: `patches/70-waiter-app-logout.patch`. Commit: pending.
+Patch file: `patches/70-waiter-app-logout.patch`. Commit: 801da0d4.
 
 ## Build and deploy
 
