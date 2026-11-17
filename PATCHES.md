@@ -2931,6 +2931,52 @@ Browser check 2026-11-11 (test-dev, after the dev deploy, ury e5cc58f8, French):
 from /admin/pos afterwards (INV-00079). Not checked: a refused payment (step 2), a points payment with the receipt on a
 QZ till (step 3), Arabic and English (no new text), iPad.
 
+### Patch 66 — Inside the Reflowgo app, tickets print through the app instead of QZ Tray
+
+Ticket 89 (owner request 2026-11-17; decisions 2026-11-02 and 2026-11-12): the iPad till runs in the Reflowgo
+app (a web view around the site). No QZ Tray exists on iPad; the app prints raw bytes itself to a LAN printer
+on port 9100.
+
+Files touched: `packages/core/src/print/qz.ts` (`reflowgoApp`, `printInApp`, first lines of `printOne`),
+`packages/core/src/frappe/errors.ts` (`appPrinterNeedsIp`, on top of Patches 46, 50, 51 and 55),
+`pos/src/main.tsx`, `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json` (`errors.app_printer_needs_ip`)
+
+What it does: the app sets `window.ReflowgoApp` (`print(host, data)`) before the page's scripts. When it is
+there, `printOne` skips QZ Tray entirely (no certificate call, no websocket): the ticket is drawn as in
+Patch 50 and its base64 ESC/POS bytes go to the app with the printer's IP address (the Kitchen / Bill Printer
+of the POS Profile, as in Patch 51). The app answers ok or an error code: `no_answer`, `send_failed` and
+`bad_address` (and no answer within 30 s) become Patch 51's "The printer does not answer"; `too_large` and
+`bad_request` become Patch 50's "could not be prepared". A printer set by name, an empty printer or a port
+other than 9100 gives the new message "In the Reflowgo app, the printer must be set by its IP address".
+Any other code from the app (`busy`: too many tickets waiting; `not_allowed`: the person at the iPad refused
+printing to that address when the app asked, once per new address) also shows "The printer does not
+answer". Patch 51's one-job-at-a-time queue is kept. In a normal browser nothing changes
+(`window.ReflowgoApp` is absent). Every caller of `printWithQz` (bill, kitchen tickets, loyalty card, receipt
+after a points payment) goes through it. The till still needs "QZ printing" on and a QZ host set: the callers
+refuse an empty host before reaching `printWithQz` (erp_restaurant `setup/qz_host.py` defaults it to
+"localhost"); the app never connects to it. The waiter app still prints nothing (existing gap).
+
+Why it can't be done in `erp_restaurant`: the ticket is drawn in the browser and handed to QZ Tray by the
+shared `@ury/core` print transport inside the POS bundle; nothing on the server can redirect that call to
+the app.
+
+Risk profile: low for browsers (one `window` lookup before the unchanged QZ path); the app path is new.
+`qz.ts` is shared with Patches 10, 41, 50, 51 and 55. Patch 50 draws the ticket through an SVG
+`foreignObject` on a canvas and reads it back; the app's web view is WebKit, the only engine where that read
+could be refused. Checked 2026-11-17 on the iPad simulator (iOS 27.2) with a small HTML sample: drawn and
+read back. A real ticket on a real iPad is still to check.
+
+Acceptance criteria and manual test (iPad simulator or iPad with the Reflowgo app, test-dev):
+1. Till printers set to an IP address: Print on an order sends the bill to that address (ESC @, GS v 0
+   bands, cut) and the till says printed; kitchen tickets too.
+2. Nothing answers at the address: "L'imprimante ne répond pas…", never success.
+3. A printer set by name: "Dans l'application Reflowgo, l'imprimante doit être réglée par son adresse IP…".
+4. In Chrome on a PC with QZ Tray: prints as before.
+5. An empty printer and `192.168.1.50:9101` give the message of step 3; check it in Arabic (RTL) and English.
+6. Loyalty card print and the receipt after a points payment print through the app too.
+
+Patch file: `patches/66-print-through-reflowgo-app.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

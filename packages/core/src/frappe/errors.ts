@@ -23,6 +23,7 @@ export interface ErrorMessages {
   printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
   printerUnreachable: string; // Patch 51: a network printer (IP address) does not answer
   qzNotRunning: string; // Patch 55: QZ Tray is not running (or closed) on this device
+  appPrinterNeedsIp: string; // Patch 66: in the Reflowgo app a printer must be set by its IP address
 }
 
 const errorMessages: ErrorMessages = {
@@ -34,6 +35,7 @@ const errorMessages: ErrorMessages = {
   printDraw: 'The ticket could not be prepared for the printer. Try again.',
   printerUnreachable: 'The printer does not answer. Check that it is on and connected to the network, then print again.',
   qzNotRunning: 'QZ Tray is not running on this device, start it and print again', // no final period: shown inside other messages
+  appPrinterNeedsIp: 'In the Reflowgo app, the printer must be set by its IP address (Settings > Tills), for example 192.168.1.50',
 };
 
 export function setErrorMessages(messages: Partial<ErrorMessages>): void {

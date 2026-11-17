@@ -18,6 +18,7 @@ initI18n().then(() => {
     printDraw: t('errors.print_draw'), // Patch 50
     printerUnreachable: t('errors.printer_unreachable'), // Patch 51
     qzNotRunning: t('errors.qz_not_running'), // Patch 55
+    appPrinterNeedsIp: t('errors.app_printer_needs_ip'), // Patch 66
   })
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

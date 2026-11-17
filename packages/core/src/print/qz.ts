@@ -77,7 +77,38 @@ export function printWithQz(host: string, htmlToPrint: string, printerName?: str
   return job;
 }
 
+// Patch 66: inside the Reflowgo app (iPad) there is no QZ Tray. The app announces itself with
+// window.ReflowgoApp and prints the same ESC/POS bytes itself, to a printer set by its IP address.
+interface ReflowgoApp {
+  print(host: string, data: string): Promise<{ ok: boolean; error?: string }>;
+}
+const APP_PRINT_TIMEOUT_MS = 30000; // the app gives up on a printer well before this
+
+function reflowgoApp(): ReflowgoApp | null {
+  const app = (window as unknown as { ReflowgoApp?: ReflowgoApp }).ReflowgoApp;
+  return app && typeof app.print === 'function' ? app : null;
+}
+
+async function printInApp(app: ReflowgoApp, htmlToPrint: string, printerName?: string | null): Promise<void> {
+  const network = printerName?.trim().match(NETWORK_PRINTER);
+  // The app prints on port 9100 only, and cannot use a printer installed under a name.
+  if (!network || (network[2] && network[2] !== '9100')) throw new Error(errorMessage('appPrinterNeedsIp'));
+  const data = await htmlToEscPos(htmlToPrint);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reply = await Promise.race([
+    app.print(network[1], data),
+    new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, error: 'no_answer' }), APP_PRINT_TIMEOUT_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
+  if (reply?.ok) return;
+  const drawn = reply?.error === 'too_large' || reply?.error === 'bad_request';
+  throw new Error(errorMessage(drawn ? 'printDraw' : 'printerUnreachable'));
+}
+
 async function printOne(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
+  const app = reflowgoApp(); // Patch 66
+  if (app) return printInApp(app, htmlToPrint, printerName);
   setQzSecurity();
 
   const printing = async () => {

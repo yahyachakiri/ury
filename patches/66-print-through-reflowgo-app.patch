@@ -1,0 +1,111 @@
+diff --git a/packages/core/src/frappe/errors.ts b/packages/core/src/frappe/errors.ts
+index feafb2b2..303814b2 100644
+--- a/packages/core/src/frappe/errors.ts
++++ b/packages/core/src/frappe/errors.ts
+@@ -23,6 +23,7 @@ export interface ErrorMessages {
+   printDraw: string; // Patch 50: the browser could not draw a ticket for the printer
+   printerUnreachable: string; // Patch 51: a network printer (IP address) does not answer
+   qzNotRunning: string; // Patch 55: QZ Tray is not running (or closed) on this device
++  appPrinterNeedsIp: string; // Patch 66: in the Reflowgo app a printer must be set by its IP address
+ }
+ 
+ const errorMessages: ErrorMessages = {
+@@ -34,6 +35,7 @@ const errorMessages: ErrorMessages = {
+   printDraw: 'The ticket could not be prepared for the printer. Try again.',
+   printerUnreachable: 'The printer does not answer. Check that it is on and connected to the network, then print again.',
+   qzNotRunning: 'QZ Tray is not running on this device, start it and print again', // no final period: shown inside other messages
++  appPrinterNeedsIp: 'In the Reflowgo app, the printer must be set by its IP address (Settings > Tills), for example 192.168.1.50',
+ };
+ 
+ export function setErrorMessages(messages: Partial<ErrorMessages>): void {
+diff --git a/packages/core/src/print/qz.ts b/packages/core/src/print/qz.ts
+index d8fbc753..e8435ca3 100644
+--- a/packages/core/src/print/qz.ts
++++ b/packages/core/src/print/qz.ts
+@@ -77,7 +77,38 @@ export function printWithQz(host: string, htmlToPrint: string, printerName?: str
+   return job;
+ }
+ 
++// Patch 66: inside the Reflowgo app (iPad) there is no QZ Tray. The app announces itself with
++// window.ReflowgoApp and prints the same ESC/POS bytes itself, to a printer set by its IP address.
++interface ReflowgoApp {
++  print(host: string, data: string): Promise<{ ok: boolean; error?: string }>;
++}
++const APP_PRINT_TIMEOUT_MS = 30000; // the app gives up on a printer well before this
++
++function reflowgoApp(): ReflowgoApp | null {
++  const app = (window as unknown as { ReflowgoApp?: ReflowgoApp }).ReflowgoApp;
++  return app && typeof app.print === 'function' ? app : null;
++}
++
++async function printInApp(app: ReflowgoApp, htmlToPrint: string, printerName?: string | null): Promise<void> {
++  const network = printerName?.trim().match(NETWORK_PRINTER);
++  // The app prints on port 9100 only, and cannot use a printer installed under a name.
++  if (!network || (network[2] && network[2] !== '9100')) throw new Error(errorMessage('appPrinterNeedsIp'));
++  const data = await htmlToEscPos(htmlToPrint);
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  const reply = await Promise.race([
++    app.print(network[1], data),
++    new Promise<{ ok: boolean; error?: string }>((resolve) => {
++      timer = setTimeout(() => resolve({ ok: false, error: 'no_answer' }), APP_PRINT_TIMEOUT_MS);
++    }),
++  ]).finally(() => clearTimeout(timer));
++  if (reply?.ok) return;
++  const drawn = reply?.error === 'too_large' || reply?.error === 'bad_request';
++  throw new Error(errorMessage(drawn ? 'printDraw' : 'printerUnreachable'));
++}
++
+ async function printOne(host: string, htmlToPrint: string, printerName?: string | null): Promise<void> {
++  const app = reflowgoApp(); // Patch 66
++  if (app) return printInApp(app, htmlToPrint, printerName);
+   setQzSecurity();
+ 
+   const printing = async () => {
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 0c7533fb..f8d6f9bb 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -331,6 +331,7 @@
+         "print_draw": "تعذر تجهيز التذكرة للطابعة. أعد المحاولة.",
+         "printer_unreachable": "الطابعة لا تستجيب. تحقق من أنها مشغلة ومتصلة بالشبكة، ثم أعد الطباعة.",
+         "qz_not_running": "برنامج QZ Tray غير مشغل على هذا الجهاز، شغّله ثم أعد الطباعة",
++        "app_printer_needs_ip": "في تطبيق Reflowgo يجب ضبط الطابعة بعنوان IP الخاص بها (الإعدادات > الصناديق)، مثلاً 192.168.1.50",
+         "load_app": "تعذر تحميل الصندوق. أعد تحميل الصفحة.",
+         "load_profile": "تعذر تحميل إعدادات الصندوق. أعد تحميل الصفحة.",
+         "load_menu": "تعذر تحميل القائمة. أعد تحميل الصفحة.",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 423d664c..798e9dc3 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -324,6 +324,7 @@
+     "print_draw": "The ticket could not be prepared for the printer. Try again.",
+     "printer_unreachable": "The printer does not answer. Check that it is on and connected to the network, then print again.",
+     "qz_not_running": "QZ Tray is not running on this device, start it and print again",
++    "app_printer_needs_ip": "In the Reflowgo app, the printer must be set by its IP address (Settings > Tills), for example 192.168.1.50",
+     "load_app": "The till could not load. Reload the page.",
+     "load_profile": "The till settings could not load. Reload the page.",
+     "load_menu": "The menu could not load. Reload the page.",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 74e216d9..02ea64cb 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -324,6 +324,7 @@
+     "print_draw": "Le ticket n'a pas pu être préparé pour l'imprimante. Réessayez.",
+     "printer_unreachable": "L'imprimante ne répond pas. Vérifiez qu'elle est allumée et branchée au réseau, puis relancez l'impression.",
+     "qz_not_running": "QZ Tray n'est pas lancé sur cet appareil, démarrez-le puis réimprimez",
++    "app_printer_needs_ip": "Dans l'application Reflowgo, l'imprimante doit être réglée par son adresse IP (Paramètres > Caisses), par exemple 192.168.1.50",
+     "load_app": "La caisse n'a pas pu se charger. Rechargez la page.",
+     "load_profile": "Les réglages de la caisse n'ont pas pu se charger. Rechargez la page.",
+     "load_menu": "Le menu n'a pas pu se charger. Rechargez la page.",
+diff --git a/pos/src/main.tsx b/pos/src/main.tsx
+index 251f4a46..97b7b378 100644
+--- a/pos/src/main.tsx
++++ b/pos/src/main.tsx
+@@ -18,6 +18,7 @@ initI18n().then(() => {
+     printDraw: t('errors.print_draw'), // Patch 50
+     printerUnreachable: t('errors.printer_unreachable'), // Patch 51
+     qzNotRunning: t('errors.qz_not_running'), // Patch 55
++    appPrinterNeedsIp: t('errors.app_printer_needs_ip'), // Patch 66
+   })
+   createRoot(document.getElementById('root')!).render(
+     <StrictMode>

@@ -324,6 +324,7 @@
     "print_draw": "The ticket could not be prepared for the printer. Try again.",
     "printer_unreachable": "The printer does not answer. Check that it is on and connected to the network, then print again.",
     "qz_not_running": "QZ Tray is not running on this device, start it and print again",
+    "app_printer_needs_ip": "In the Reflowgo app, the printer must be set by its IP address (Settings > Tills), for example 192.168.1.50",
     "load_app": "The till could not load. Reload the page.",
     "load_profile": "The till settings could not load. Reload the page.",
     "load_menu": "The menu could not load. Reload the page.",
