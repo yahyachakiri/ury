@@ -3052,7 +3052,7 @@ Acceptance criteria and manual test (test-dev):
 4. A refused move (for example the destination taken meanwhile): the red message shows above the buttons.
 5. Arabic: buttons mirrored as before, still pinned.
 
-Patch file: `patches/68-table-transfer-sticky-buttons.patch`. Commit: pending.
+Patch file: `patches/68-table-transfer-sticky-buttons.patch`. Commit: b033c808.
 
 ## Build and deploy
 
