@@ -3011,6 +3011,15 @@ Acceptance criteria and manual test (test-dev, /pos/pos):
 
 Patch file: `patches/67-till-categories-toggle.patch`. Commit: c02ef230.
 
+Browser check 2026-11-17 (test-dev, Chrome at 1512 px wide, French, after the dev deploy, ury ff4e7920): first visit
+with no saved choice: column open, button "Masquer les catégories" (step 3 passed). Button: column closed, the
+dishes area goes from 840 to 1096 px, chips "Tous les articles" + 6 categories; the "Tacos" chip shows the 3 tacos;
+the choice is kept after a reload (steps 1 and 2 passed, except the closed default under 1280 px: the window could
+not be made narrower). Right-to-left layout forced on the page (texts still French): button at the right end, icon
+mirrored, chips right to left, column on the right when open (layout of step 4 passed). Not checked: the closed
+default on an iPad or a narrow window, real Arabic texts, chips while the menu is disabled (step 5), the till
+inside the Reflowgo app.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
