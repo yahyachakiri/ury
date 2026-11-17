@@ -1,0 +1,66 @@
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index a959bcc6..0c1276d4 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -12,7 +12,7 @@ import {
+   SyncOrderRequest,
+   tableTransfer,
+ } from '../../lib/order-api';
+-import { printOrder } from '../../lib/print';
++import { printKitchenTickets, printOrder } from '../../lib/print';
+ import { resolvePrintFormat } from '../../lib/invoice-api';
+ import { getVacantTablesForBranch, Table } from '../../lib/table-api';
+ import { DINE_IN } from '../../data/order-types';
+@@ -239,6 +239,16 @@ export default function CaptainOrder() {
+         return;
+       }
+ 
++      // Patch 69 (Patch 10 for the waiter app): this device prints the kitchen tickets sync_order
++      // just created, in the background (the Reflowgo app to the printer's IP, a PC through QZ Tray).
++      const saved = result?.message;
++      const savedName = saved && typeof saved === 'object' && 'name' in saved ? saved.name : orderId;
++      if (savedName && posProfile.custom_auto_print_kitchen_ticket) {
++        printKitchenTickets({ invoice: savedName, posProfile }).catch((err) => {
++          showToast.error(t('captain.kitchen_print_failed', { reason: err?.message || String(err) }));
++        });
++      }
++
+       clearTableOrder();
+       showToast.success(isUpdatingOrder ? t('captain.order_updated') : t('captain.order_sent'));
+       navigate('/order');
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 9eea1c73..4a14384a 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -644,6 +644,7 @@
+         "loading_menu": "جارٍ تحميل القائمة…",
+         "order_updated": "تم تحديث الطلب.",
+         "order_sent": "أُرسل الطلب إلى المطبخ.",
++        "kitchen_print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. أخبر المطبخ.",
+         "updating_order": "تعديل الطلب",
+         "new_order": "طلب جديد",
+         "already_ordered": "طُلب سابقا",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 5af0e8c2..f4a15d32 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -637,6 +637,7 @@
+     "loading_menu": "Loading menu…",
+     "order_updated": "Order updated.",
+     "order_sent": "Order sent to kitchen.",
++    "kitchen_print_failed": "Kitchen ticket not printed: {{reason}}. Tell the kitchen.",
+     "updating_order": "Updating order",
+     "new_order": "New order",
+     "already_ordered": "Already Ordered",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 9b29ed56..2c00635e 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -637,6 +637,7 @@
+     "loading_menu": "Chargement du menu…",
+     "order_updated": "Commande mise à jour.",
+     "order_sent": "Commande envoyée en cuisine.",
++    "kitchen_print_failed": "Ticket cuisine non imprimé : {{reason}}. Prévenez la cuisine.",
+     "updating_order": "Modification de la commande",
+     "new_order": "Nouvelle commande",
+     "already_ordered": "Déjà commandé",

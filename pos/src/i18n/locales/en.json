@@ -637,6 +637,7 @@
     "loading_menu": "Loading menu…",
     "order_updated": "Order updated.",
     "order_sent": "Order sent to kitchen.",
+    "kitchen_print_failed": "Kitchen ticket not printed: {{reason}}. Tell the kitchen.",
     "updating_order": "Updating order",
     "new_order": "New order",
     "already_ordered": "Already Ordered",

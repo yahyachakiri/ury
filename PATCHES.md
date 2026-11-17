@@ -480,7 +480,7 @@ Known gap: the captain (waiter) app (`pos/src/captain/pages/CaptainOrder.tsx`)
 also calls `sync_order` and does not auto-print. Its KOTs stay unprinted and
 print, late and labelled by their type, on the next cashier send of the same
 order, or from Reprint. Fine for counter-only fast food; revisit if a client
-uses waiter tablets.
+uses waiter tablets. Closed 2026-11-17 by Patch 69 (ticket 93).
 
 Why it can't be done in `erp_restaurant`: only the browser on the cashier PC
 can reach QZ Tray and the local printers. The fields, the print format, the
@@ -3055,6 +3055,50 @@ Acceptance criteria and manual test (test-dev):
 Patch file: `patches/68-table-transfer-sticky-buttons.patch`. Commit: b033c808.
 
 Browser check 2026-11-17 (test-dev, Chrome window 500 px wide, French, Administrator, after the dev deploy, ury 447034c8): waiter app, order of table T3, ⋮ > "Transférer la table": 12 free tables in two rooms, "Transférer" and "Annuler" visible under the list at opening and still there after scrolling to the last table, a divider line above them (step 1 passed); picking TR1 turns "Transférer" blue (step 2 up to the button: the move was not confirmed, the order on T3 was not a test order of this check); "Annuler" closes the window, nothing moved. Not checked: the till's Tables page (step 3: at 500 px the till shows its "Desktop Only" screen), a refused move (step 4), Arabic (step 5), a real phone, landscape, the keyboard open on the search field.
+
+### Patch 69 — The waiter app prints the kitchen ticket of the order it sends
+
+Ticket 93 (owner report 2026-11-17: an order sent from the waiter app printed no kitchen ticket, in the browser
+and in the Reflowgo app). Closes the "Known gap" of Patch 10.
+
+Files touched: `pos/src/captain/pages/CaptainOrder.tsx` (`handleSend`: the print after a successful
+`sync_order`; import of `printKitchenTickets`), `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json`
+(`captain.kitchen_print_failed`)
+
+What it does: after the waiter app's `sync_order` succeeds (new order or update), when the POS Profile has
+"Auto-print Kitchen Ticket" on, the device that sent the order prints the order's unprinted kitchen tickets with
+Patch 10's `printKitchenTickets` (same server calls, same "Kitchen Ticket" format, marked printed once printed),
+in the background: the waiter goes back to the tables at once. Transport as for the till: inside the Reflowgo
+app to the Kitchen Printer's IP (Patch 66), on a PC through QZ Tray (Patches 50 and 51). A failed print shows
+"Ticket cuisine non imprimé : <reason>. Prévenez la cuisine." and leaves the ticket unprinted, so it still prints
+with the till's next send of that order or from the till's "Reprint kitchen ticket", as before this patch.
+A phone or tablet in a plain browser has neither QZ Tray nor the app: it gets that message on each send.
+
+Why it can't be done in `erp_restaurant`: the print is started by the POS React app on the device that holds the
+printer connection (QZ Tray or the app's bridge); the server cannot reach a printer in the restaurant and
+`erp_restaurant` already provides the tickets (`api/kitchen_print.py`, unchanged).
+
+Risk profile: low to medium. One call added after a successful send in `CaptainOrder.tsx` (also carried by
+Patches 17, 22, 23, 46 and 63); no store or order payload change. Any second print request for that order while
+the first is still printing can print the same ticket twice before it is marked printed: a till send, the till's
+Valider or cancel of that order, or the same waiter sending again (same window as two tills today). On a conflict
+in `handleSend`, keep the block between the Failure return and `clearTableOrder()`. The comments in
+`pos/src/components/SelfOrderListener.tsx` still say the waiter app prints no kitchen tickets (file not touched).
+
+Acceptance criteria and manual test (test-dev, till "Test Dev" with auto-print and a Kitchen Printer):
+1. Waiter app in the Reflowgo app, printer set by IP: send a new order on a free table: the kitchen ticket prints
+   once, the app is back on the tables without waiting. (A device printing for the first time asks "Autoriser
+   l'impression ?" in the app; a PC needs QZ Tray with override.crt.)
+2. Add an item to that order and send: only the added item prints ("Order Modified" ticket).
+3. Waiter app in a PC browser with QZ Tray: same two steps.
+4. Printer off or QZ Tray closed: the waiter sees "Ticket cuisine non imprimé : ... Prévenez la cuisine."; the
+   order is saved; the till's "Reprint kitchen ticket" prints it.
+5. Auto-print off on the till: nothing prints, no message. After changing the till's settings, open a new tab
+   (or restart the Reflowgo app): the first reload still uses the tab's saved copy of the till.
+6. The till's own sends still print once (Patch 10 unchanged).
+7. Arabic and English: the failure message.
+
+Patch file: `patches/69-waiter-app-prints-kitchen-ticket.patch`. Commit: pending.
 
 ## Build and deploy
 

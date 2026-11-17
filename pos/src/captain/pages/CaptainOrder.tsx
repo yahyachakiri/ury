@@ -12,7 +12,7 @@ import {
   SyncOrderRequest,
   tableTransfer,
 } from '../../lib/order-api';
-import { printOrder } from '../../lib/print';
+import { printKitchenTickets, printOrder } from '../../lib/print';
 import { resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
 import { DINE_IN } from '../../data/order-types';
@@ -237,6 +237,16 @@ export default function CaptainOrder() {
             : t('captain.send_failed_retry')
         );
         return;
+      }
+
+      // Patch 69 (Patch 10 for the waiter app): this device prints the kitchen tickets sync_order
+      // just created, in the background (the Reflowgo app to the printer's IP, a PC through QZ Tray).
+      const saved = result?.message;
+      const savedName = saved && typeof saved === 'object' && 'name' in saved ? saved.name : orderId;
+      if (savedName && posProfile.custom_auto_print_kitchen_ticket) {
+        printKitchenTickets({ invoice: savedName, posProfile }).catch((err) => {
+          showToast.error(t('captain.kitchen_print_failed', { reason: err?.message || String(err) }));
+        });
       }
 
       clearTableOrder();

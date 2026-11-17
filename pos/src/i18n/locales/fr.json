@@ -637,6 +637,7 @@
     "loading_menu": "Chargement du menu…",
     "order_updated": "Commande mise à jour.",
     "order_sent": "Commande envoyée en cuisine.",
+    "kitchen_print_failed": "Ticket cuisine non imprimé : {{reason}}. Prévenez la cuisine.",
     "updating_order": "Modification de la commande",
     "new_order": "Nouvelle commande",
     "already_ordered": "Déjà commandé",

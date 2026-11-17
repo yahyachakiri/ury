@@ -644,6 +644,7 @@
         "loading_menu": "جارٍ تحميل القائمة…",
         "order_updated": "تم تحديث الطلب.",
         "order_sent": "أُرسل الطلب إلى المطبخ.",
+        "kitchen_print_failed": "لم تُطبع تذكرة المطبخ: {{reason}}. أخبر المطبخ.",
         "updating_order": "تعديل الطلب",
         "new_order": "طلب جديد",
         "already_ordered": "طُلب سابقا",
