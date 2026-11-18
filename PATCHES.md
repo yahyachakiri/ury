@@ -3169,7 +3169,7 @@ Acceptance criteria and manual test (test-dev, /pos/order, a table with two sent
 4. Change a note and save, tap the same item again: the new note shows. Cancel after typing: the next opening
    shows the saved note, not the typed text.
 
-Patch file: `patches/71-waiter-note-dialog-value.patch`. Commit: not committed yet.
+Patch file: `patches/71-waiter-note-dialog-value.patch`. Commit: 2d4f0fd9.
 
 ## Build and deploy
 
