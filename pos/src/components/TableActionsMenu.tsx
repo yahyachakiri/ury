@@ -33,7 +33,8 @@ const TableActionsMenu = ({
   const isAvailable = table.occupied === 0;
   const isOccupied = table.occupied === 1;
   const isMerged = isMergedTable(table);
-  const canUnmerge = isMerged && isAvailable;
+  // Patch 76: a busy group can be split too (tables other than the order's taken out).
+  const canUnmerge = isMerged && Boolean(onUnmerge);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -130,7 +131,7 @@ const TableActionsMenu = ({
                   <div className="my-1 border-t border-gray-100" />
                   <Button
                     variant="ghost"
-                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
                     onClick={handleUnmerge}
                   >
                     <Unlink className="h-4 w-4 shrink-0" />
@@ -169,6 +170,16 @@ const TableActionsMenu = ({
                 >
                   <UserRound className="h-4 w-4 shrink-0" />
                   {t('tables.transfer_captain')}
+                </Button>
+              )}
+              {canUnmerge && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleUnmerge}
+                >
+                  <Unlink className="h-4 w-4 shrink-0" />
+                  {t('tables.unmerge_tables')}
                 </Button>
               )}
               {onCancelOrder && (

@@ -135,3 +135,16 @@ export async function unmergeTables(table: string) {
   });
 }
 
+
+// Patch 76: a merged group's tables and the one holding its order; take tables out of the group
+// (erp_restaurant api/table_merge.py, ticket 102).
+export async function getTableGroup(table: string): Promise<{ members: string[]; order_tables: string[] }> {
+  const res = (await call.get('erp_restaurant.erp_restaurant.api.table_merge.get_group', { table })) as {
+    message?: { members: string[]; order_tables: string[] };
+  };
+  return res.message ?? { members: [table], order_tables: [] };
+}
+
+export async function splitTables(table: string, remove: string[]) {
+  return call.post('erp_restaurant.erp_restaurant.api.table_merge.split_tables', { table, remove });
+}

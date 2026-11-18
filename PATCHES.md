@@ -3386,6 +3386,47 @@ test-dev data: printed drafts on tables URY marks free).
 Follow-up 2026-11-18 (owner screenshot: cards shrunk to their content, ⋮ outside them): `w-full` on the card;
 seen in a 360 px frame on test-dev (ury 3bd0ca8d): cards 12-173 and 185-346 px, ⋮ inside each card's corner.
 
+### Patch 76 — Take tables out of a merged group, on the till and in the waiter app
+
+Ticket 102 (owner request 2026-11-18: "the option to unmerge and it shows the existing merged tables to unselect
+them for both cashier and waiter"). URY's "Séparer les tables" split a whole group at once, only when it had no
+open order, after a yes / no window naming the tables.
+
+Files touched: `pos/src/components/TableSplitDialog.tsx` (new), `pos/src/lib/table-api.ts` (`getTableGroup`,
+`splitTables`), `pos/src/components/TableActionsMenu.tsx` ("Séparer les tables" also on a busy merged table),
+`pos/src/pages/Table.tsx` and `pos/src/captain/pages/CaptainTables.tsx` (the new window instead of
+`TableUnmergeDialog`, whose file stays unused), `pos/src/i18n/locales/{en,fr,ar}.json` (5 keys `tables.split_*`)
+
+What it does: "Séparer les tables" opens a window with every table of the group ticked (erp_restaurant
+`api/table_merge.get_group`); every table holding an open order (printed or not) is locked with a "Commande"
+badge, and the server refuses taking one out; the user
+unticks the tables to take out and confirms ("Retirer N"): erp_restaurant `api/table_merge.split_tables` frees
+them and keeps the rest of the group and its order (custom_merged_tables recomputed by URY's own helper); taking
+every other table out dissolves the group. Works for a free group and a busy one, on the till and in the waiter
+app (Patch 75's menu). The page reloads, and erp_restaurant sends the erp_tables_<branch> event, so the other
+Tables pages reload too; URY's merge and unmerge endpoints are wrapped in erp_restaurant to send it as well.
+
+Why it can't be done in `erp_restaurant` alone: the window and the menu entry are in the POS React app; the
+group change is erp_restaurant's endpoint (URY has none for part of a group).
+
+Risk profile: low to medium. `Table.tsx` also carries Patches 53, 61, 64, 73, 74; `CaptainTables.tsx` Patches 17,
+46, 63, 70, 73, 75; `TableActionsMenu.tsx` Patches 61, 74, 75.
+
+Acceptance criteria and manual test (test-dev or test-cours):
+1. Till: merge T1 (busy) with T4 and T5. ⋮ on T5 > Séparer les tables: T1, T4, T5 ticked, T1 locked "Commande";
+   untick T5, Retirer 1: T5 free, T1 + T4 still a group with the order; an open waiter Tables page shows it with no
+   tap.
+2. Untick T4 too: the group is gone, T1 keeps its order.
+3. Free group T4 + T5 + T7 in the waiter app: untick T7: T7 free, T4 + T5 still merged; the till's page shows it.
+4. A merge on the till: an open waiter Tables page shows the group with no tap.
+5. Arabic: window mirrored, texts translated, at 360 px too; English.
+6. The order's table cannot be unticked; a refusal from the server shows its translated message.
+7. A printed order's group, on the till (the waiter menu has no entry on a printed table).
+8. A group with an old printed draft on one table and the live order on another: both locked.
+9. A tap on the till's ⋮ list keeps "Séparer les tables" grey, above the red "Annuler la commande".
+
+Patch file: `patches/76-split-merged-tables.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

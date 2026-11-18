@@ -1,0 +1,417 @@
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index b1788956..e2f44dc9 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
+ import { AlertTriangle, LogOut, Square } from 'lucide-react';
+ import { Button, Spinner, showToast } from '@ury/ui';
+ import { useCaptainContext } from '../hooks/useCaptainContext';
+-import { getRooms, getTables, mergeTablesBatch, unmergeTables, type Room, type Table } from '../../lib/table-api';
++import { getRooms, getTables, mergeTablesBatch, type Room, type Table } from '../../lib/table-api';
+ import { getMergeGroupMembers, isMergedTable, sortTablesByMergeGroups } from '../../lib/table-utils';
+ import TableActionsMenu from '../../components/TableActionsMenu';
+ import TableMergeDialog from '../../components/TableMergeDialog';
+-import TableUnmergeDialog from '../../components/TableUnmergeDialog';
++import TableSplitDialog from '../../components/TableSplitDialog';
+ import {
+   getActiveTableOrders,
+   getUserFullNames,
+@@ -203,11 +203,6 @@ export default function CaptainTables() {
+     );
+   }, [mergeSourceTable, tables]);
+ 
+-  const unmergeGroupMembers = useMemo(
+-    () => (unmergeSourceTable ? getMergeGroupMembers(unmergeSourceTable, tables) : []),
+-    [unmergeSourceTable, tables]
+-  );
+-
+   const handleMergeConfirm = async (targetNames: string[]) => {
+     if (!mergeSourceTable || targetNames.length === 0) return;
+     try {
+@@ -220,18 +215,6 @@ export default function CaptainTables() {
+     }
+   };
+ 
+-  const handleUnmergeConfirm = async () => {
+-    if (!unmergeSourceTable) return;
+-    try {
+-      await unmergeTables(unmergeSourceTable.name);
+-      refresh();
+-      showToast.success(t('tables.unmerge_success'));
+-    } catch (error) {
+-      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
+-      throw error;
+-    }
+-  };
+-
+   const handleTableTap = (table: Table, order: ActiveTableOrder | undefined) => {
+     const ownership = resolveOwnership(table, order);
+ 
+@@ -375,14 +358,13 @@ export default function CaptainTables() {
+         availableTables={mergeAvailableTables}
+         onConfirm={handleMergeConfirm}
+       />
+-      <TableUnmergeDialog
++      <TableSplitDialog
+         open={unmergeSourceTable !== null}
+         onOpenChange={(open) => {
+           if (!open) setUnmergeSourceTable(null);
+         }}
+         sourceTable={unmergeSourceTable}
+-        groupMembers={unmergeGroupMembers}
+-        onConfirm={handleUnmergeConfirm}
++        onDone={refresh}
+       />
+     </div>
+   );
+diff --git a/pos/src/components/TableActionsMenu.tsx b/pos/src/components/TableActionsMenu.tsx
+index 9f67f830..c02bb473 100644
+--- a/pos/src/components/TableActionsMenu.tsx
++++ b/pos/src/components/TableActionsMenu.tsx
+@@ -33,7 +33,8 @@ const TableActionsMenu = ({
+   const isAvailable = table.occupied === 0;
+   const isOccupied = table.occupied === 1;
+   const isMerged = isMergedTable(table);
+-  const canUnmerge = isMerged && isAvailable;
++  // Patch 76: a busy group can be split too (tables other than the order's taken out).
++  const canUnmerge = isMerged && Boolean(onUnmerge);
+ 
+   useEffect(() => {
+     if (!isOpen) return;
+@@ -130,7 +131,7 @@ const TableActionsMenu = ({
+                   <div className="my-1 border-t border-gray-100" />
+                   <Button
+                     variant="ghost"
+-                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
++                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                     onClick={handleUnmerge}
+                   >
+                     <Unlink className="h-4 w-4 shrink-0" />
+@@ -171,6 +172,16 @@ const TableActionsMenu = ({
+                   {t('tables.transfer_captain')}
+                 </Button>
+               )}
++              {canUnmerge && (
++                <Button
++                  variant="ghost"
++                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
++                  onClick={handleUnmerge}
++                >
++                  <Unlink className="h-4 w-4 shrink-0" />
++                  {t('tables.unmerge_tables')}
++                </Button>
++              )}
+               {onCancelOrder && (
+                 <>
+                   <div className="my-1 border-t border-gray-100" />
+diff --git a/pos/src/components/TableSplitDialog.tsx b/pos/src/components/TableSplitDialog.tsx
+new file mode 100644
+index 00000000..31fdc61d
+--- /dev/null
++++ b/pos/src/components/TableSplitDialog.tsx
+@@ -0,0 +1,160 @@
++import { useEffect, useRef, useState } from 'react';
++import { Check } from 'lucide-react';
++import {
++  Badge,
++  Button,
++  Spinner,
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogFooter,
++  DialogHeader,
++  DialogTitle,
++  cn,
++  showToast,
++} from '@ury/ui';
++import { parseFrappeError } from '@ury/core';
++import { t } from '../i18n';
++import { getTableGroup, splitTables, type Table } from '../lib/table-api';
++
++/**
++ * Patch 76 (ticket 102): the tables of a merged group, all ticked; untick the ones to take out
++ * (erp_restaurant split_tables frees them). Every table holding an open order stays ticked and
++ * locked. Used by the till's and the waiter's Tables pages, for free and busy groups.
++ */
++interface TableSplitDialogProps {
++  open: boolean;
++  onOpenChange: (open: boolean) => void;
++  sourceTable: Table | null;
++  onDone: () => void;
++}
++
++const TableSplitDialog = ({ open, onOpenChange, sourceTable, onDone }: TableSplitDialogProps) => {
++  const [members, setMembers] = useState<string[]>([]);
++  const [orderTables, setOrderTables] = useState<string[]>([]);
++  // The parents pass a new onOpenChange on each render (a live reload included): kept in a ref so
++  // the group is loaded once per opening and the user's ticks survive.
++  const onOpenChangeRef = useRef(onOpenChange);
++  useEffect(() => {
++    onOpenChangeRef.current = onOpenChange;
++  });
++  const [removed, setRemoved] = useState<Set<string>>(new Set());
++  const [loading, setLoading] = useState(false);
++  const [submitting, setSubmitting] = useState(false);
++
++  useEffect(() => {
++    if (!open || !sourceTable) return;
++    let cancelled = false;
++    setRemoved(new Set());
++    setMembers([]);
++    setLoading(true);
++    getTableGroup(sourceTable.name)
++      .then((group) => {
++        if (cancelled) return;
++        setMembers(group.members);
++        setOrderTables(group.order_tables);
++      })
++      .catch((error) => {
++        if (cancelled) return;
++        showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
++        onOpenChangeRef.current(false);
++      })
++      .finally(() => {
++        if (!cancelled) setLoading(false);
++      });
++    return () => {
++      cancelled = true;
++    };
++  }, [open, sourceTable]);
++
++  if (!sourceTable) return null;
++
++  const toggle = (name: string) => {
++    if (orderTables.includes(name)) return;
++    setRemoved((prev) => {
++      const next = new Set(prev);
++      if (next.has(name)) next.delete(name);
++      else next.add(name);
++      return next;
++    });
++  };
++
++  const handleConfirm = async () => {
++    if (removed.size === 0) {
++      showToast.error(t('tables.split_none'));
++      return;
++    }
++    setSubmitting(true);
++    try {
++      await splitTables(sourceTable.name, [...removed]);
++      showToast.success(t('tables.unmerge_success'));
++      onOpenChange(false);
++      onDone();
++    } catch (error) {
++      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
++    } finally {
++      setSubmitting(false);
++    }
++  };
++
++  return (
++    <Dialog open={open} onOpenChange={(next) => !submitting && onOpenChange(next)}>
++      <DialogContent onClose={() => !submitting && onOpenChange(false)}>
++        <DialogHeader>
++          <DialogTitle>{t('tables.split_title')}</DialogTitle>
++          <DialogDescription>{t('tables.split_description')}</DialogDescription>
++        </DialogHeader>
++        <div className="grid grid-cols-1 gap-2 px-6 pb-2 sm:grid-cols-2">
++          {loading
++            ? <Spinner message={t('common.loading')} />
++            : members.map((name) => {
++                const kept = !removed.has(name);
++                const locked = orderTables.includes(name);
++                return (
++                  <Button
++                    key={name}
++                    variant="ghost"
++                    onClick={() => toggle(name)}
++                    disabled={locked || submitting}
++                    aria-pressed={kept}
++                    className={cn(
++                      'flex h-auto items-center justify-start gap-3 rounded-lg border-2 p-3 text-start font-normal',
++                      kept ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
++                    )}
++                  >
++                    <span
++                      className={cn(
++                        'flex h-5 w-5 shrink-0 items-center justify-center rounded border',
++                        kept ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300'
++                      )}
++                    >
++                      {kept && <Check className="h-3.5 w-3.5" />}
++                    </span>
++                    <span className="flex-1 truncate font-semibold text-gray-900">{name}</span>
++                    {locked && (
++                      <Badge variant="info" size="sm">
++                        {t('tables.split_order_table')}
++                      </Badge>
++                    )}
++                  </Button>
++                );
++              })}
++        </div>
++        <DialogFooter>
++          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
++            {t('common.cancel')}
++          </Button>
++          <Button
++            variant="danger"
++            onClick={() => void handleConfirm()}
++            disabled={submitting || loading || removed.size === 0}
++          >
++            {submitting ? t('common.loading') : t('tables.split_confirm', { count: removed.size })}
++          </Button>
++        </DialogFooter>
++      </DialogContent>
++    </Dialog>
++  );
++};
++
++export default TableSplitDialog;
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 4a14384a..8d559e56 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -436,6 +436,11 @@
+         "unmerge_confirm": "فصل",
+         "unmerge_success": "تم فصل الطاولات بنجاح",
+         "unmerge_failed": "فشل فصل الطاولات",
++        "split_title": "إخراج طاولات من المجموعة",
++        "split_description": "ألغِ تحديد الطاولات التي تريد إخراجها. ستصبح متاحة.",
++        "split_order_table": "الطلب",
++        "split_confirm": "إخراج {{count}}",
++        "split_none": "ألغِ تحديد طاولة واحدة على الأقل.",
+         "not_merged": "هذه الطاولة ليست مدمجة",
+         "transfer_table": "نقل الطاولة",
+         "transfer_captain": "نقل المسؤول",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index f4a15d32..0618e2f0 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -429,6 +429,11 @@
+     "unmerge_confirm": "Unmerge",
+     "unmerge_success": "Tables unmerged successfully",
+     "unmerge_failed": "Failed to unmerge tables",
++    "split_title": "Take tables out of the group",
++    "split_description": "Untick the tables to take out. They become free.",
++    "split_order_table": "Order",
++    "split_confirm": "Take out {{count}}",
++    "split_none": "Untick at least one table.",
+     "not_merged": "This table is not merged",
+     "transfer_table": "Transfer table",
+     "transfer_captain": "Transfer captain",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 2c00635e..43bff796 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -429,6 +429,11 @@
+     "unmerge_confirm": "Séparer",
+     "unmerge_success": "Tables séparées avec succès",
+     "unmerge_failed": "Échec de la séparation des tables",
++    "split_title": "Retirer des tables du groupe",
++    "split_description": "Décochez les tables à retirer. Elles redeviennent libres.",
++    "split_order_table": "Commande",
++    "split_confirm": "Retirer {{count}}",
++    "split_none": "Décochez au moins une table.",
+     "not_merged": "Cette table n'est pas fusionnée",
+     "transfer_table": "Transférer la table",
+     "transfer_captain": "Transférer le capitaine",
+diff --git a/pos/src/lib/table-api.ts b/pos/src/lib/table-api.ts
+index 9244b695..1f9bf535 100644
+--- a/pos/src/lib/table-api.ts
++++ b/pos/src/lib/table-api.ts
+@@ -135,3 +135,16 @@ export async function unmergeTables(table: string) {
+   });
+ }
+ 
++
++// Patch 76: a merged group's tables and the one holding its order; take tables out of the group
++// (erp_restaurant api/table_merge.py, ticket 102).
++export async function getTableGroup(table: string): Promise<{ members: string[]; order_tables: string[] }> {
++  const res = (await call.get('erp_restaurant.erp_restaurant.api.table_merge.get_group', { table })) as {
++    message?: { members: string[]; order_tables: string[] };
++  };
++  return res.message ?? { members: [table], order_tables: [] };
++}
++
++export async function splitTables(table: string, remove: string[]) {
++  return call.post('erp_restaurant.erp_restaurant.api.table_merge.split_tables', { table, remove });
++}
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 4f85a6d3..d47e6a01 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
+ import { AlertTriangle, Layout, Square } from 'lucide-react';
+ import { usePOSStore } from '../store/pos-store';
+ import { useRootStore } from '../store/root-store';
+-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
++import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, type Room, type Table } from '../lib/table-api';
+ import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+ import { Spinner } from '@ury/ui';
+ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Textarea } from '@ury/ui';
+@@ -20,7 +20,7 @@ import { showToast } from '@ury/ui';
+ import { t } from '../i18n';
+ import LayoutView from '../components/LayoutView';
+ import TableMergeDialog from '../components/TableMergeDialog';
+-import TableUnmergeDialog from '../components/TableUnmergeDialog';
++import TableSplitDialog from '../components/TableSplitDialog';
+ import TableTransferDialog from '../components/TableTransferDialog';
+ import CaptainTransferDialog from '../components/CaptainTransferDialog';
+ import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
+@@ -376,21 +376,6 @@ const TableView = () => {
+     }
+   };
+ 
+-  const handleUnmergeConfirm = async () => {
+-    if (!unmergeSourceTable) return;
+-
+-    try {
+-      await unmergeTables(unmergeSourceTable.name);
+-      if (selectedRoom) {
+-        await loadTables(selectedRoom, { useCache: false });
+-      }
+-      showToast.success(t('tables.unmerge_success'));
+-    } catch (error) {
+-      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
+-      throw error;
+-    }
+-  };
+-
+   const validateActiveTableOrder = async (tableName: string) => {
+     const orderResponse = await getTableOrder(tableName);
+     const invoice = orderResponse.message;
+@@ -497,11 +482,6 @@ const TableView = () => {
+ 
+   const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
+ 
+-  const unmergeGroupMembers = useMemo(() => {
+-    if (!unmergeSourceTable) return [];
+-    return getMergeGroupMembers(unmergeSourceTable, tablesToDisplay);
+-  }, [unmergeSourceTable, tablesToDisplay]);
+-
+   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
+ 
+   const renderTableCard = (table: Table, className?: string) => {
+@@ -686,14 +666,16 @@ const TableView = () => {
+         onConfirm={handleMergeConfirm}
+       />
+ 
+-      <TableUnmergeDialog
++      {/* Patch 76: untick tables to take them out of a group (free or busy). */}
++      <TableSplitDialog
+         open={unmergeSourceTable !== null}
+         onOpenChange={(open) => {
+           if (!open) setUnmergeSourceTable(null);
+         }}
+         sourceTable={unmergeSourceTable}
+-        groupMembers={unmergeGroupMembers}
+-        onConfirm={handleUnmergeConfirm}
++        onDone={() => {
++          if (selectedRoom) void loadTables(selectedRoom, { useCache: false });
++        }}
+       />
+ 
+       {/* Patch 74: cancel the busy table's order, with a reason (as Orders). */}

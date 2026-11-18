@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, LogOut, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getRooms, getTables, mergeTablesBatch, unmergeTables, type Room, type Table } from '../../lib/table-api';
+import { getRooms, getTables, mergeTablesBatch, type Room, type Table } from '../../lib/table-api';
 import { getMergeGroupMembers, isMergedTable, sortTablesByMergeGroups } from '../../lib/table-utils';
 import TableActionsMenu from '../../components/TableActionsMenu';
 import TableMergeDialog from '../../components/TableMergeDialog';
-import TableUnmergeDialog from '../../components/TableUnmergeDialog';
+import TableSplitDialog from '../../components/TableSplitDialog';
 import {
   getActiveTableOrders,
   getUserFullNames,
@@ -203,11 +203,6 @@ export default function CaptainTables() {
     );
   }, [mergeSourceTable, tables]);
 
-  const unmergeGroupMembers = useMemo(
-    () => (unmergeSourceTable ? getMergeGroupMembers(unmergeSourceTable, tables) : []),
-    [unmergeSourceTable, tables]
-  );
-
   const handleMergeConfirm = async (targetNames: string[]) => {
     if (!mergeSourceTable || targetNames.length === 0) return;
     try {
@@ -216,18 +211,6 @@ export default function CaptainTables() {
       showToast.success(t('tables.merge_success'));
     } catch (error) {
       showToast.error(parseFrappeError(error, t('tables.merge_failed')));
-      throw error;
-    }
-  };
-
-  const handleUnmergeConfirm = async () => {
-    if (!unmergeSourceTable) return;
-    try {
-      await unmergeTables(unmergeSourceTable.name);
-      refresh();
-      showToast.success(t('tables.unmerge_success'));
-    } catch (error) {
-      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
       throw error;
     }
   };
@@ -375,14 +358,13 @@ export default function CaptainTables() {
         availableTables={mergeAvailableTables}
         onConfirm={handleMergeConfirm}
       />
-      <TableUnmergeDialog
+      <TableSplitDialog
         open={unmergeSourceTable !== null}
         onOpenChange={(open) => {
           if (!open) setUnmergeSourceTable(null);
         }}
         sourceTable={unmergeSourceTable}
-        groupMembers={unmergeGroupMembers}
-        onConfirm={handleUnmergeConfirm}
+        onDone={refresh}
       />
     </div>
   );

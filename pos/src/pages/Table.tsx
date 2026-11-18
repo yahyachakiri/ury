@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Textarea } from '@ury/ui';
@@ -20,7 +20,7 @@ import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
 import TableMergeDialog from '../components/TableMergeDialog';
-import TableUnmergeDialog from '../components/TableUnmergeDialog';
+import TableSplitDialog from '../components/TableSplitDialog';
 import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
@@ -376,21 +376,6 @@ const TableView = () => {
     }
   };
 
-  const handleUnmergeConfirm = async () => {
-    if (!unmergeSourceTable) return;
-
-    try {
-      await unmergeTables(unmergeSourceTable.name);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
-      showToast.success(t('tables.unmerge_success'));
-    } catch (error) {
-      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
-      throw error;
-    }
-  };
-
   const validateActiveTableOrder = async (tableName: string) => {
     const orderResponse = await getTableOrder(tableName);
     const invoice = orderResponse.message;
@@ -496,11 +481,6 @@ const TableView = () => {
   }, [mergeSourceTable, tables]);
 
   const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
-
-  const unmergeGroupMembers = useMemo(() => {
-    if (!unmergeSourceTable) return [];
-    return getMergeGroupMembers(unmergeSourceTable, tablesToDisplay);
-  }, [unmergeSourceTable, tablesToDisplay]);
 
   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
 
@@ -686,14 +666,16 @@ const TableView = () => {
         onConfirm={handleMergeConfirm}
       />
 
-      <TableUnmergeDialog
+      {/* Patch 76: untick tables to take them out of a group (free or busy). */}
+      <TableSplitDialog
         open={unmergeSourceTable !== null}
         onOpenChange={(open) => {
           if (!open) setUnmergeSourceTable(null);
         }}
         sourceTable={unmergeSourceTable}
-        groupMembers={unmergeGroupMembers}
-        onConfirm={handleUnmergeConfirm}
+        onDone={() => {
+          if (selectedRoom) void loadTables(selectedRoom, { useCache: false });
+        }}
       />
 
       {/* Patch 74: cancel the busy table's order, with a reason (as Orders). */}
