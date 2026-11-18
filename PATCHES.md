@@ -3316,8 +3316,7 @@ the order is looked up with `get_order_invoice(table, is_payment="Payments")`, w
 through `custom_merged_tables` from any member; an unsaved new order (no order on the table) is not taken. The
 window title names the group ("Annuler la commande · T1 + T2"). URY's `release_merge_cluster_tables`, called by
 erp_restaurant's `cancel_order`, already frees every table of the group and clears `merged_with`, so the tables
-are separated by the cancel. Patch file: `patches/74b-tables-cancel-merged-printed.patch`. Commit: not committed
-yet.
+are separated by the cancel. Patch file: `patches/74b-tables-cancel-merged-printed.patch`. Commit: edfaeb4d.
 
 Browser check 2026-11-18 (test-dev, ury 0b3bb141 + erp_restaurant bbe4cfa4, Administrator in French; the till's
 Tables page in a 1300 px same-site frame since the Chrome window stayed at 500 px): the waiter app sent a
