@@ -1,0 +1,42 @@
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 97f7e91c..4f85a6d3 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -299,8 +299,17 @@ const TableView = () => {
+   // only with that right: no reason typed for nothing.
+   const handleOpenCancel = async (table: Table) => {
+     try {
+-      const orderResponse = await getTableOrder(table.name);
+-      const invoiceId = orderResponse.message?.name;
++      // Patch 74 follow-up: printed orders too ("Payments" lifts get_order_invoice's not-printed filter), and a
++      // merged table's group order (found through custom_merged_tables); cancel_order then frees and
++      // separates every table of the group.
++      const orderResponse = (await call.get('ury.ury.doctype.ury_order.ury_order.get_order_invoice', {
++        table: table.name,
++        is_payment: 'Payments',
++      })) as { message?: { name?: string; docstatus?: number } | null };
++      // An unsaved new order (no order on the table) has no name, or a "new-..." one.
++      const found = orderResponse.message;
++      const invoiceId =
++        found?.docstatus === 0 && found.name && !found.name.startsWith('new-') ? found.name : undefined;
+       if (!invoiceId) {
+         showToast.error(t('errors.no_active_order'));
+         return;
+@@ -515,7 +524,7 @@ const TableView = () => {
+       onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+       showCaptainTransfer={showCaptainTransfer}
+       onCancelOrder={
+-        table.occupied === 1 && !isRestricted && mergeMembers.length <= 1
++        table.occupied === 1 && !isRestricted
+           ? () => void handleOpenCancel(table)
+           : undefined
+       }
+@@ -698,7 +707,7 @@ const TableView = () => {
+           <DialogHeader>
+             <DialogTitle>
+               {t('order.cancel_order')}
+-              {cancelTable ? ` · ${cancelTable.name}` : ''}
++              {cancelTable ? ` · ${getMergeGroupMembers(cancelTable, tables).join(' + ')}` : ''}
+             </DialogTitle>
+             <DialogDescription>{t('errors.enter_cancel_reason')}</DialogDescription>
+           </DialogHeader>

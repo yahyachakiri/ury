@@ -3310,6 +3310,15 @@ device):
 
 Patch file: `patches/74-tables-live-reload-cancel.patch`. Commit: 4157069d.
 
+Follow-up 2026-11-18 (owner: "I can't cancel a merged table"): the cancel entry is shown on merged tables too, and
+the order is looked up with `get_order_invoice(table, is_payment="Payments")`, which also finds a printed order
+(the plain lookup skips printed ones, so a printed table could not be cancelled) and a merged group's order
+through `custom_merged_tables` from any member; an unsaved new order (no order on the table) is not taken. The
+window title names the group ("Annuler la commande · T1 + T2"). URY's `release_merge_cluster_tables`, called by
+erp_restaurant's `cancel_order`, already frees every table of the group and clears `merged_with`, so the tables
+are separated by the cancel. Patch file: `patches/74b-tables-cancel-merged-printed.patch`. Commit: not committed
+yet.
+
 Browser check 2026-11-18 (test-dev, ury 0b3bb141 + erp_restaurant bbe4cfa4, Administrator in French; the till's
 Tables page in a 1300 px same-site frame since the Chrome window stayed at 500 px): the waiter app sent a
 Coca-Cola on T5; the till frame, never reloaded, turned T5 from "Disponible" to "Occupé, démarré à 15:14" (step 1
