@@ -3208,7 +3208,7 @@ Acceptance criteria and manual test (test-dev, /pos/order, a table with an order
 4. Arabic: ⋮ on the left edge, fully visible; its menu opens inside the screen.
 5. A long table name (or a 2-digit count): the name is cut with "…", ⋮ still visible.
 
-Patch file: `patches/72-waiter-header-phone.patch`. Commit: not committed yet.
+Patch file: `patches/72-waiter-header-phone.patch`. Commit: 47526e0b.
 
 ## Build and deploy
 
