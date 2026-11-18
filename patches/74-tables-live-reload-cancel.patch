@@ -1,0 +1,337 @@
+diff --git a/pos/src/components/TableActionsMenu.tsx b/pos/src/components/TableActionsMenu.tsx
+index 32255ac3..de405c1d 100644
+--- a/pos/src/components/TableActionsMenu.tsx
++++ b/pos/src/components/TableActionsMenu.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+-import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
++import { ArrowRightLeft, Ban, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
+ import { Button } from '@ury/ui';
+ import { t } from '../i18n';
+ import { isMergedTable } from '../lib/table-utils';
+@@ -14,6 +14,8 @@ interface TableActionsMenuProps {
+   onTransferTable?: () => void;
+   onTransferCaptain?: () => void;
+   showCaptainTransfer?: boolean;
++  /** Patch 74: cancel the busy table's order from the Tables page. */
++  onCancelOrder?: () => void;
+ }
+ 
+ const TableActionsMenu = ({
+@@ -25,6 +27,7 @@ const TableActionsMenu = ({
+   onTransferTable,
+   onTransferCaptain,
+   showCaptainTransfer = false,
++  onCancelOrder,
+ }: TableActionsMenuProps) => {
+   const menuRef = useRef<HTMLDivElement>(null);
+   const isAvailable = table.occupied === 0;
+@@ -74,6 +77,12 @@ const TableActionsMenu = ({
+     onTransferCaptain?.();
+   };
+ 
++  const handleCancelOrder = (event: ReactMouseEvent<HTMLButtonElement>) => {
++    event.stopPropagation();
++    onOpenChange(false);
++    onCancelOrder?.();
++  };
++
+   const hasAvailableActions = isAvailable;
+   const hasOccupiedActions =
+     isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain));
+@@ -96,7 +105,7 @@ const TableActionsMenu = ({
+       </Button>
+ 
+       {isOpen && (
+-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
++        <div className="absolute end-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+           {isAvailable && (
+             <>
+               <Button
+@@ -153,6 +162,19 @@ const TableActionsMenu = ({
+                   {t('tables.transfer_captain')}
+                 </Button>
+               )}
++              {onCancelOrder && (
++                <>
++                  <div className="my-1 border-t border-gray-100" />
++                  <Button
++                    variant="ghost"
++                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
++                    onClick={handleCancelOrder}
++                  >
++                    <Ban className="h-4 w-4 shrink-0" />
++                    {t('order.cancel_order')}
++                  </Button>
++                </>
++              )}
+             </>
+           )}
+         </div>
+diff --git a/pos/src/components/TableCard.tsx b/pos/src/components/TableCard.tsx
+index c01e60e1..be011bcd 100644
+--- a/pos/src/components/TableCard.tsx
++++ b/pos/src/components/TableCard.tsx
+@@ -25,6 +25,7 @@ interface TableCardProps {
+   onTransferTable?: () => void;
+   onTransferCaptain?: () => void;
+   showCaptainTransfer?: boolean;
++  onCancelOrder?: () => void; // Patch 74
+   onNavigate: () => void;
+   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
+   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
+@@ -43,6 +44,7 @@ const TableCard = ({
+   onTransferTable,
+   onTransferCaptain,
+   showCaptainTransfer = false,
++  onCancelOrder,
+   onNavigate,
+   onPreview,
+   onPrint,
+@@ -98,6 +100,7 @@ const TableCard = ({
+               onTransferTable={onTransferTable}
+               onTransferCaptain={onTransferCaptain}
+               showCaptainTransfer={showCaptainTransfer}
++              onCancelOrder={onCancelOrder}
+             />
+             </span>
+           </div>
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index b8f2277d..97f7e91c 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -1,4 +1,4 @@
+-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
++import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { AlertTriangle, Layout, Square } from 'lucide-react';
+ import { usePOSStore } from '../store/pos-store';
+@@ -6,13 +6,16 @@ import { useRootStore } from '../store/root-store';
+ import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+ import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+ import { Spinner } from '@ury/ui';
++import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Textarea } from '@ury/ui';
+ import { Button } from '@ury/ui';
+ import { Badge } from '@ury/ui';
+ import { DINE_IN } from '../data/order-types';
+ import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
+-import { printOrder } from '../lib/print';
++import { printKitchenTickets, printOrder } from '../lib/print';
+ import { resolvePrintFormat, updatePrintStatus } from '../lib/invoice-api';
+-import { canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
++import { call, canCaptainTransfer, isUserRestrictedFromTableOrders, parseFrappeError } from '@ury/core';
++import type { Socket } from 'socket.io-client';
++import { getRealtimeSocket } from '../lib/realtime';
+ import { showToast } from '@ury/ui';
+ import { t } from '../i18n';
+ import LayoutView from '../components/LayoutView';
+@@ -34,6 +37,10 @@ const TableView = () => {
+   const branch = posProfile?.branch ?? null;
+   const [rooms, setRooms] = useState<Room[]>([]);
+   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
++  const selectedRoomRef = useRef<string | null>(null); // Patch 74: room on screen, for live reloads
++  useEffect(() => {
++    selectedRoomRef.current = selectedRoom;
++  }, [selectedRoom]);
+   const [tables, setTables] = useState<Table[]>([]);
+   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
+   const [loadingRooms, setLoadingRooms] = useState(false);
+@@ -43,6 +50,11 @@ const TableView = () => {
+   const [error, setError] = useState<string | null>(null);
+   const [printingTable, setPrintingTable] = useState<string | null>(null);
+   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
++  // Patch 74: cancel a busy table's order from this page (same endpoint and reason as Orders).
++  const [cancelTable, setCancelTable] = useState<Table | null>(null);
++  const [cancelInvoice, setCancelInvoice] = useState<string | null>(null);
++  const [cancelReason, setCancelReason] = useState('');
++  const [cancelLoading, setCancelLoading] = useState(false);
+   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+   const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
+   const [transferSourceTable, setTransferSourceTable] = useState<Table | null>(null);
+@@ -132,10 +144,23 @@ const TableView = () => {
+   }, [branch, rooms, persistRoomCounts]);
+ 
+   const loadTables = useCallback(
+-    async (roomName: string, options?: { useCache?: boolean }) => {
++    async (roomName: string, options?: { useCache?: boolean; quiet?: boolean }) => {
+       if (!roomName) return;
+       setError(null);
+ 
++      // Patch 74: a live reload keeps the grid on screen, never touches the loading state, keeps the
++      // current tables on a network error and drops an answer for a room no longer on screen.
++      if (options?.quiet) {
++        try {
++          const fetchedTables = sortTablesByMergeGroups(await getTables(roomName));
++          setTablesCache((prev) => ({ ...prev, [roomName]: fetchedTables }));
++          if (selectedRoomRef.current === roomName) setTables(fetchedTables);
++        } catch (e) {
++          console.error('Tables: live reload failed', e);
++        }
++        return;
++      }
++
+       const shouldUseCache = options?.useCache !== false;
+       if (shouldUseCache && tablesCache[roomName]) {
+         setTables(sortTablesByMergeGroups(tablesCache[roomName]));
+@@ -228,6 +253,103 @@ const TableView = () => {
+     }
+   };
+ 
++  // Patch 74: a table order sent by a waiter (or paid, cancelled) on this branch reloads the
++  // tables (erp_restaurant table_refresh.py, channel erp_tables_<branch>), without the loading
++  // grid; other rooms are fetched again when opened. A socket (re)connection reloads too.
++  const liveReloadRef = useRef<() => void>(() => {});
++  useEffect(() => {
++    liveReloadRef.current = () => {
++      setTablesCache({});
++      if (selectedRoom) void loadTables(selectedRoom, { useCache: false, quiet: true });
++    };
++  });
++  useEffect(() => {
++    if (!branch) return;
++    const channel = `erp_tables_${branch}`;
++    let activeSocket: Socket | null = null;
++    let cancelled = false;
++    let timer: ReturnType<typeof setTimeout> | undefined;
++    const onEvent = () => {
++      clearTimeout(timer);
++      timer = setTimeout(() => liveReloadRef.current(), 500);
++    };
++    getRealtimeSocket()
++      .then((s) => {
++        if (cancelled) return;
++        activeSocket = s;
++        s.on(channel, onEvent);
++        s.on('connect', onEvent);
++      })
++      .catch((err) => console.error('Tables: realtime unavailable:', err));
++    return () => {
++      cancelled = true;
++      clearTimeout(timer);
++      activeSocket?.off(channel, onEvent);
++      activeSocket?.off('connect', onEvent);
++    };
++  }, [branch]);
++
++  const closeCancel = () => {
++    setCancelTable(null);
++    setCancelInvoice(null);
++    setCancelReason('');
++  };
++
++  // The table's open order and the user's cancel right first, as Orders shows its cancel button
++  // only with that right: no reason typed for nothing.
++  const handleOpenCancel = async (table: Table) => {
++    try {
++      const orderResponse = await getTableOrder(table.name);
++      const invoiceId = orderResponse.message?.name;
++      if (!invoiceId) {
++        showToast.error(t('errors.no_active_order'));
++        return;
++      }
++      const res = (await call.get('frappe.client.has_permission', {
++        doctype: 'POS Invoice',
++        docname: invoiceId,
++        perm_type: 'cancel',
++      })) as { message?: { has_permission?: boolean } };
++      if (res?.message?.has_permission !== true) {
++        showToast.error(t('captain.no_permission_order'));
++        return;
++      }
++      setCancelInvoice(invoiceId);
++      setCancelTable(table);
++    } catch (err) {
++      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
++    }
++  };
++
++  const handleConfirmCancel = async () => {
++    const invoiceId = cancelInvoice;
++    if (!cancelTable || !invoiceId) return;
++    if (!cancelReason.trim()) {
++      showToast.error(t('errors.enter_cancel_reason'));
++      return;
++    }
++    setCancelLoading(true);
++    try {
++      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
++        invoice_id: invoiceId,
++        reason: cancelReason,
++      });
++      showToast.success(t('success.order_cancelled'));
++      // As in Orders (Patches 10 and 37): the "Cancelled" kitchen ticket, without blocking.
++      if (posProfile?.custom_auto_print_kitchen_ticket) {
++        printKitchenTickets({ invoice: invoiceId, posProfile }).catch((err) => {
++          showToast.error(t('kitchen.print_failed', { reason: err?.message || String(err) }));
++        });
++      }
++      closeCancel();
++      if (selectedRoom) await loadTables(selectedRoom, { useCache: false, quiet: true });
++    } catch (err) {
++      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
++    } finally {
++      setCancelLoading(false);
++    }
++  };
++
+   const handleMergeConfirm = async (targetNames: string[]) => {
+     if (!mergeSourceTable || targetNames.length === 0) return;
+ 
+@@ -392,6 +514,11 @@ const TableView = () => {
+       onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+       onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+       showCaptainTransfer={showCaptainTransfer}
++      onCancelOrder={
++        table.occupied === 1 && !isRestricted && mergeMembers.length <= 1
++          ? () => void handleOpenCancel(table)
++          : undefined
++      }
+       onNavigate={() => handleNavigateToPOS(table.name)}
+       onPreview={(event) => handlePreviewTable(table, event)}
+       onPrint={(event) => handlePrintTable(table, event)}
+@@ -560,6 +687,45 @@ const TableView = () => {
+         onConfirm={handleUnmergeConfirm}
+       />
+ 
++      {/* Patch 74: cancel the busy table's order, with a reason (as Orders). */}
++      <Dialog
++        open={cancelTable !== null}
++        onOpenChange={(open) => {
++          if (!open && !cancelLoading) closeCancel();
++        }}
++      >
++        <DialogContent>
++          <DialogHeader>
++            <DialogTitle>
++              {t('order.cancel_order')}
++              {cancelTable ? ` · ${cancelTable.name}` : ''}
++            </DialogTitle>
++            <DialogDescription>{t('errors.enter_cancel_reason')}</DialogDescription>
++          </DialogHeader>
++          <div className="px-6 mb-3">
++            <Textarea
++              placeholder={t('order.enter_cancel_reason')}
++              value={cancelReason}
++              onChange={(e) => setCancelReason(e.target.value)}
++              disabled={cancelLoading}
++              autoFocus
++            />
++          </div>
++          <DialogFooter>
++            <Button
++              variant="outline"
++              onClick={closeCancel}
++              disabled={cancelLoading}
++            >
++              {t('common.cancel')}
++            </Button>
++            <Button variant="danger" onClick={() => void handleConfirmCancel()} disabled={cancelLoading}>
++              {cancelLoading ? t('common.cancelling') : t('common.confirm_cancel')}
++            </Button>
++          </DialogFooter>
++        </DialogContent>
++      </Dialog>
++
+       <TableTransferDialog
+         open={transferSourceTable !== null}
+         onOpenChange={(open) => {

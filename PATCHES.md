@@ -3264,6 +3264,52 @@ tap and no page reload (page loaded 247 s earlier) (step 2, cancel of a draft, p
 path (POS Invoice on_submit), a cancel of a paid order or from the desk, a printer off (step 3), Arabic, a waiter's
 own login on a phone.
 
+### Patch 74 — The till's Tables page reloads by itself and cancels a busy table's order
+
+Ticket 99 (owner requests 2026-11-18). The till's Tables page showed a table free until the cashier left the
+page or reloaded, even after a waiter sent an order on it; and a busy table's order could be cancelled only from
+Orders.
+
+Files touched: `pos/src/pages/Table.tsx` (live reload, cancel window), `pos/src/components/TableCard.tsx` and
+`pos/src/components/TableActionsMenu.tsx` (`onCancelOrder`, a red "Annuler la commande" entry in a busy table's ⋮
+menu)
+
+What it does:
+- Live reload: listens to `erp_tables_<branch>` (erp_restaurant `table_refresh.py`, sent after commit when a table
+  order is saved, paid or cancelled) and reloads the room on screen half a second later, without the loading grid
+  (`loadTables` option `quiet`: no loading state, the current tables kept on a network error, an answer for a
+  room no longer on screen only cached); other rooms are fetched again when opened; a socket (re)connection
+  reloads too.
+  The waiter Tables page (Patch 73) gets the same events, so it also shows other waiters' new orders.
+- Cancel: "Annuler la commande" (busy tables not merged with others, hidden for a user restricted from table
+  orders; the menu is anchored with `end-0` so it opens inside the page in Arabic) first finds the table's open
+  order (`getTableOrder`) and checks the user's cancel right on it (`frappe.client.has_permission`, as Orders
+  shows its cancel button), else "Vous n'avez pas le droit de modifier cette commande."; then the reason window of
+  Orders (same texts) and the same `cancel_order` endpoint (erp_restaurant's, permission and
+  branch checked there) and prints the "Cancelled" kitchen ticket as Orders does (Patches 10 and 37). A refusal
+  shows the server's message. No new text (keys `order.cancel_order`, `order.enter_cancel_reason`,
+  `common.confirm_cancel`...).
+
+Why it can't be done in `erp_restaurant`: a menu entry, a window and a reload on a page of the POS React app; the
+event and the cancel itself are server-side and already in erp_restaurant.
+
+Risk profile: low to medium. `Table.tsx` also carries Patches 53, 61, 64 and 73; the menu also Patch 61. The
+cancel uses the order found for the table at that moment (merged tables: the group's order, released by
+cancel_order).
+
+Acceptance criteria and manual test (test-dev or test-cours, till Tables page open, waiter app in another tab or
+device):
+1. A waiter sends an order on a free table: the till shows it busy within about a second, no tap, no loading grid.
+2. The order is paid or cancelled elsewhere: the table shows free.
+3. ⋮ on a busy table: "Annuler la commande" in red; reason required; confirm: toast, the table free, the order
+   cancelled with the reason, the "Cancelled" kitchen ticket printed when auto print is on.
+4. A free table's ⋮ menu has no cancel entry; nor a table merged with others (cancel those from Orders).
+5. A user without the cancel right on POS Invoice: "Vous n'avez pas le droit de modifier cette commande." and no
+   reason window.
+6. Arabic: the ⋮ menu opens inside the page, entry in red.
+
+Patch file: `patches/74-tables-live-reload-cancel.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

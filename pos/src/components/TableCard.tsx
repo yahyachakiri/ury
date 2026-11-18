@@ -25,6 +25,7 @@ interface TableCardProps {
   onTransferTable?: () => void;
   onTransferCaptain?: () => void;
   showCaptainTransfer?: boolean;
+  onCancelOrder?: () => void; // Patch 74
   onNavigate: () => void;
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -43,6 +44,7 @@ const TableCard = ({
   onTransferTable,
   onTransferCaptain,
   showCaptainTransfer = false,
+  onCancelOrder,
   onNavigate,
   onPreview,
   onPrint,
@@ -98,6 +100,7 @@ const TableCard = ({
               onTransferTable={onTransferTable}
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
+              onCancelOrder={onCancelOrder}
             />
             </span>
           </div>

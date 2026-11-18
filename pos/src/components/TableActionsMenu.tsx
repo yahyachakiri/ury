@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
+import { ArrowRightLeft, Ban, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 import { isMergedTable } from '../lib/table-utils';
@@ -14,6 +14,8 @@ interface TableActionsMenuProps {
   onTransferTable?: () => void;
   onTransferCaptain?: () => void;
   showCaptainTransfer?: boolean;
+  /** Patch 74: cancel the busy table's order from the Tables page. */
+  onCancelOrder?: () => void;
 }
 
 const TableActionsMenu = ({
@@ -25,6 +27,7 @@ const TableActionsMenu = ({
   onTransferTable,
   onTransferCaptain,
   showCaptainTransfer = false,
+  onCancelOrder,
 }: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isAvailable = table.occupied === 0;
@@ -74,6 +77,12 @@ const TableActionsMenu = ({
     onTransferCaptain?.();
   };
 
+  const handleCancelOrder = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onCancelOrder?.();
+  };
+
   const hasAvailableActions = isAvailable;
   const hasOccupiedActions =
     isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain));
@@ -96,7 +105,7 @@ const TableActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute end-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
           {isAvailable && (
             <>
               <Button
@@ -152,6 +161,19 @@ const TableActionsMenu = ({
                   <UserRound className="h-4 w-4 shrink-0" />
                   {t('tables.transfer_captain')}
                 </Button>
+              )}
+              {onCancelOrder && (
+                <>
+                  <div className="my-1 border-t border-gray-100" />
+                  <Button
+                    variant="ghost"
+                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                    onClick={handleCancelOrder}
+                  >
+                    <Ban className="h-4 w-4 shrink-0" />
+                    {t('order.cancel_order')}
+                  </Button>
+                </>
               )}
             </>
           )}
