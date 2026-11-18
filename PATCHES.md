@@ -3210,6 +3210,16 @@ Acceptance criteria and manual test (test-dev, /pos/order, a table with an order
 
 Patch file: `patches/72-waiter-header-phone.patch`. Commit: 47526e0b.
 
+Browser check 2026-11-18 (test-dev, ury b2763c81, Administrator in French, T3's order loaded in same-site frames
+360, 375 and 430 px wide, since the Chrome window cannot go below 500 px): ⋮ fully visible at 312-348, 327-363 and
+382-418 px, no sideways scroll at any width; tabs icon-only with the count at 360 and 375 px (40 and 68 px wide),
+labels shown at 430 px; title "Table T3" kept, subtitle cut with "…"; the ⋮ menu opens at 124-348 px with
+"Transférer la table", "Changer de serveur", "Imprimer l'addition" (step 1 except the print, step 2). Right to left
+(page set to dir="rtl" in the frames; the user's French language comes first, so not the Arabic texts): ⋮ at
+12-48 px at every width, its menu at 12-236 px, inside the screen (step 4 layout). Not checked: printing the bill
+(it would lock T3's order), switching tabs (step 3), a long table name (step 5), Arabic texts, a real phone. Seen
+on the way, not changed: the back chevron is not mirrored in right to left.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
