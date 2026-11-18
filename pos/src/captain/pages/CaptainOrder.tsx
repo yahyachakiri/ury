@@ -704,6 +704,7 @@ export default function CaptainOrder() {
       />
 
       <CommentDialog
+        key={noteEditingLine?.uniqueId ?? 'note-closed'} // Patch 71: the tapped line's note each time
         isOpen={noteEditingLine !== null}
         onClose={() => setNoteEditingLine(null)}
         onSave={handleSaveConfirmedNote}

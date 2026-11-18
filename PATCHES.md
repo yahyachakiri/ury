@@ -3142,6 +3142,35 @@ Patch file: `patches/70-waiter-app-logout.patch`. Commit: 801da0d4. Follow-up 03
 
 Browser check 2026-11-17 (test-dev, Chrome 1920 px wide, French, Administrator, ury 51f88479): the logout icon is at the end of the waiter Tables header after "Actualiser"; one tap shows "Déconnexion" next to the icon and it goes back to the icon after 4 seconds, still logged in (step 2, wide screen only). Without the mouse over it the label is red; under the mouse it was dark (the button's hover colour): fixed in 03ac6833 (`hover:text-red-600`), deployed, not looked at again. Not checked: the second tap and the login page (step 3: it would have logged the owner's browser out of test-dev), 360 px in French and Arabic, Arabic, English, the Reflowgo app, a failed logout.
 
+### Patch 71 — The waiter app's note window shows the tapped item's note
+
+Owner report 2026-11-18: in the waiter app, tapping an item under "Déjà commandé" opened the note window empty
+the first time, and afterwards it showed the note of the item tapped before; closing and reopening showed the
+right note. Cause: `CommentDialog` copies `initialComment` into its state only when it is first created
+(`useState(initialComment)`), and `CaptainOrder.tsx` keeps one note window mounted for every line (it only
+hides it while closed), so the text box kept the first value it was given.
+
+Files touched: `pos/src/captain/pages/CaptainOrder.tsx` (one `key` on the line-note `CommentDialog`)
+
+What it does: the note window gets a `key` per line (`noteEditingLine.uniqueId`, a fixed key while closed), so
+React builds a new window each time a line is tapped and the text box starts from that line's note. Same
+technique as Patch 63's removal-reason window. `CommentDialog.tsx` (shared with the till) is unchanged. No new
+text.
+
+Why it can't be done in `erp_restaurant`: the text box value of a React window in the POS app; the server is
+not involved.
+
+Risk profile: low. One attribute in `CaptainOrder.tsx` (also carried by Patches 17, 46, 63, 68 and 69).
+
+Acceptance criteria and manual test (test-dev, /pos/order, a table with two sent items with different notes):
+1. Tap the first item: the window shows its note, at the first opening.
+2. Close, tap the second item: the window shows the second item's note, not the first's.
+3. Tap an item without a note: the box is empty.
+4. Change a note and save, tap the same item again: the new note shows. Cancel after typing: the next opening
+   shows the saved note, not the typed text.
+
+Patch file: `patches/71-waiter-note-dialog-value.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

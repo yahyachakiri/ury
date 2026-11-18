@@ -1,0 +1,12 @@
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index 0c1276d4..ef8540e4 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -704,6 +704,7 @@ export default function CaptainOrder() {
+       />
+ 
+       <CommentDialog
++        key={noteEditingLine?.uniqueId ?? 'note-closed'} // Patch 71: the tapped line's note each time
+         isOpen={noteEditingLine !== null}
+         onClose={() => setNoteEditingLine(null)}
+         onSave={handleSaveConfirmedNote}
