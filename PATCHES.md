@@ -3360,6 +3360,17 @@ Acceptance criteria and manual test (test-dev, waiter app /pos/order):
 
 Patch file: `patches/75-waiter-merge-tables.patch`. Commit: cb67de1e.
 
+Browser check 2026-11-18 (test-dev, ury 6156dcf5, Administrator in French; the waiter app in a 360 px same-site
+frame): ⋮ on T1, T3, T4, T5, T6, T7 (T3 and T6 "À moi"), none on T2 and T8 (bill printed); the list ("Fusionner
+les tables") stays on screen for a left-column card (T1, 137-329 px) and a right-column one (T4, 150-342 px), and
+with right to left forced (T1 29-221, T4 16-208). Merge window from T4: one column (263 px rows), names readable,
+busy T3 and T6 not offered; T5 picked: cards "T4 + T5" and "T5 + T4" (step 1). ⋮ on T4: "Séparer les tables",
+window "Séparer le groupe de tables ? Cela séparera T4, T5.", both free again (step 2). Not checked: merging the
+waiter's own busy table (left alone: a busy group cannot be split until paid), another waiter's table, a
+waiter's own login, a phone, Arabic texts, the till's Tables page after the TableActionsMenu and TableMergeDialog
+changes. Seen: T2 and T8 offered as free in the merge window while the waiter cards show "Addition imprimée" (old
+test-dev data: printed drafts on tables URY marks free).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
