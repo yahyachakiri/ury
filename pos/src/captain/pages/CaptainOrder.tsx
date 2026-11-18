@@ -530,18 +530,19 @@ export default function CaptainOrder() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* Patch 72: the actions button stays in view on a phone (title cut, tab labels hidden under 420 px) */}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label={t('captain.back_to_tables')}>
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="font-semibold text-gray-900 leading-tight">Table {table}</h1>
-            <p className="text-xs text-gray-500">{isUpdatingOrder ? t('captain.updating_order') : t('captain.new_order')}</p>
+          <div className="min-w-0">
+            <h1 className="font-semibold text-gray-900 leading-tight truncate">Table {table}</h1>
+            <p className="text-xs text-gray-500 truncate">{isUpdatingOrder ? t('captain.updating_order') : t('captain.new_order')}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {canModify && (
             <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 lg:hidden">
               <button
@@ -552,7 +553,7 @@ export default function CaptainOrder() {
                 )}
               >
                 <UtensilsCrossed className="w-4 h-4" />
-                {t('captain.tab_menu')}
+                <span className="sr-only min-[420px]:not-sr-only">{t('captain.tab_menu')}</span>
               </button>
               <button
                 onClick={() => setMode('order')}
@@ -562,7 +563,7 @@ export default function CaptainOrder() {
                 )}
               >
                 <ClipboardList className="w-4 h-4" />
-                {t('captain.tab_order')}
+                <span className="sr-only min-[420px]:not-sr-only">{t('captain.tab_order')}</span>
                 {activeOrders.length > 0 && (
                   <span className="ms-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-blue-600 text-white text-xs">
                     {activeOrders.length}

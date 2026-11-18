@@ -3178,6 +3178,38 @@ Frites without a note: empty box), step 4 passed (Cancel after typing " XYZ" sho
 shows Note C on reopening; not sent). Test order INV-00084 cancelled, T1 free. Not checked: Arabic, English, a
 real phone, the waiter's own login.
 
+### Patch 72 — The waiter order header keeps its actions button on a phone
+
+Owner report 2026-11-18 (iPhone, about 370 px wide): on a table's order page in the waiter app, the ⋮ button
+(reprint kitchen ticket, move table, change waiter, print the bill) was pushed off the right edge of the screen,
+so the waiter could not print the bill. The header row (back button, "Table T4" with "Modification de la
+commande", the Menu / Commande switch with its count, ⋮) needs about 470 px.
+
+Files touched: `pos/src/captain/pages/CaptainOrder.tsx` (header classes and the two tab buttons),
+`pos/src/captain/components/CaptainActionsMenu.tsx` (menu anchored with `end-0` instead of `right-0`)
+
+What it does: the right group (switch and ⋮) never shrinks (`shrink-0`); the title block can shrink and cuts
+"Table …" and the subtitle with "…" (`min-w-0`, `truncate`); under 420 px the Menu and Commande tabs show only
+their icon (and the count badge); the label stays readable by screen readers (`sr-only`, shown again from 420 px
+with `not-sr-only`), so the count is still announced. From 420 px nothing changes; the desktop layout (`lg:`)
+hides the switch as before. The ⋮ menu is anchored to the button's inner side (`end-0`), so in Arabic, where ⋮
+is at the left edge, it opens towards the screen instead of past its left edge. No new text.
+
+Why it can't be done in `erp_restaurant`: layout of a page of the POS React app.
+
+Risk profile: low. Classes and one wrapper span per tab in `CaptainOrder.tsx` (also carried by Patches 17, 46,
+63, 68, 69 and 71); one class in `CaptainActionsMenu.tsx`.
+
+Acceptance criteria and manual test (test-dev, /pos/order, a table with an order):
+1. At 360 and 375 px wide (French and Arabic): the ⋮ button is fully visible, opens its menu, and "Imprimer
+   l'addition" prints; the tabs show icons, the Commande count is readable; no sideways scroll.
+2. At 430 px: tab labels shown, ⋮ visible.
+3. Tapping each tab still switches between Menu and Commande.
+4. Arabic: ⋮ on the left edge, fully visible; its menu opens inside the screen.
+5. A long table name (or a 2-digit count): the name is cut with "…", ⋮ still visible.
+
+Patch file: `patches/72-waiter-header-phone.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
