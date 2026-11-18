@@ -3171,6 +3171,13 @@ Acceptance criteria and manual test (test-dev, /pos/order, a table with two sent
 
 Patch file: `patches/71-waiter-note-dialog-value.patch`. Commit: 2d4f0fd9.
 
+Browser check 2026-11-18 (test-dev, Chrome 500 px wide, French, Administrator, ury a7ef21ec): T1 order with
+Coca-Cola "Note A sans glace" and Frites "Note B bien cuites" sent, then under "Déjà commandé": step 1 passed
+(first tap on Coca-Cola shows Note A), step 2 passed (Frites next shows Note B, not Note A), step 3 passed (T3's
+Frites without a note: empty box), step 4 passed (Cancel after typing " XYZ" shows Note B again; "Note C" saved
+shows Note C on reopening; not sent). Test order INV-00084 cancelled, T1 free. Not checked: Arabic, English, a
+real phone, the waiter's own login.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
