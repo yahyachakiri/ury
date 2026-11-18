@@ -142,7 +142,7 @@ const TableMergeDialog = ({
                   {t('tables.no_tables_to_merge')}
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {mergeCandidates.map((table) => {
                     const isSelected = selectedTargets.has(table.name);
                     return (
@@ -151,7 +151,7 @@ const TableMergeDialog = ({
                         type="button"
                         onClick={() => toggleTarget(table.name)}
                         className={cn(
-                          'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
+                          'flex items-center gap-2 rounded-lg border-2 p-3 text-start transition-all',
                           isSelected
                             ? 'border-primary bg-primary-50'
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'

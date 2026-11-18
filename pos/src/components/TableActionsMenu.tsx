@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ArrowRightLeft, Ban, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
@@ -48,8 +48,17 @@ const TableActionsMenu = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
+  // Patch 75: the 192 px list opens towards the screen when it would run past an edge (a waiter
+  // card in a phone's two-column grid), in either direction.
+  const [alignStart, setAlignStart] = useState(false);
+
   const handleToggle = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (!isOpen && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const rtl = getComputedStyle(menuRef.current).direction === 'rtl';
+      setAlignStart(rtl ? rect.left + 192 > window.innerWidth - 8 : rect.right - 192 < 8);
+    }
     onOpenChange(!isOpen);
   };
 
@@ -105,7 +114,7 @@ const TableActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute end-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className={`absolute ${alignStart ? 'start-0' : 'end-0'} top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg`}>
           {isAvailable && (
             <>
               <Button

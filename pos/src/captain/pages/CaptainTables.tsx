@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, LogOut, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
-import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
+import { getRooms, getTables, mergeTablesBatch, unmergeTables, type Room, type Table } from '../../lib/table-api';
+import { getMergeGroupMembers, isMergedTable, sortTablesByMergeGroups } from '../../lib/table-utils';
+import TableActionsMenu from '../../components/TableActionsMenu';
+import TableMergeDialog from '../../components/TableMergeDialog';
+import TableUnmergeDialog from '../../components/TableUnmergeDialog';
 import {
   getActiveTableOrders,
   getUserFullNames,
@@ -14,7 +17,7 @@ import CaptainTableCard, {
   type CaptainTableOwnership,
 } from '../components/CaptainTableCard';
 import { getActiveLanguage, t } from '../../i18n';
-import { call, logout } from '@ury/core';
+import { call, logout, parseFrappeError } from '@ury/core';
 import type { Socket } from 'socket.io-client';
 import { getRealtimeSocket } from '../../lib/realtime';
 
@@ -46,6 +49,10 @@ export default function CaptainTables() {
   const [ownerNames, setOwnerNames] = useState<Map<string, string>>(new Map());
   const [tablesLoading, setTablesLoading] = useState(false);
   const [tablesError, setTablesError] = useState<string | null>(null);
+  // Patch 75: waiters merge and unmerge tables with the till's ⋮ menu and windows.
+  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
+  const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
 
   // `get_captain_context()`'s `rooms` field (from `getRoom()` in
   // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
@@ -176,6 +183,55 @@ export default function CaptainTables() {
     [currentUser]
   );
 
+  // Patch 75: a waiter may merge a free table, or a busy one they may open (theirs, or any with the
+  // transfer / billing right); a table whose bill is printed is left to the till.
+  const canMergeFrom = useCallback(
+    (table: Table, order: ActiveTableOrder | undefined) => {
+      if (order?.invoicePrinted) return false;
+      const ownership = resolveOwnership(table, order);
+      return ownership === 'free' || ownership === 'mine' || canAccessOtherCaptainsTables;
+    },
+    [resolveOwnership, canAccessOtherCaptainsTables]
+  );
+
+  const mergeAvailableTables = useMemo(() => {
+    if (!mergeSourceTable) return [];
+    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
+    // URY's merge_tables_batch refuses a busy target and one already in another group.
+    return tables.filter(
+      (table) => !sourceCluster.has(table.name) && table.occupied !== 1 && !isMergedTable(table)
+    );
+  }, [mergeSourceTable, tables]);
+
+  const unmergeGroupMembers = useMemo(
+    () => (unmergeSourceTable ? getMergeGroupMembers(unmergeSourceTable, tables) : []),
+    [unmergeSourceTable, tables]
+  );
+
+  const handleMergeConfirm = async (targetNames: string[]) => {
+    if (!mergeSourceTable || targetNames.length === 0) return;
+    try {
+      await mergeTablesBatch(mergeSourceTable.name, targetNames);
+      refresh();
+      showToast.success(t('tables.merge_success'));
+    } catch (error) {
+      showToast.error(parseFrappeError(error, t('tables.merge_failed')));
+      throw error;
+    }
+  };
+
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      refresh();
+      showToast.success(t('tables.unmerge_success'));
+    } catch (error) {
+      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
+      throw error;
+    }
+  };
+
   const handleTableTap = (table: Table, order: ActiveTableOrder | undefined) => {
     const ownership = resolveOwnership(table, order);
 
@@ -278,21 +334,56 @@ export default function CaptainTables() {
                 (name) => name !== table.name
               );
 
+              const showMenu = canMergeFrom(table, order);
+
               return (
+                <div key={table.name} className="relative">
                 <CaptainTableCard
-                  key={table.name}
                   table={table}
                   order={order}
                   ownership={ownership}
                   ownerName={ownership === 'mine' ? undefined : ownerName}
                   mergePartners={mergePartners}
+                  reserveMenuSpace={showMenu}
                   onTap={() => handleTableTap(table, order)}
                 />
+                {/* Patch 75: the till's table menu, merge and unmerge only. */}
+                {showMenu && (
+                  <div className="absolute end-1 top-1.5">
+                    <TableActionsMenu
+                      table={table}
+                      isOpen={menuOpenForTable === table.name}
+                      onOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+                      onMerge={() => setMergeSourceTable(table)}
+                      onUnmerge={isMergedTable(table) ? () => setUnmergeSourceTable(table) : undefined}
+                    />
+                  </div>
+                )}
+                </div>
               );
             })}
           </div>
         )}
       </div>
+
+      <TableMergeDialog
+        open={mergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setMergeSourceTable(null);
+        }}
+        sourceTable={mergeSourceTable}
+        availableTables={mergeAvailableTables}
+        onConfirm={handleMergeConfirm}
+      />
+      <TableUnmergeDialog
+        open={unmergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeSourceTable(null);
+        }}
+        sourceTable={unmergeSourceTable}
+        groupMembers={unmergeGroupMembers}
+        onConfirm={handleUnmergeConfirm}
+      />
     </div>
   );
 }

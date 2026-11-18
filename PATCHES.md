@@ -3320,6 +3320,46 @@ passed); same on T1 (INV-00086). Not checked: the "Cancelled" kitchen ticket on 
 merged table, a user without the cancel right, Arabic, the payment event, test-cours (migrated and cache cleared
 for the owner's test).
 
+### Patch 75 — Waiters merge and unmerge tables
+
+Ticket 101 (owner request 2026-11-18: "the waiters should be able to merge tables"). URY's waiter app shows a merge
+on a table card ("+ T2, T3") but has no way to make one: only the till's Tables page has "Fusionner les tables".
+The server endpoints (`merge_tables_batch`, `unmerge_tables` in `ury_order.py`) check no role.
+
+Files touched: `pos/src/captain/pages/CaptainTables.tsx` (menu over each card, merge and unmerge windows),
+`pos/src/captain/components/CaptainTableCard.tsx` (`reserveMenuSpace`: room for the menu at the top end),
+`pos/src/components/TableActionsMenu.tsx` (the list opens towards the screen when it would run past an edge),
+`pos/src/components/TableMergeDialog.tsx` (one column under 640 px, rows `text-start`; the till, 1024 px and wider,
+keeps two columns)
+
+What it does: the till's table ⋮ menu (`TableActionsMenu`, Patch 74's `end-0`) sits in the top corner of a
+waiter's table card, next to it (not inside the card's button), with "Fusionner les tables" and, on a free merged
+table, "Défusionner les tables". They open the till's own windows (`TableMergeDialog`, `TableUnmergeDialog`) and
+call the same endpoints; the page then reloads. The menu is shown on a free table and on a busy table the waiter
+may open (theirs, or any with the transfer / billing right, as tapping it); not on a table whose bill is printed.
+The merge window lists only free tables not already in a group (URY's `merge_tables_batch` refuses a busy target
+and one from another group, also on the till). The ⋮ list (192 px) is measured when it opens and anchored to the
+side that keeps it on screen, so a left-column card on a phone (and a right-column one in Arabic) opens inward. No
+new text.
+
+Why it can't be done in `erp_restaurant`: buttons and windows on a page of the POS React app; the server side is
+URY's and needs no change.
+
+Risk profile: low. Reuses three till components; `CaptainTables.tsx` also carries Patches 17, 46, 63, 70 and 73.
+
+Acceptance criteria and manual test (test-dev, waiter app /pos/order):
+1. ⋮ on a free table: "Fusionner les tables"; pick two free tables: one card shows "+ T2, T3"; the till's Tables
+   page shows the group too.
+2. ⋮ on that free merged table: "Défusionner les tables" splits it back.
+3. ⋮ on the waiter's own busy table: merge with free tables; the order stays on the group. Another waiter's busy
+   table: no menu (unless transfer / billing right). A bill-printed table: no menu.
+4. A tap on the card still opens the table; at 360 px the ⋮ does not cover the table name and its list stays on
+   screen for a card in either column, in French and Arabic.
+5. At 360 px the merge window lists one table per row with the name readable; only free, unmerged tables.
+6. Till Tables page: the ⋮ list and the merge window look as before.
+
+Patch file: `patches/75-waiter-merge-tables.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

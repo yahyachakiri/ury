@@ -15,6 +15,8 @@ export interface CaptainTableCardProps {
   ownerName?: string;
   /** Names of other tables merged into this one's cluster (excludes `table.name` itself). */
   mergePartners?: string[];
+  /** Patch 75: room at the top end for the ⋮ menu drawn over the card. */
+  reserveMenuSpace?: boolean;
   onTap: () => void;
 }
 
@@ -48,6 +50,7 @@ const CaptainTableCard = ({
   ownership,
   ownerName,
   mergePartners,
+  reserveMenuSpace = false,
   onTap,
 }: CaptainTableCardProps) => {
   const isOccupied = table.occupied === 1;
@@ -90,7 +93,7 @@ const CaptainTableCard = ({
         colorClasses
       )}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className={cn('flex items-start justify-between gap-2', reserveMenuSpace && 'pe-8')}>
         <span className="truncate text-lg font-bold" title={table.name}>
           {table.name}
         </span>

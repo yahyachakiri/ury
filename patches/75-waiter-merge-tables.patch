@@ -1,0 +1,241 @@
+diff --git a/pos/src/captain/components/CaptainTableCard.tsx b/pos/src/captain/components/CaptainTableCard.tsx
+index c0899946..f4cb7f91 100644
+--- a/pos/src/captain/components/CaptainTableCard.tsx
++++ b/pos/src/captain/components/CaptainTableCard.tsx
+@@ -15,6 +15,8 @@ export interface CaptainTableCardProps {
+   ownerName?: string;
+   /** Names of other tables merged into this one's cluster (excludes `table.name` itself). */
+   mergePartners?: string[];
++  /** Patch 75: room at the top end for the ⋮ menu drawn over the card. */
++  reserveMenuSpace?: boolean;
+   onTap: () => void;
+ }
+ 
+@@ -48,6 +50,7 @@ const CaptainTableCard = ({
+   ownership,
+   ownerName,
+   mergePartners,
++  reserveMenuSpace = false,
+   onTap,
+ }: CaptainTableCardProps) => {
+   const isOccupied = table.occupied === 1;
+@@ -90,7 +93,7 @@ const CaptainTableCard = ({
+         colorClasses
+       )}
+     >
+-      <div className="flex items-start justify-between gap-2">
++      <div className={cn('flex items-start justify-between gap-2', reserveMenuSpace && 'pe-8')}>
+         <span className="truncate text-lg font-bold" title={table.name}>
+           {table.name}
+         </span>
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index cc5eb76c..b1788956 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
+ import { AlertTriangle, LogOut, Square } from 'lucide-react';
+ import { Button, Spinner, showToast } from '@ury/ui';
+ import { useCaptainContext } from '../hooks/useCaptainContext';
+-import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
+-import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
++import { getRooms, getTables, mergeTablesBatch, unmergeTables, type Room, type Table } from '../../lib/table-api';
++import { getMergeGroupMembers, isMergedTable, sortTablesByMergeGroups } from '../../lib/table-utils';
++import TableActionsMenu from '../../components/TableActionsMenu';
++import TableMergeDialog from '../../components/TableMergeDialog';
++import TableUnmergeDialog from '../../components/TableUnmergeDialog';
+ import {
+   getActiveTableOrders,
+   getUserFullNames,
+@@ -14,7 +17,7 @@ import CaptainTableCard, {
+   type CaptainTableOwnership,
+ } from '../components/CaptainTableCard';
+ import { getActiveLanguage, t } from '../../i18n';
+-import { call, logout } from '@ury/core';
++import { call, logout, parseFrappeError } from '@ury/core';
+ import type { Socket } from 'socket.io-client';
+ import { getRealtimeSocket } from '../../lib/realtime';
+ 
+@@ -46,6 +49,10 @@ export default function CaptainTables() {
+   const [ownerNames, setOwnerNames] = useState<Map<string, string>>(new Map());
+   const [tablesLoading, setTablesLoading] = useState(false);
+   const [tablesError, setTablesError] = useState<string | null>(null);
++  // Patch 75: waiters merge and unmerge tables with the till's ⋮ menu and windows.
++  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
++  const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
++  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
+ 
+   // `get_captain_context()`'s `rooms` field (from `getRoom()` in
+   // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
+@@ -176,6 +183,55 @@ export default function CaptainTables() {
+     [currentUser]
+   );
+ 
++  // Patch 75: a waiter may merge a free table, or a busy one they may open (theirs, or any with the
++  // transfer / billing right); a table whose bill is printed is left to the till.
++  const canMergeFrom = useCallback(
++    (table: Table, order: ActiveTableOrder | undefined) => {
++      if (order?.invoicePrinted) return false;
++      const ownership = resolveOwnership(table, order);
++      return ownership === 'free' || ownership === 'mine' || canAccessOtherCaptainsTables;
++    },
++    [resolveOwnership, canAccessOtherCaptainsTables]
++  );
++
++  const mergeAvailableTables = useMemo(() => {
++    if (!mergeSourceTable) return [];
++    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
++    // URY's merge_tables_batch refuses a busy target and one already in another group.
++    return tables.filter(
++      (table) => !sourceCluster.has(table.name) && table.occupied !== 1 && !isMergedTable(table)
++    );
++  }, [mergeSourceTable, tables]);
++
++  const unmergeGroupMembers = useMemo(
++    () => (unmergeSourceTable ? getMergeGroupMembers(unmergeSourceTable, tables) : []),
++    [unmergeSourceTable, tables]
++  );
++
++  const handleMergeConfirm = async (targetNames: string[]) => {
++    if (!mergeSourceTable || targetNames.length === 0) return;
++    try {
++      await mergeTablesBatch(mergeSourceTable.name, targetNames);
++      refresh();
++      showToast.success(t('tables.merge_success'));
++    } catch (error) {
++      showToast.error(parseFrappeError(error, t('tables.merge_failed')));
++      throw error;
++    }
++  };
++
++  const handleUnmergeConfirm = async () => {
++    if (!unmergeSourceTable) return;
++    try {
++      await unmergeTables(unmergeSourceTable.name);
++      refresh();
++      showToast.success(t('tables.unmerge_success'));
++    } catch (error) {
++      showToast.error(parseFrappeError(error, t('tables.unmerge_failed')));
++      throw error;
++    }
++  };
++
+   const handleTableTap = (table: Table, order: ActiveTableOrder | undefined) => {
+     const ownership = resolveOwnership(table, order);
+ 
+@@ -278,21 +334,56 @@ export default function CaptainTables() {
+                 (name) => name !== table.name
+               );
+ 
++              const showMenu = canMergeFrom(table, order);
++
+               return (
++                <div key={table.name} className="relative">
+                 <CaptainTableCard
+-                  key={table.name}
+                   table={table}
+                   order={order}
+                   ownership={ownership}
+                   ownerName={ownership === 'mine' ? undefined : ownerName}
+                   mergePartners={mergePartners}
++                  reserveMenuSpace={showMenu}
+                   onTap={() => handleTableTap(table, order)}
+                 />
++                {/* Patch 75: the till's table menu, merge and unmerge only. */}
++                {showMenu && (
++                  <div className="absolute end-1 top-1.5">
++                    <TableActionsMenu
++                      table={table}
++                      isOpen={menuOpenForTable === table.name}
++                      onOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
++                      onMerge={() => setMergeSourceTable(table)}
++                      onUnmerge={isMergedTable(table) ? () => setUnmergeSourceTable(table) : undefined}
++                    />
++                  </div>
++                )}
++                </div>
+               );
+             })}
+           </div>
+         )}
+       </div>
++
++      <TableMergeDialog
++        open={mergeSourceTable !== null}
++        onOpenChange={(open) => {
++          if (!open) setMergeSourceTable(null);
++        }}
++        sourceTable={mergeSourceTable}
++        availableTables={mergeAvailableTables}
++        onConfirm={handleMergeConfirm}
++      />
++      <TableUnmergeDialog
++        open={unmergeSourceTable !== null}
++        onOpenChange={(open) => {
++          if (!open) setUnmergeSourceTable(null);
++        }}
++        sourceTable={unmergeSourceTable}
++        groupMembers={unmergeGroupMembers}
++        onConfirm={handleUnmergeConfirm}
++      />
+     </div>
+   );
+ }
+diff --git a/pos/src/components/TableActionsMenu.tsx b/pos/src/components/TableActionsMenu.tsx
+index de405c1d..9f67f830 100644
+--- a/pos/src/components/TableActionsMenu.tsx
++++ b/pos/src/components/TableActionsMenu.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
++import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+ import { ArrowRightLeft, Ban, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
+ import { Button } from '@ury/ui';
+ import { t } from '../i18n';
+@@ -48,8 +48,17 @@ const TableActionsMenu = ({
+     return () => document.removeEventListener('mousedown', handleClickOutside);
+   }, [isOpen, onOpenChange]);
+ 
++  // Patch 75: the 192 px list opens towards the screen when it would run past an edge (a waiter
++  // card in a phone's two-column grid), in either direction.
++  const [alignStart, setAlignStart] = useState(false);
++
+   const handleToggle = (event: ReactMouseEvent<HTMLButtonElement>) => {
+     event.stopPropagation();
++    if (!isOpen && menuRef.current) {
++      const rect = menuRef.current.getBoundingClientRect();
++      const rtl = getComputedStyle(menuRef.current).direction === 'rtl';
++      setAlignStart(rtl ? rect.left + 192 > window.innerWidth - 8 : rect.right - 192 < 8);
++    }
+     onOpenChange(!isOpen);
+   };
+ 
+@@ -105,7 +114,7 @@ const TableActionsMenu = ({
+       </Button>
+ 
+       {isOpen && (
+-        <div className="absolute end-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
++        <div className={`absolute ${alignStart ? 'start-0' : 'end-0'} top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg`}>
+           {isAvailable && (
+             <>
+               <Button
+diff --git a/pos/src/components/TableMergeDialog.tsx b/pos/src/components/TableMergeDialog.tsx
+index de6c8b32..de5ca0fe 100644
+--- a/pos/src/components/TableMergeDialog.tsx
++++ b/pos/src/components/TableMergeDialog.tsx
+@@ -142,7 +142,7 @@ const TableMergeDialog = ({
+                   {t('tables.no_tables_to_merge')}
+                 </p>
+               ) : (
+-                <div className="grid grid-cols-2 gap-2">
++                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                   {mergeCandidates.map((table) => {
+                     const isSelected = selectedTargets.has(table.name);
+                     return (
+@@ -151,7 +151,7 @@ const TableMergeDialog = ({
+                         type="button"
+                         onClick={() => toggleTarget(table.name)}
+                         className={cn(
+-                          'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
++                          'flex items-center gap-2 rounded-lg border-2 p-3 text-start transition-all',
+                           isSelected
+                             ? 'border-primary bg-primary-50'
+                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
