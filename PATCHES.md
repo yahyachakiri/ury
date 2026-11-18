@@ -3427,6 +3427,18 @@ Acceptance criteria and manual test (test-dev or test-cours):
 
 Patch file: `patches/76-split-merged-tables.patch`. Commit: b221fe5b.
 
+Browser check 2026-11-18 (test-dev, ury 0f9cb38b + erp_restaurant f05df637, Administrator in French; the till in a
+1300 px frame and the waiter app in a 360 px frame side by side): waiter order on T1 (INV-00089); the till merged
+T1 with T4 and T5 and the waiter frame (never reloaded) showed "T1 + T4, T5" (step 4). Till ⋮ on T5: "Fusionner
+les tables", "Transférer le capitaine", "Séparer les tables" (grey), "Annuler la commande" (red) (step 9); window
+"Retirer des tables du groupe" with T1 locked "Commande", T4, T5 ticked, "Retirer 0"; T5 unticked, "Retirer 1":
+T5 free, T1 + T4 merged, the order's custom_merged_tables "T4", the waiter frame "T1 + T4" with no reload (step 1).
+Waiter frame ⋮ on T4 > Séparer les tables (window 360 px wide): T1 locked, T4; T4 unticked: the group gone, T1
+keeps its order, the till frame updated with no reload (step 2). Waiter: T4 + T5 + T7 merged free, T7 taken out:
+T4 + T5 still merged, the till showed "Avec T4 + T5" (step 3). Cleanup: T4 + T5 separated on the till, INV-00089
+cancelled from Tables, all four tables free. Not checked: Arabic and English (step 5), a server refusal message
+(step 6), a printed order's group (step 7), a stale printed draft in a group (step 8), a waiter's own login.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
