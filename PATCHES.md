@@ -3358,7 +3358,7 @@ Acceptance criteria and manual test (test-dev, waiter app /pos/order):
 5. At 360 px the merge window lists one table per row with the name readable; only free, unmerged tables.
 6. Till Tables page: the ⋮ list and the merge window look as before.
 
-Patch file: `patches/75-waiter-merge-tables.patch`. Commit: not committed yet.
+Patch file: `patches/75-waiter-merge-tables.patch`. Commit: cb67de1e.
 
 ## Build and deploy
 
