@@ -3253,7 +3253,7 @@ Acceptance criteria and manual test (test-dev; erp_restaurant with `table_refres
 3. Printer off: "Vous pouvez quand même encaisser", Orders opens with the order selected.
 4. Arabic: same.
 
-Patch file: `patches/73-print-opens-orders-waiter-refresh.patch`. Commit: not committed yet.
+Patch file: `patches/73-print-opens-orders-waiter-refresh.patch`. Commit: cf7a5854.
 
 ## Build and deploy
 
