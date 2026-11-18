@@ -3371,6 +3371,8 @@ waiter's own busy table (left alone: a busy group cannot be split until paid), a
 waiter's own login, a phone, Arabic texts, the till's Tables page after the TableActionsMenu and TableMergeDialog
 changes. Seen: T2 and T8 offered as free in the merge window while the waiter cards show "Addition imprimée" (old
 test-dev data: printed drafts on tables URY marks free).
+Follow-up 2026-11-18 (owner screenshot: cards shrunk to their content, ⋮ outside them): `w-full` on the card;
+seen in a 360 px frame on test-dev (ury 3bd0ca8d): cards 12-173 and 185-346 px, ⋮ inside each card's corner.
 
 ## Build and deploy
 
