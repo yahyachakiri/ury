@@ -3308,7 +3308,7 @@ device):
    reason window.
 6. Arabic: the ⋮ menu opens inside the page, entry in red.
 
-Patch file: `patches/74-tables-live-reload-cancel.patch`. Commit: not committed yet.
+Patch file: `patches/74-tables-live-reload-cancel.patch`. Commit: 4157069d.
 
 ## Build and deploy
 
