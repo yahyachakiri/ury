@@ -89,7 +89,8 @@ const CaptainTableCard = ({
       type="button"
       onClick={onTap}
       className={cn(
-        'flex min-h-[7.5rem] flex-col items-stretch rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98]',
+        // Patch 75: full width, the card now sits in a wrapper (with its ⋮ menu) rather than in the grid.
+        'flex w-full min-h-[7.5rem] flex-col items-stretch rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98]',
         colorClasses
       )}
     >

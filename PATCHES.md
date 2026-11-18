@@ -3327,7 +3327,8 @@ on a table card ("+ T2, T3") but has no way to make one: only the till's Tables 
 The server endpoints (`merge_tables_batch`, `unmerge_tables` in `ury_order.py`) check no role.
 
 Files touched: `pos/src/captain/pages/CaptainTables.tsx` (menu over each card, merge and unmerge windows),
-`pos/src/captain/components/CaptainTableCard.tsx` (`reserveMenuSpace`: room for the menu at the top end),
+`pos/src/captain/components/CaptainTableCard.tsx` (`reserveMenuSpace`: room for the menu at the top end; `w-full`,
+since the card button now sits in a wrapper instead of the grid and would shrink to its content),
 `pos/src/components/TableActionsMenu.tsx` (the list opens towards the screen when it would run past an edge),
 `pos/src/components/TableMergeDialog.tsx` (one column under 640 px, rows `text-start`; the till, 1024 px and wider,
 keeps two columns)
