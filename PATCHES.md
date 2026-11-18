@@ -3425,7 +3425,7 @@ Acceptance criteria and manual test (test-dev or test-cours):
 8. A group with an old printed draft on one table and the live order on another: both locked.
 9. A tap on the till's ⋮ list keeps "Séparer les tables" grey, above the red "Annuler la commande".
 
-Patch file: `patches/76-split-merged-tables.patch`. Commit: not committed yet.
+Patch file: `patches/76-split-merged-tables.patch`. Commit: b221fe5b.
 
 ## Build and deploy
 
