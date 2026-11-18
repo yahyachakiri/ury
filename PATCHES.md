@@ -3359,7 +3359,7 @@ Acceptance criteria and manual test (test-dev, waiter app /pos/order):
 5. At 360 px the merge window lists one table per row with the name readable; only free, unmerged tables.
 6. Till Tables page: the ⋮ list and the merge window look as before.
 
-Patch file: `patches/75-waiter-merge-tables.patch`. Commit: cb67de1e.
+Patch file: `patches/75-waiter-merge-tables.patch`. Commit: cb67de1e, follow-up 5b5e4542 (cards full width).
 
 Browser check 2026-11-18 (test-dev, ury 6156dcf5, Administrator in French; the waiter app in a 360 px same-site
 frame): ⋮ on T1, T3, T4, T5, T6, T7 (T3 and T6 "À moi"), none on T2 and T8 (bill printed); the list ("Fusionner
