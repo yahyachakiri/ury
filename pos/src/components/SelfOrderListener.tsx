@@ -307,6 +307,11 @@ const SelfOrderListener: React.FC = () => {
 
 const OPEN_ORDER_EVENT = 'erp-self-order-open';
 
+// Patch 73: the Tables page's Imprimer opens the printed order in Orders, selected.
+export function openOrderInOrders(invoice: string) {
+  window.dispatchEvent(new CustomEvent<string>(OPEN_ORDER_EVENT, { detail: invoice }));
+}
+
 function openInOrders(toastId: string, invoice: string) {
   // A dialog open (payment, cancel...) is about the order on screen: a tap must not switch it to
   // another order. The toast stays until the cashier is done.

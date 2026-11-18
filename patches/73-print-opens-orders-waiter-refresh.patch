@@ -1,0 +1,88 @@
+diff --git a/pos/src/captain/pages/CaptainTables.tsx b/pos/src/captain/pages/CaptainTables.tsx
+index f4c5faa8..cc5eb76c 100644
+--- a/pos/src/captain/pages/CaptainTables.tsx
++++ b/pos/src/captain/pages/CaptainTables.tsx
+@@ -15,6 +15,8 @@ import CaptainTableCard, {
+ } from '../components/CaptainTableCard';
+ import { getActiveLanguage, t } from '../../i18n';
+ import { call, logout } from '@ury/core';
++import type { Socket } from 'socket.io-client';
++import { getRealtimeSocket } from '../../lib/realtime';
+ 
+ /**
+  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
+@@ -133,6 +135,36 @@ export default function CaptainTables() {
+     if (branch) loadActiveOrders(branch);
+   }, [selectedRoom, branch, loadTables, loadActiveOrders]);
+ 
++  // Patch 73: a table order paid or cancelled at the till (erp_restaurant table_refresh.py,
++  // channel erp_tables_<branch>) reloads this page, so the waiter sees the table free without
++  // tapping "Actualiser"; a reconnect (sleep, Wi-Fi loss) reloads too, events were missed.
++  // Several events in a row give one reload.
++  useEffect(() => {
++    if (!branch) return;
++    const channel = `erp_tables_${branch}`;
++    let activeSocket: Socket | null = null;
++    let cancelled = false;
++    let timer: ReturnType<typeof setTimeout> | undefined;
++    const onEvent = () => {
++      clearTimeout(timer);
++      timer = setTimeout(refresh, 500);
++    };
++    getRealtimeSocket()
++      .then((s) => {
++        if (cancelled) return;
++        activeSocket = s;
++        s.on(channel, onEvent);
++        s.on('connect', onEvent);
++      })
++      .catch((error) => console.error('CaptainTables: realtime unavailable:', error));
++    return () => {
++      cancelled = true;
++      clearTimeout(timer);
++      activeSocket?.off(channel, onEvent);
++      activeSocket?.off('connect', onEvent);
++    };
++  }, [branch, refresh]);
++
+   const tableGroups = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
+ 
+   const resolveOwnership = useCallback(
+diff --git a/pos/src/components/SelfOrderListener.tsx b/pos/src/components/SelfOrderListener.tsx
+index 35c55c4e..61e57045 100644
+--- a/pos/src/components/SelfOrderListener.tsx
++++ b/pos/src/components/SelfOrderListener.tsx
+@@ -307,6 +307,11 @@ const SelfOrderListener: React.FC = () => {
+ 
+ const OPEN_ORDER_EVENT = 'erp-self-order-open';
+ 
++// Patch 73: the Tables page's Imprimer opens the printed order in Orders, selected.
++export function openOrderInOrders(invoice: string) {
++  window.dispatchEvent(new CustomEvent<string>(OPEN_ORDER_EVENT, { detail: invoice }));
++}
++
+ function openInOrders(toastId: string, invoice: string) {
+   // A dialog open (payment, cancel...) is about the order on screen: a tap must not switch it to
+   // another order. The toast stays until the cashier is done.
+diff --git a/pos/src/pages/Table.tsx b/pos/src/pages/Table.tsx
+index 20c044ea..b8f2277d 100644
+--- a/pos/src/pages/Table.tsx
++++ b/pos/src/pages/Table.tsx
+@@ -22,6 +22,7 @@ import TableTransferDialog from '../components/TableTransferDialog';
+ import CaptainTransferDialog from '../components/CaptainTransferDialog';
+ import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
+ import MergeLinkConnector from '../components/MergeLinkConnector';
++import { openOrderInOrders } from '../components/SelfOrderListener';
+ 
+ const TableView = () => {
+   const navigate = useNavigate();
+@@ -218,7 +219,8 @@ const TableView = () => {
+         });
+         showToast.error(t('errors.print_failed_pay_anyway', { reason: parseFrappeError(printError, t('errors.failed_print')) }));
+       }
+-      await loadTables(table.restaurant_room, { useCache: false });
++      // Patch 73: the printed order opens in Orders, selected, ready for its payment.
++      openOrderInOrders(invoiceId);
+     } catch (error) {
+       showToast.error(parseFrappeError(error, t('errors.failed_print')));
+     } finally {

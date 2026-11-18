@@ -22,6 +22,7 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import { openOrderInOrders } from '../components/SelfOrderListener';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -218,7 +219,8 @@ const TableView = () => {
         });
         showToast.error(t('errors.print_failed_pay_anyway', { reason: parseFrappeError(printError, t('errors.failed_print')) }));
       }
-      await loadTables(table.restaurant_room, { useCache: false });
+      // Patch 73: the printed order opens in Orders, selected, ready for its payment.
+      openOrderInOrders(invoiceId);
     } catch (error) {
       showToast.error(parseFrappeError(error, t('errors.failed_print')));
     } finally {

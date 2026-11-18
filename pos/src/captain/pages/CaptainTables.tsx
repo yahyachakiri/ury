@@ -15,6 +15,8 @@ import CaptainTableCard, {
 } from '../components/CaptainTableCard';
 import { getActiveLanguage, t } from '../../i18n';
 import { call, logout } from '@ury/core';
+import type { Socket } from 'socket.io-client';
+import { getRealtimeSocket } from '../../lib/realtime';
 
 /**
  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
@@ -132,6 +134,36 @@ export default function CaptainTables() {
     if (selectedRoom) loadTables(selectedRoom);
     if (branch) loadActiveOrders(branch);
   }, [selectedRoom, branch, loadTables, loadActiveOrders]);
+
+  // Patch 73: a table order paid or cancelled at the till (erp_restaurant table_refresh.py,
+  // channel erp_tables_<branch>) reloads this page, so the waiter sees the table free without
+  // tapping "Actualiser"; a reconnect (sleep, Wi-Fi loss) reloads too, events were missed.
+  // Several events in a row give one reload.
+  useEffect(() => {
+    if (!branch) return;
+    const channel = `erp_tables_${branch}`;
+    let activeSocket: Socket | null = null;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onEvent = () => {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 500);
+    };
+    getRealtimeSocket()
+      .then((s) => {
+        if (cancelled) return;
+        activeSocket = s;
+        s.on(channel, onEvent);
+        s.on('connect', onEvent);
+      })
+      .catch((error) => console.error('CaptainTables: realtime unavailable:', error));
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      activeSocket?.off(channel, onEvent);
+      activeSocket?.off('connect', onEvent);
+    };
+  }, [branch, refresh]);
 
   const tableGroups = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
 

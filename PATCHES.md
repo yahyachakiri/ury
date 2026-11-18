@@ -3220,6 +3220,41 @@ labels shown at 430 px; title "Table T3" kept, subtitle cut with "…"; the ⋮ 
 (it would lock T3's order), switching tabs (step 3), a long table name (step 5), Arabic texts, a real phone. Seen
 on the way, not changed: the back chevron is not mirrored in right to left.
 
+### Patch 73 — Imprimer on the Tables page opens the order in Orders; waiter tables refresh after a payment
+
+Ticket 99 (owner request 2026-11-18). On the till's Tables page, "Imprimer" on a busy table printed the bill and
+stayed there; the cashier had to open Orders and find the order to take the payment. In the waiter app, the
+Tables page loaded once: after the payment, the waiter saw the table busy until they tapped "Actualiser".
+
+Files touched: `pos/src/pages/Table.tsx` (`handlePrintTable`), `pos/src/components/SelfOrderListener.tsx`
+(exported `openOrderInOrders`), `pos/src/captain/pages/CaptainTables.tsx` (realtime listener)
+
+What it does:
+- Tables page: after the bill is printed, or the print failed and the order is still marked printed (Patch 53),
+  the order opens in Orders on the Draft list, selected, through Patch 56's `OpenOrderBridge` (the same path as a
+  confirmed takeaway, Patch 08, and a QR order toast). A print refused before marking (no order on the table)
+  stays on Tables with its message.
+- Waiter Tables page: listens to `erp_tables_<branch>`, sent by erp_restaurant `table_refresh.py` after commit
+  when a table order is paid or cancelled, and reloads the tables and their orders half a second later (one
+  reload for events in a row); a socket (re)connection reloads too, so events missed while a phone slept are
+  caught (one extra reload right after the page's first load when the socket was not connected yet). No new text.
+
+Why it can't be done in `erp_restaurant`: where the till goes after a print and when a POS React page reloads are
+decided in the POS app; the server side (the event) is in erp_restaurant.
+
+Risk profile: low. A navigation at the end of the Tables print handler; one effect in `CaptainTables.tsx` (also
+carried by Patches 17, 46, 63 and 70) on the shared socket of `lib/realtime.ts`. If an order is not in the first
+page of the Draft list, Orders opens without a selection (as Patch 08).
+
+Acceptance criteria and manual test (test-dev; erp_restaurant with `table_refresh.py`):
+1. Till Tables, busy table, Imprimer: the bill prints, Orders opens with that order selected, Payment opens.
+2. Waiter Tables page open in another browser: after the payment, the table turns free within a few seconds,
+   no tap; same after a cancel from Orders (draft and paid).
+3. Printer off: "Vous pouvez quand même encaisser", Orders opens with the order selected.
+4. Arabic: same.
+
+Patch file: `patches/73-print-opens-orders-waiter-refresh.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
