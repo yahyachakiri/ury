@@ -3255,6 +3255,15 @@ Acceptance criteria and manual test (test-dev; erp_restaurant with `table_refres
 
 Patch file: `patches/73-print-opens-orders-waiter-refresh.patch`. Commit: cf7a5854.
 
+Browser check 2026-11-18 (test-dev, ury e70d3899 + erp_restaurant 12096446, Administrator in French, Chrome 1300 px
+with QZ Tray): waiter app order on T1 (Coca-Cola, INV-00085) sent; till Tables, T1 "Imprimer": the print waited on
+QZ Tray's Allow window until the owner answered it, then Orders opened on "Brouillon" with INV-00085 (T1, 8 DH)
+selected and "Paiement" ready (step 1 passed). Waiter Tables page open in a second tab showing T1 busy; the order
+cancelled from Orders (draft path, reason "Test ticket 99 (Claude)"): T1 showed "Libre" in the waiter tab with no
+tap and no page reload (page loaded 247 s earlier) (step 2, cancel of a draft, passed). Not checked: the payment
+path (POS Invoice on_submit), a cancel of a paid order or from the desk, a printer off (step 3), Arabic, a waiter's
+own login on a phone.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
