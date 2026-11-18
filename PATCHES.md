@@ -3310,6 +3310,16 @@ device):
 
 Patch file: `patches/74-tables-live-reload-cancel.patch`. Commit: 4157069d.
 
+Browser check 2026-11-18 (test-dev, ury 0b3bb141 + erp_restaurant bbe4cfa4, Administrator in French; the till's
+Tables page in a 1300 px same-site frame since the Chrome window stayed at 500 px): the waiter app sent a
+Coca-Cola on T5; the till frame, never reloaded, turned T5 from "Disponible" to "Occupé, démarré à 15:14" (step 1
+passed). T5's ⋮ menu: "Fusionner les tables", "Transférer la table", "Transférer le capitaine", "Annuler la commande"
+in red; the reason window "Annuler la commande · T5" opened after the permission check; reason typed and confirmed:
+T5 "Disponible" on the till and "Libre" in the open waiter tab, INV-00087 Cancelled with the reason (steps 2 and 3
+passed); same on T1 (INV-00086). Not checked: the "Cancelled" kitchen ticket on paper, a free table's menu, a
+merged table, a user without the cancel right, Arabic, the payment event, test-cours (migrated and cache cleared
+for the owner's test).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
