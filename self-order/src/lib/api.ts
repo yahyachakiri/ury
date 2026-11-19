@@ -73,6 +73,9 @@ export interface CustomerOrder {
   // erp_restaurant: the table already has another order (staff or another customer) and adding to it
   // is off, so this session's order would be refused: the app says it when the menu opens.
   table_busy?: boolean
+  // erp_restaurant: order paid or cancelled, or the table's code turned off: a reload starts a new
+  // session instead of resuming this one (Patch 80).
+  session_closed?: boolean
 }
 
 export interface QrOrderRequest {
@@ -112,7 +115,40 @@ export function getStoredContext(): OrderingContext | null {
   }
 }
 
-function storeContext(context: OrderingContext) {
+// Patch 80: every get_ordering_context opens a NEW session, so a reload of the QR page (the table's
+// code stays in the address) lost the customer's order: busy table, no bill request. The session is
+// kept on the phone per QR code (localStorage: a re-scan in a new tab resumes too) and reused while the
+// server accepts it and its order is open.
+const RESUME_PREFIX = 'ury_order_resume:'
+
+export function getResumeContext(token: string): OrderingContext | null {
+  try {
+    const raw = localStorage.getItem(RESUME_PREFIX + token)
+    return raw ? (JSON.parse(raw) as OrderingContext) : null
+  } catch {
+    return null
+  }
+}
+
+function storeResumeContext(token: string, context: OrderingContext) {
+  // Table sessions only: a pickup customer who scans again wants a new, separate order.
+  if (context.source !== 'QR Table') return
+  try {
+    localStorage.setItem(RESUME_PREFIX + token, JSON.stringify(context))
+  } catch {
+    // Private mode or full storage: a reload starts a new session, as before.
+  }
+}
+
+export function clearResumeContext(token: string) {
+  try {
+    localStorage.removeItem(RESUME_PREFIX + token)
+  } catch {
+    // nothing kept
+  }
+}
+
+export function storeContext(context: OrderingContext) {
   sessionStorage.setItem(SESSION_KEY, context.session)
   sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
   // Patch 62: @ury/core formatCurrency reads these keys (Patch 60); a customer's phone has none cached.
@@ -139,6 +175,7 @@ interface FrappeResponse<T> {
 export async function bootstrap(token: string): Promise<OrderingContext> {
   const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(), token })
   storeContext(response.message)
+  storeResumeContext(token, response.message)
   return response.message
 }
 

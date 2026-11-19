@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   addItems,
   bootstrap,
+  clearResumeContext,
   createPaymentRequest,
   getCurrentOrder,
   getMenu,
+  getResumeContext,
   getStoredContext,
   requestBill,
+  storeContext,
   type CustomerOrder,
   type MenuItem,
   type OrderingContext,
@@ -22,6 +25,29 @@ const SESSION_KEY = 'ury_order_session'
 const CONTEXT_KEY = 'ury_order_context'
 
 type Cart = Record<string, { item: MenuItem; qty: number }>
+
+// Patch 80: the table session this phone opened with this QR code, while the server accepts it and its
+// order is not paid or cancelled; else null (and forgotten), and a new session is opened as before.
+async function resumeSession(token: string): Promise<OrderingContext | null> {
+  const saved = getResumeContext(token)
+  if (!saved || saved.source !== 'QR Table') return null
+  try {
+    const current = await getCurrentOrder(saved.session)
+    if (!current.session_closed) {
+      storeContext(saved)
+      return saved
+    }
+  } catch (err) {
+    // Expired or unknown session (403 / 404): forget it. A network or server error keeps it for the
+    // next reload, else flaky Wi-Fi would lose the order again; the page shows its usual error.
+    const e = (err ?? {}) as { httpStatus?: number; exc_type?: string }
+    const gone =
+      e.httpStatus === 403 || e.httpStatus === 404 || /PermissionError|DoesNotExistError/.test(String(e.exc_type ?? ''))
+    if (!gone) throw err
+  }
+  clearResumeContext(token)
+  return null
+}
 
 function useQueryToken(): string | null {
   const params = new URLSearchParams(window.location.search)
@@ -66,7 +92,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       if (initialContext) {
         ctx = initialContext
       } else if (token) {
-        ctx = await bootstrap(token)
+        ctx = (await resumeSession(token)) ?? (await bootstrap(token))
       } else {
         const storedContext = getStoredContext()
         if (storedContext) {
@@ -148,14 +174,12 @@ export function useOrderingSession(initialContext?: OrderingContext) {
    * context, so we can immediately re-bootstrap a fresh session via `init`
    * without sending the customer back through a QR scan.
    *
-   * For QR/link-based sessions there is no device credential to re-derive
-   * a session from — clearing storage here means the next `init` run finds
-   * neither a token override nor a stored context, so the hook falls back
-   * to its normal "missing ordering code" error state and the customer (or
-   * staff) must rescan/re-open the link. That is the correct outcome, not
-   * a bug: a QR session's only source of truth is the token in the URL.
+   * For QR/link-based sessions the token is still in the URL, so `init`
+   * opens a new session from it; Patch 80 first forgets the session kept
+   * for that code, so "start over" really starts a new order.
    */
   const resetSession = useCallback(() => {
+    if (token) clearResumeContext(token)
     sessionStorage.removeItem(SESSION_KEY)
     sessionStorage.removeItem(CONTEXT_KEY)
     setCart({})
@@ -168,7 +192,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     setContext(null)
     setMenu([])
     init()
-  }, [init])
+  }, [init, token])
 
   function addToCart(item: MenuItem) {
     setCart((prev) => {

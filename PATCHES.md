@@ -3517,6 +3517,46 @@ tables list and from another table's order; with a window open the button does n
 
 Patch file: `patches/79-bill-request-open-action.patch`. Commit: f143a473.
 
+### Patch 80 — QR app: a reload resumes the customer's session
+
+Ticket 110 follow-up (owner test 2026-11-19: after an order, refreshing the table page lost the order and blocked
+ordering and "Demander l'addition"). The address keeps the table's QR code (`?t=`), and every
+`get_ordering_context` opens a NEW URY Ordering Session (`_open_session`), so a reload left the customer on a session
+without their order: the table showed busy (their own order) and `request_bill` refused ("No active order").
+
+Files touched: `self-order/src/lib/api.ts` (`getResumeContext`, `storeResumeContext`, `clearResumeContext`,
+`storeContext` exported; `bootstrap` stores the context per QR code), `self-order/src/hooks/useOrderingSession.ts`
+(`resumeSession` before `bootstrap`; "Recommencer" forgets it)
+
+What it does: the context returned for a table's QR code is kept in localStorage under that code
+(`ury_order_resume:<code>`), so a reload, or a re-scan opening a new tab, reuses the session while the server accepts
+it (`get_customer_order` works: not expired, 30 minutes idle by default, each call refreshes it) and erp_restaurant's
+`customer_view` does not return `session_closed` (order paid or cancelled, or the table's QR code turned off: the new
+session then shows URY's clear message). A 403 / 404 (expired, unknown) forgets it and a new session opens as before;
+a network or server error keeps it for the next reload (the page shows its usual error). Pickup codes are never
+resumed: a pickup customer who scans again gets a new, separate order as before. Private mode or blocked storage: a
+new session, as before.
+
+Why not in `erp_restaurant` alone: possible with a guest cookie per QR code set by the erp_restaurant
+`get_ordering_context` override, returning the kept session instead of URY's `_open_session`. Not chosen: more server
+code (cookie path and lifetime, the context response rebuilt by hand) and a GET that silently opens or resumes; the
+fork change is two small files already carrying Patch 77. erp_restaurant adds `session_closed`.
+
+Known limits: a table code changed in /admin "Commande QR" (old printed codes stop) does not end a session already
+resumed from the old code until it expires (idle timeout). Without qr_validation (`ready()` false) `session_closed` is
+not sent and a paid order's session resumes until it expires. Entries for other codes stay in localStorage.
+
+Risk profile: low. Same files as Patch 77. The raw session token now outlives the tab (localStorage instead of
+sessionStorage only): on a shared phone it can be reused within the idle timeout.
+
+Acceptance criteria and manual test: a QR table order sent (and validated): reload the page: the order, its status
+and "Demander l'addition" are there and a new order goes to the same order; close the tab and scan again: the same;
+pay the order at the till, reload: a new session (no old order shown); "Recommencer": a new session; pickup code
+scanned again after an unpaid pickup order: a new order; table QR turned off, reload: URY's "unavailable" message;
+reload with the network off, then on: the order is still there.
+
+Patch file: `patches/80-qr-resume-session.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

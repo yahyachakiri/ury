@@ -1,0 +1,150 @@
+diff --git a/self-order/src/hooks/useOrderingSession.ts b/self-order/src/hooks/useOrderingSession.ts
+index fc5cabc8..21d74433 100644
+--- a/self-order/src/hooks/useOrderingSession.ts
++++ b/self-order/src/hooks/useOrderingSession.ts
+@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
+ import {
+   addItems,
+   bootstrap,
++  clearResumeContext,
+   createPaymentRequest,
+   getCurrentOrder,
+   getMenu,
++  getResumeContext,
+   getStoredContext,
+   requestBill,
++  storeContext,
+   type CustomerOrder,
+   type MenuItem,
+   type OrderingContext,
+@@ -23,6 +26,29 @@ const CONTEXT_KEY = 'ury_order_context'
+ 
+ type Cart = Record<string, { item: MenuItem; qty: number }>
+ 
++// Patch 80: the table session this phone opened with this QR code, while the server accepts it and its
++// order is not paid or cancelled; else null (and forgotten), and a new session is opened as before.
++async function resumeSession(token: string): Promise<OrderingContext | null> {
++  const saved = getResumeContext(token)
++  if (!saved || saved.source !== 'QR Table') return null
++  try {
++    const current = await getCurrentOrder(saved.session)
++    if (!current.session_closed) {
++      storeContext(saved)
++      return saved
++    }
++  } catch (err) {
++    // Expired or unknown session (403 / 404): forget it. A network or server error keeps it for the
++    // next reload, else flaky Wi-Fi would lose the order again; the page shows its usual error.
++    const e = (err ?? {}) as { httpStatus?: number; exc_type?: string }
++    const gone =
++      e.httpStatus === 403 || e.httpStatus === 404 || /PermissionError|DoesNotExistError/.test(String(e.exc_type ?? ''))
++    if (!gone) throw err
++  }
++  clearResumeContext(token)
++  return null
++}
++
+ function useQueryToken(): string | null {
+   const params = new URLSearchParams(window.location.search)
+   return params.get('t')
+@@ -66,7 +92,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+       if (initialContext) {
+         ctx = initialContext
+       } else if (token) {
+-        ctx = await bootstrap(token)
++        ctx = (await resumeSession(token)) ?? (await bootstrap(token))
+       } else {
+         const storedContext = getStoredContext()
+         if (storedContext) {
+@@ -148,14 +174,12 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+    * context, so we can immediately re-bootstrap a fresh session via `init`
+    * without sending the customer back through a QR scan.
+    *
+-   * For QR/link-based sessions there is no device credential to re-derive
+-   * a session from — clearing storage here means the next `init` run finds
+-   * neither a token override nor a stored context, so the hook falls back
+-   * to its normal "missing ordering code" error state and the customer (or
+-   * staff) must rescan/re-open the link. That is the correct outcome, not
+-   * a bug: a QR session's only source of truth is the token in the URL.
++   * For QR/link-based sessions the token is still in the URL, so `init`
++   * opens a new session from it; Patch 80 first forgets the session kept
++   * for that code, so "start over" really starts a new order.
+    */
+   const resetSession = useCallback(() => {
++    if (token) clearResumeContext(token)
+     sessionStorage.removeItem(SESSION_KEY)
+     sessionStorage.removeItem(CONTEXT_KEY)
+     setCart({})
+@@ -168,7 +192,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+     setContext(null)
+     setMenu([])
+     init()
+-  }, [init])
++  }, [init, token])
+ 
+   function addToCart(item: MenuItem) {
+     setCart((prev) => {
+diff --git a/self-order/src/lib/api.ts b/self-order/src/lib/api.ts
+index ba38af92..05a349bf 100644
+--- a/self-order/src/lib/api.ts
++++ b/self-order/src/lib/api.ts
+@@ -73,6 +73,9 @@ export interface CustomerOrder {
+   // erp_restaurant: the table already has another order (staff or another customer) and adding to it
+   // is off, so this session's order would be refused: the app says it when the menu opens.
+   table_busy?: boolean
++  // erp_restaurant: order paid or cancelled, or the table's code turned off: a reload starts a new
++  // session instead of resuming this one (Patch 80).
++  session_closed?: boolean
+ }
+ 
+ export interface QrOrderRequest {
+@@ -112,7 +115,40 @@ export function getStoredContext(): OrderingContext | null {
+   }
+ }
+ 
+-function storeContext(context: OrderingContext) {
++// Patch 80: every get_ordering_context opens a NEW session, so a reload of the QR page (the table's
++// code stays in the address) lost the customer's order: busy table, no bill request. The session is
++// kept on the phone per QR code (localStorage: a re-scan in a new tab resumes too) and reused while the
++// server accepts it and its order is open.
++const RESUME_PREFIX = 'ury_order_resume:'
++
++export function getResumeContext(token: string): OrderingContext | null {
++  try {
++    const raw = localStorage.getItem(RESUME_PREFIX + token)
++    return raw ? (JSON.parse(raw) as OrderingContext) : null
++  } catch {
++    return null
++  }
++}
++
++function storeResumeContext(token: string, context: OrderingContext) {
++  // Table sessions only: a pickup customer who scans again wants a new, separate order.
++  if (context.source !== 'QR Table') return
++  try {
++    localStorage.setItem(RESUME_PREFIX + token, JSON.stringify(context))
++  } catch {
++    // Private mode or full storage: a reload starts a new session, as before.
++  }
++}
++
++export function clearResumeContext(token: string) {
++  try {
++    localStorage.removeItem(RESUME_PREFIX + token)
++  } catch {
++    // nothing kept
++  }
++}
++
++export function storeContext(context: OrderingContext) {
+   sessionStorage.setItem(SESSION_KEY, context.session)
+   sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
+   // Patch 62: @ury/core formatCurrency reads these keys (Patch 60); a customer's phone has none cached.
+@@ -139,6 +175,7 @@ interface FrappeResponse<T> {
+ export async function bootstrap(token: string): Promise<OrderingContext> {
+   const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { _lang: activeLang(), token })
+   storeContext(response.message)
++  storeResumeContext(token, response.message)
+   return response.message
+ }
+ 
