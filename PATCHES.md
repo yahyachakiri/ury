@@ -3555,7 +3555,7 @@ pay the order at the till, reload: a new session (no old order shown); "Recommen
 scanned again after an unpaid pickup order: a new order; table QR turned off, reload: URY's "unavailable" message;
 reload with the network off, then on: the order is still there.
 
-Patch file: `patches/80-qr-resume-session.patch`. Commit: not committed yet.
+Patch file: `patches/80-qr-resume-session.patch`. Commit: 79e8de66.
 
 ## Build and deploy
 
