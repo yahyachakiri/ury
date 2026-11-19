@@ -12,6 +12,7 @@ import {
   type OrderingContext,
   type PaymentRequestResult,
 } from '../lib/api'
+import { parseFrappeError } from '@ury/core'
 import { tr } from '../i18n'
 
 // Same keys api.ts uses internally for sessionStorage persistence. api.ts
@@ -55,6 +56,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const loadOrder = useCallback(async (session: string) => {
     const current = await getCurrentOrder(session)
     setOrder(current)
+    return current
   }, [])
 
   const init = useCallback(async () => {
@@ -115,6 +117,24 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     }, 8000)
     return () => window.clearInterval(timer)
   }, [waiting, session, loadOrder])
+
+  // A busy table (another order on it, adding off): said when the menu opens, not at sending. Checked
+  // again every 15 seconds while the page is on screen, so the notice goes once the table is free; for
+  // 20 minutes at most, like the wait above (each check keeps the session alive).
+  const tableBusy = !!order?.table_busy
+  useEffect(() => {
+    if (!tableBusy || !session) return
+    const stopAt = Date.now() + 20 * 60 * 1000
+    const timer = window.setInterval(() => {
+      if (Date.now() > stopAt) {
+        window.clearInterval(timer)
+        return
+      }
+      if (document.hidden) return
+      loadOrder(session).catch(() => undefined)
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [tableBusy, session, loadOrder])
 
   /**
    * Manual "start a fresh order" action — the MVP alternative to an
@@ -179,12 +199,17 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     setSubmitting(true)
     setError(null)
     try {
+      // Still busy? Keep the cart and the notice instead of sending an order the server refuses.
+      if (tableBusy && (await loadOrder(context.session)).table_busy) return
       const payload = cartItems.map((entry) => ({ item: entry.item.item, qty: entry.qty }))
       const updated = await addItems(context.session, payload)
       setOrder(updated)
       setCart({})
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr('order_failed'))
+      // Frappe's error object is not an Error: read the server's own message.
+      setError(parseFrappeError(err, tr('order_failed')))
+      // The table may have been taken meanwhile: the busy notice replaces the message then.
+      loadOrder(context.session).catch(() => undefined)
     } finally {
       setSubmitting(false)
     }
@@ -226,7 +251,8 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     cart,
     loading,
     submitting,
-    error,
+    // Every layout shows `error` above the menu: a real error first, else the busy notice.
+    error: error ?? (tableBusy ? tr('table_busy') : null),
     billRequested,
     paymentRequest,
     payingOnline,

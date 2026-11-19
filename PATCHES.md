@@ -3439,6 +3439,56 @@ T4 + T5 still merged, the till showed "Avec T4 + T5" (step 3). Cleanup: T4 + T5 
 cancelled from Tables, all four tables free. Not checked: Arabic and English (step 5), a server refusal message
 (step 6), a printed order's group (step 7), a stale printed draft in a group (step 8), a waiter's own login.
 
+### Patch 77 — QR app: a busy table is said when the menu opens
+
+Ticket 110 (owner request 2026-11-19: show the busy table "at the start when the page loads", keep the menu). A
+customer scanning the code of a table that already had an order (adding to a running order off) filled the cart
+and only got "La commande n'a pas pu être envoyée. Réessayez." at Commander: the server's own refusal was lost
+because `err instanceof Error` is false for Frappe's error object.
+
+Files touched: `self-order/src/hooks/useOrderingSession.ts`, `self-order/src/lib/api.ts` (`CustomerOrder.table_busy`),
+`self-order/src/i18n.tsx` (key `table_busy`, en / fr / ar)
+
+What it does: erp_restaurant's `get_customer_order` / `add_customer_items` (qr_validation.customer_view) return
+`table_busy`; the hook then returns the notice as `error` when there is no other error, which every layout already
+shows above the menu (the menu stays). Checked again every 15 s while the page is on screen, for 20 minutes at most
+like ticket 40's wait (each check keeps the session alive); Commander while still busy reloads the order and
+sends nothing (cart kept); a refusal at sending shows the server's message (`parseFrappeError`) and reloads the
+order, so a table taken meanwhile turns into the notice.
+
+Why it can't be done in `erp_restaurant` alone: the server already refused; showing it at load and keeping the cart
+is the QR app's rendering. The busy rule itself is erp_restaurant's (`qr_validation.table_busy`).
+
+Risk profile: low. `useOrderingSession.ts` was unpatched; `i18n.tsx` is Patch 24's file. The QR app is not built by
+the deploy: `cd apps/ury/self-order && yarn build` on the server.
+
+Acceptance criteria: ticket 110 criteria 1 to 4.
+
+Patch file: `patches/77-qr-busy-table-notice.patch`. Commit: not committed yet.
+
+### Patch 78 — Waiters validate or refuse QR table orders
+
+Ticket 110 (owner request 2026-11-19: "the waiter to have the action of accepting or rejecting the order too like the
+cashier"). Ticket 40 (Patch 56) kept the decision at the till because the waiter app printed no kitchen tickets;
+Patch 69 (ticket 93) made it print them.
+
+Files touched: `pos/src/components/SelfOrderListener.tsx` (`RequestCard` shows Valider / Refuser everywhere),
+`pos/src/i18n/locales/{en,fr,ar}.json` (`self_order.request_waiter` removed)
+
+What it does: the waiter app's QR request toast has the till's Valider / Refuser (reason required); Valider prints
+the kitchen ticket on the waiter's device when the till's auto print is on (Patch 10's printKitchenTickets, QZ Tray
+or the Reflowgo app as Patch 69); the toast keeps its close button in the waiter app, so a waiter can leave it to the
+till. erp_restaurant `qr_validation.TILL_ROLES` adds URY Captain (branch check unchanged).
+
+Why it can't be done in `erp_restaurant` alone: the buttons are in the POS React app; the permission is
+erp_restaurant's.
+
+Risk profile: low. `SelfOrderListener.tsx` also carries Patches 43, 56, 73.
+
+Acceptance criteria: ticket 110 criteria 5 to 7.
+
+Patch file: `patches/78-waiter-validates-qr-orders.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

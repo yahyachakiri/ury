@@ -1,0 +1,116 @@
+diff --git a/self-order/src/hooks/useOrderingSession.ts b/self-order/src/hooks/useOrderingSession.ts
+index 137dcdba..fc5cabc8 100644
+--- a/self-order/src/hooks/useOrderingSession.ts
++++ b/self-order/src/hooks/useOrderingSession.ts
+@@ -12,6 +12,7 @@ import {
+   type OrderingContext,
+   type PaymentRequestResult,
+ } from '../lib/api'
++import { parseFrappeError } from '@ury/core'
+ import { tr } from '../i18n'
+ 
+ // Same keys api.ts uses internally for sessionStorage persistence. api.ts
+@@ -55,6 +56,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+   const loadOrder = useCallback(async (session: string) => {
+     const current = await getCurrentOrder(session)
+     setOrder(current)
++    return current
+   }, [])
+ 
+   const init = useCallback(async () => {
+@@ -116,6 +118,24 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+     return () => window.clearInterval(timer)
+   }, [waiting, session, loadOrder])
+ 
++  // A busy table (another order on it, adding off): said when the menu opens, not at sending. Checked
++  // again every 15 seconds while the page is on screen, so the notice goes once the table is free; for
++  // 20 minutes at most, like the wait above (each check keeps the session alive).
++  const tableBusy = !!order?.table_busy
++  useEffect(() => {
++    if (!tableBusy || !session) return
++    const stopAt = Date.now() + 20 * 60 * 1000
++    const timer = window.setInterval(() => {
++      if (Date.now() > stopAt) {
++        window.clearInterval(timer)
++        return
++      }
++      if (document.hidden) return
++      loadOrder(session).catch(() => undefined)
++    }, 15000)
++    return () => window.clearInterval(timer)
++  }, [tableBusy, session, loadOrder])
++
+   /**
+    * Manual "start a fresh order" action — the MVP alternative to an
+    * auto-idle-reset timer (not wired up yet). Always clears the cart and
+@@ -179,12 +199,17 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+     setSubmitting(true)
+     setError(null)
+     try {
++      // Still busy? Keep the cart and the notice instead of sending an order the server refuses.
++      if (tableBusy && (await loadOrder(context.session)).table_busy) return
+       const payload = cartItems.map((entry) => ({ item: entry.item.item, qty: entry.qty }))
+       const updated = await addItems(context.session, payload)
+       setOrder(updated)
+       setCart({})
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : tr('order_failed'))
++      // Frappe's error object is not an Error: read the server's own message.
++      setError(parseFrappeError(err, tr('order_failed')))
++      // The table may have been taken meanwhile: the busy notice replaces the message then.
++      loadOrder(context.session).catch(() => undefined)
+     } finally {
+       setSubmitting(false)
+     }
+@@ -226,7 +251,8 @@ export function useOrderingSession(initialContext?: OrderingContext) {
+     cart,
+     loading,
+     submitting,
+-    error,
++    // Every layout shows `error` above the menu: a real error first, else the busy notice.
++    error: error ?? (tableBusy ? tr('table_busy') : null),
+     billRequested,
+     paymentRequest,
+     payingOnline,
+diff --git a/self-order/src/i18n.tsx b/self-order/src/i18n.tsx
+index 616ef0b2..5d03a0e8 100644
+--- a/self-order/src/i18n.tsx
++++ b/self-order/src/i18n.tsx
+@@ -19,6 +19,7 @@ const en = {
+   missing_code: 'This link is missing an ordering code. Please rescan the QR code on your table.',
+   menu_failed: 'Unable to load the menu. Please rescan the QR code.',
+   order_failed: 'Could not place the order. Please try again.',
++  table_busy: 'This table already has an order in progress. You can browse the menu; to order, scan the QR code of another table or ask a staff member.',
+   bill_failed: 'Could not request the bill. Please ask staff for help.',
+   payment_failed: 'Could not start online payment. Please pay at the counter.',
+   order_for_pickup: 'Order for Pickup',
+@@ -79,6 +80,7 @@ const fr: Record<Key, string> = {
+   missing_code: 'Ce lien ne contient pas de code de commande. Scannez à nouveau le QR code de votre table.',
+   menu_failed: 'Impossible de charger le menu. Scannez à nouveau le QR code.',
+   order_failed: "La commande n'a pas pu être envoyée. Réessayez.",
++  table_busy: "Cette table a déjà une commande en cours. Vous pouvez consulter le menu ; pour commander, scannez le QR code d'une autre table ou demandez au personnel.",
+   bill_failed: "L'addition n'a pas pu être demandée. Demandez au personnel.",
+   payment_failed: 'Le paiement en ligne est indisponible. Merci de payer au comptoir.',
+   order_for_pickup: 'Commande à emporter',
+@@ -137,6 +139,7 @@ const ar: Record<Key, string> = {
+   missing_code: 'هذا الرابط لا يحتوي على رمز الطلب. امسح رمز QR الموجود على طاولتك مرة أخرى.',
+   menu_failed: 'تعذّر تحميل القائمة. امسح رمز QR مرة أخرى.',
+   order_failed: 'تعذّر إرسال الطلب. أعد المحاولة.',
++  table_busy: 'لهذه الطاولة طلب جارٍ بالفعل. يمكنك تصفح القائمة، وللطلب امسح رمز QR لطاولة أخرى أو اطلب المساعدة من الموظفين.',
+   bill_failed: 'تعذّر طلب الفاتورة. اطلبها من الموظفين.',
+   payment_failed: 'الدفع عبر الإنترنت غير متاح. يرجى الدفع عند الصندوق.',
+   order_for_pickup: 'طلب سفري',
+diff --git a/self-order/src/lib/api.ts b/self-order/src/lib/api.ts
+index 93218039..ba38af92 100644
+--- a/self-order/src/lib/api.ts
++++ b/self-order/src/lib/api.ts
+@@ -70,6 +70,9 @@ export interface CustomerOrder {
+   // first, and a pickup order whose kitchen ticket waits for the payment.
+   requests?: QrOrderRequest[]
+   kitchen_on_payment?: boolean
++  // erp_restaurant: the table already has another order (staff or another customer) and adding to it
++  // is off, so this session's order would be refused: the app says it when the menu opens.
++  table_busy?: boolean
+ }
+ 
+ export interface QrOrderRequest {

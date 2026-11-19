@@ -70,6 +70,9 @@ export interface CustomerOrder {
   // first, and a pickup order whose kitchen ticket waits for the payment.
   requests?: QrOrderRequest[]
   kitchen_on_payment?: boolean
+  // erp_restaurant: the table already has another order (staff or another customer) and adding to it
+  // is off, so this session's order would be refused: the app says it when the menu opens.
+  table_busy?: boolean
 }
 
 export interface QrOrderRequest {
