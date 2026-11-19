@@ -689,8 +689,7 @@
     "reason_required": "Indiquez une raison pour le client.",
     "accepted": "Commande QR validée : {{table}}",
     "refused": "Commande QR refusée : {{table}}",
-    "decide_failed": "La commande QR n'a pas pu être traitée. Réessayez.",
-    "request_waiter": "À valider à la caisse"
+    "decide_failed": "La commande QR n'a pas pu être traitée. Réessayez."
   },
   "loyalty": {
     "title": "Points fidélité",

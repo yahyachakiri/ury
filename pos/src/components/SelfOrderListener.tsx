@@ -13,9 +13,10 @@ import { getActiveDirection, t } from '../i18n';
 // Patch 43: alerts the till when a customer orders or asks for the bill from the
 // QR app. erp_restaurant (self_order_alerts.py) publishes erp_self_order_<branch>
 // after the order is saved.
-// Ticket 40: a QR table order waits for the counter ("request": Valider / Refuser on the
-// till, info only in the waiter app, which prints no kitchen tickets); the requests still
-// waiting are shown again when the till starts; "request_done" removes it on every till.
+// Ticket 40: a QR table order waits for the counter ("request": Valider / Refuser); the requests
+// still waiting are shown again when the till starts; "request_done" removes it on every till.
+// Patch 78: the waiter app decides too (it prints its kitchen tickets since Patch 69); a waiter
+// can still close the toast and leave it to the till.
 // A QR pickup order ("pay_first") reaches the kitchen when the cashier prints its bill in Orders
 // (owner 2026-11-06; lib/print.ts printQrPickupKitchenTicket), else once paid (PaymentDialog).
 // On the till, tapping a QR order toast opens Orders with that order selected (OpenOrderBridge).
@@ -87,8 +88,7 @@ function message(e: SelfOrderEvent): string {
 
 const requestToastId = (name: string) => `request-${name}`;
 
-// The waiter app (/pos/order, /pos/order/table/<table>) does not print kitchen tickets:
-// validation stays at the till (/pos/orders is the till's Orders page, not the waiter app).
+// The waiter app is /pos/order and /pos/order/table/<table> (/pos/orders is the till's Orders page).
 const onTill = () => {
   const path = window.location.pathname;
   return !(path === '/pos/order' || path.startsWith('/pos/order/'));
@@ -102,7 +102,6 @@ const RequestCard: React.FC<{ req: QrRequest }> = ({ req }) => {
   const [refusing, setRefusing] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const canDecide = onTill();
 
   const done = (message: string) => {
     toast.dismiss(requestToastId(req.name));
@@ -158,8 +157,7 @@ const RequestCard: React.FC<{ req: QrRequest }> = ({ req }) => {
           </li>
         ))}
       </ul>
-      {!canDecide && <div className="text-sm">{t('self_order.request_waiter')}</div>}
-      {canDecide && !refusing && (
+      {!refusing && (
         <div className="flex gap-2">
           <Button type="button" size="sm" className={button} disabled={busy} onClick={accept}>
             {t('self_order.accept')}
@@ -169,7 +167,7 @@ const RequestCard: React.FC<{ req: QrRequest }> = ({ req }) => {
           </Button>
         </div>
       )}
-      {canDecide && refusing && (
+      {refusing && (
         <div className="space-y-2">
           <Input
             size="sm"
@@ -203,7 +201,8 @@ function showRequest(req: QrRequest): boolean {
     autoClose: false,
     closeOnClick: false,
     draggable: false,
-    // On the till the toast is the only place a waiting request shows: no close button.
+    // On the till the toast is the only place a waiting request shows: no close button. A waiter
+    // may close it and leave the decision to the till.
     closeButton: !onTill(),
     theme: 'colored',
   });

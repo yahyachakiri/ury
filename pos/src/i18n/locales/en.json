@@ -689,8 +689,7 @@
     "reason_required": "Give a reason for the customer.",
     "accepted": "QR order accepted: {{table}}",
     "refused": "QR order refused: {{table}}",
-    "decide_failed": "The QR order could not be handled. Try again.",
-    "request_waiter": "To be confirmed at the till"
+    "decide_failed": "The QR order could not be handled. Try again."
   },
   "loyalty": {
     "title": "Loyalty points",
