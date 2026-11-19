@@ -20,6 +20,8 @@ import { getActiveDirection, t } from '../i18n';
 // A QR pickup order ("pay_first") reaches the kitchen when the cashier prints its bill in Orders
 // (owner 2026-11-06; lib/print.ts printQrPickupKitchenTicket), else once paid (PaymentDialog).
 // On the till, tapping a QR order toast opens Orders with that order selected (OpenOrderBridge).
+// Patch 79: a bill request has a button: the till opens the order in Orders, selected; the waiter
+// app opens the table's order (/order/table/<table>).
 
 interface QrRequest {
   name: string;
@@ -259,7 +261,12 @@ const SelfOrderListener: React.FC = () => {
       }
       // One toast per order and kind: a customer adding more replaces the earlier one.
       const toastId = `${e.kind}-${e.invoice}`;
-      const content = <div dir={getActiveDirection()}>{message(e)}</div>;
+      const content =
+        e.kind === 'bill' ? (
+          <BillRequestCard event={e} toastId={toastId} />
+        ) : (
+          <div dir={getActiveDirection()}>{message(e)}</div>
+        );
       // Till, QR order toast: a tap opens the order in Orders, ready to print and take the payment.
       const opens = e.kind === 'order' && onTill();
       if (toast.isActive(toastId)) {
@@ -305,6 +312,39 @@ const SelfOrderListener: React.FC = () => {
 };
 
 const OPEN_ORDER_EVENT = 'erp-self-order-open';
+const OPEN_TABLE_EVENT = 'erp-self-order-open-table';
+
+// Patch 79: "Demander l'addition" with its action: Orders on the till, the table in the waiter app.
+const BillRequestCard: React.FC<{ event: SelfOrderEvent; toastId: string }> = ({ event, toastId }) => {
+  const till = onTill();
+  if (!till && !event.table) return <div dir={getActiveDirection()}>{message(event)}</div>;
+  const open = () => {
+    if (till) {
+      openInOrders(toastId, event.invoice);
+      return;
+    }
+    // A window open (note, transfer...) is about the order on screen: like the till, do nothing.
+    if (document.querySelector('[role="dialog"]')) return;
+    toast.dismiss(toastId);
+    window.dispatchEvent(new CustomEvent<string>(OPEN_TABLE_EVENT, { detail: event.table }));
+  };
+  return (
+    <div dir={getActiveDirection()} className="space-y-2">
+      <div>{message(event)}</div>
+      <Button
+        type="button"
+        size="sm"
+        className="bg-white font-semibold text-blue-700 hover:bg-white/90"
+        onClick={(ev) => {
+          ev.stopPropagation(); // the toast's own click closes it; the action decides
+          open();
+        }}
+      >
+        {t(till ? 'self_order.open_order' : 'self_order.open_table')}
+      </Button>
+    </div>
+  );
+};
 
 // Patch 73: the Tables page's Imprimer opens the printed order in Orders, selected.
 export function openOrderInOrders(invoice: string) {
@@ -330,12 +370,35 @@ export const OpenOrderBridge: React.FC = () => {
       const rootStore = useRootStore.getState();
       rootStore.setOrderSearchQuery('');
       await rootStore.setSelectedStatus('Draft');
-      const listed = useRootStore.getState().orders.find((o) => o.name === invoice);
+      let listed = useRootStore.getState().orders.find((o) => o.name === invoice);
+      if (!listed) {
+        // Patch 79: a table order not printed yet (a bill request) is in Unbilled, not Draft.
+        await useRootStore.getState().setSelectedStatus('Unbilled');
+        listed = useRootStore.getState().orders.find((o) => o.name === invoice);
+      }
       if (listed) useRootStore.getState().selectOrder(listed);
       navigate('/orders');
     };
+    // Patch 79: the waiter app opens the table that asked for the bill.
+    // Another table's order on screen: through the tables list first, so its page starts afresh
+    // (the order page keeps its state when only the table in the address changes).
+    const openTable = (event: Event) => {
+      const table = (event as CustomEvent<string>).detail;
+      if (!table) return;
+      const target = `/order/table/${encodeURIComponent(table)}`;
+      if (window.location.pathname.startsWith('/pos/order/table/')) {
+        navigate('/order');
+        window.setTimeout(() => navigate(target), 0);
+      } else {
+        navigate(target);
+      }
+    };
     window.addEventListener(OPEN_ORDER_EVENT, open);
-    return () => window.removeEventListener(OPEN_ORDER_EVENT, open);
+    window.addEventListener(OPEN_TABLE_EVENT, openTable);
+    return () => {
+      window.removeEventListener(OPEN_ORDER_EVENT, open);
+      window.removeEventListener(OPEN_TABLE_EVENT, openTable);
+    };
   }, [navigate]);
   return null;
 };

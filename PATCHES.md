@@ -3489,6 +3489,34 @@ Acceptance criteria: ticket 110 criteria 5 to 7.
 
 Patch file: `patches/78-waiter-validates-qr-orders.patch`. Commit: 0aa00c09.
 
+### Patch 79 — "Demander l'addition" toast opens the order or the table
+
+Ticket 110 follow-up (owner request 2026-11-19: an action button on the bill request, the waiter opens the table's
+details, the cashier opens Orders with the order selected). Before, the bill request toast was text only.
+
+Files touched: `pos/src/components/SelfOrderListener.tsx` (`BillRequestCard`, `OPEN_TABLE_EVENT` in
+`OpenOrderBridge`), `pos/src/i18n/locales/{en,fr,ar}.json` (`self_order.open_order`, `self_order.open_table`)
+
+What it does: the bill request toast has a button. On the till, "Ouvrir la commande" opens Orders with that order
+selected (Patch 56's bridge, which now also looks in Unbilled: a table order whose bill is not printed is listed
+there, not in Draft; only the first page of each list is searched, as before; nothing happens while a dialog is
+open, the toast stays). In the waiter app, "Ouvrir la table" opens `/order/table/<table>` (the waiter app's usual
+table screen and its access rules); nothing happens while a window is open; from another table's order it goes
+through the tables list so the page starts afresh, which drops that table's unsent lines like the back button does.
+The toast closes on the action; a tap elsewhere on it still closes it.
+
+Why it can't be done in `erp_restaurant`: the toast and the navigation are in the POS React app; the event
+(erp_restaurant self_order_alerts.notify_bill_request) already carries the invoice and the table.
+
+Risk profile: low. `SelfOrderListener.tsx` also carries Patches 43, 56, 73, 78.
+
+Acceptance criteria and manual test: a QR customer taps "Demander l'addition" on a table whose bill is not printed:
+the till's toast has "Ouvrir la commande", which opens Orders with that order selected (Unbilled); the same after the
+bill is printed (Draft); the waiter app's toast has "Ouvrir la table", which opens that table's order, from the
+tables list and from another table's order; with a window open the button does nothing; fr, ar (right to left), en.
+
+Patch file: `patches/79-bill-request-open-action.patch`. Commit: not committed yet.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

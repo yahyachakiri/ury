@@ -696,7 +696,9 @@
         "reason_required": "اذكر سبباً للزبون.",
         "accepted": "تم تأكيد طلب QR: {{table}}",
         "refused": "تم رفض طلب QR: {{table}}",
-        "decide_failed": "تعذّرت معالجة طلب QR. حاول مرة أخرى."
+        "decide_failed": "تعذّرت معالجة طلب QR. حاول مرة أخرى.",
+        "open_order": "فتح الطلب",
+        "open_table": "فتح الطاولة"
     },
     "loyalty": {
         "title": "نقاط الوفاء",
