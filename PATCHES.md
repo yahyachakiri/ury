@@ -3464,7 +3464,7 @@ the deploy: `cd apps/ury/self-order && yarn build` on the server.
 
 Acceptance criteria: ticket 110 criteria 1 to 4.
 
-Patch file: `patches/77-qr-busy-table-notice.patch`. Commit: not committed yet.
+Patch file: `patches/77-qr-busy-table-notice.patch`. Commit: 320ad497.
 
 ### Patch 78 — Waiters validate or refuse QR table orders
 
@@ -3487,7 +3487,7 @@ Risk profile: low. `SelfOrderListener.tsx` also carries Patches 43, 56, 73.
 
 Acceptance criteria: ticket 110 criteria 5 to 7.
 
-Patch file: `patches/78-waiter-validates-qr-orders.patch`. Commit: not committed yet.
+Patch file: `patches/78-waiter-validates-qr-orders.patch`. Commit: 0aa00c09.
 
 ## Build and deploy
 
