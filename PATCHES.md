@@ -3515,7 +3515,7 @@ the till's toast has "Ouvrir la commande", which opens Orders with that order se
 bill is printed (Draft); the waiter app's toast has "Ouvrir la table", which opens that table's order, from the
 tables list and from another table's order; with a window open the button does nothing; fr, ar (right to left), en.
 
-Patch file: `patches/79-bill-request-open-action.patch`. Commit: not committed yet.
+Patch file: `patches/79-bill-request-open-action.patch`. Commit: f143a473.
 
 ## Build and deploy
 
