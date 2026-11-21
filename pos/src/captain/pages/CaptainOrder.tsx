@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, ClipboardList, Loader2, ScanLine, UtensilsCrossed } from 'lucide-react';
 import { Button, Spinner, cn, showToast } from '@ury/ui';
-import { formatCurrency, parseFrappeError } from '@ury/core';
+import { call, formatCurrency, parseFrappeError } from '@ury/core';
 import { usePOSStore } from '../../store/pos-store';
 import { useRootStore, RootState } from '../../store/root-store';
 import {
@@ -25,6 +25,7 @@ import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
 import CaptainTransferDialog from '../../components/CaptainTransferDialog';
 import { CustomerSelect } from '../../components/CustomerSelect';
+import CaptainScanDialog from '../components/CaptainScanDialog';
 import { t } from '../../i18n';
 
 type Mode = 'menu' | 'order';
@@ -92,6 +93,8 @@ export default function CaptainOrder() {
   const [transferDestinations, setTransferDestinations] = useState<Table[]>([]);
   const [isTransferDestinationsLoading, setIsTransferDestinationsLoading] = useState(false);
   const [isTransferCaptainOpen, setIsTransferCaptainOpen] = useState(false);
+  // Patch 82 (ticket 116): the loyalty card scan of this table's customer.
+  const [isScanOpen, setIsScanOpen] = useState(false);
 
   // Default to the Order view for a table that already has a baseline
   // order, Menu for a fresh table — matches PLAN §5 ("free table: menu
@@ -365,6 +368,38 @@ export default function CaptainOrder() {
     navigate('/order');
   };
 
+  // Patch 82 (ticket 116, owner 2026-11-21): a scanned card puts its customer on this table's order. A new order
+  // takes it before it is sent; an order already sent or served on the till's default customer ("Client comptoir")
+  // takes it on the server (erp_restaurant loyalty.set_order_customer: unpaid only, a named customer is never
+  // replaced), and the order's new time is kept so the next update is not refused as modified.
+  const handleScannedCard = async (code: string) => {
+    const pos = usePOSStore.getState();
+    type Member = { customer: string; customer_name: string; phone?: string; points?: number };
+    try {
+      if (!pos.isUpdatingOrder || !pos.orderId) {
+        const r = await call.get<{ message: Member }>('erp_restaurant.erp_restaurant.loyalty.resolve_for_waiter', { code });
+        pos.setSelectedCustomer({ id: r.message.customer, name: r.message.customer_name, phone: r.message.phone || '' });
+        showToast.success(t('loyalty_scan.customer_set', { name: r.message.customer_name }));
+      } else {
+        const r = await call.post<{ message: { customer: string; customer_name: string; modified: string; previous_modified: string } }>(
+          'erp_restaurant.erp_restaurant.loyalty.set_order_customer',
+          { invoice: pos.orderId, code }
+        );
+        // The new time only if this copy was current (Patch 06's check stays meaningful).
+        const current = pos.lastModifiedTime === r.message.previous_modified;
+        usePOSStore.setState({
+          selectedCustomer: { id: r.message.customer, name: r.message.customer_name, phone: '' },
+          lastModifiedTime: current ? r.message.modified : pos.lastModifiedTime,
+        });
+        showToast.success(t('loyalty_scan.order_customer_set', { name: r.message.customer_name }));
+      }
+      setIsScanOpen(false);
+    } catch (err) {
+      showToast.error(parseFrappeError(err, t('loyalty_scan.failed')));
+      throw err; // the dialog skips this code for a few seconds instead of asking again at every frame
+    }
+  };
+
   const MIN_PAX = 1;
   const MAX_PAX = 50;
 
@@ -376,6 +411,12 @@ export default function CaptainOrder() {
         // here so a Captain can satisfy it before hitting the send-time
         // validation error. Reused as-is from the Cashier OrderPanel.
         <CustomerSelect disabled={isInteractionDisabled} />
+      )}
+      {canModify && (
+        <Button variant="outline" className="w-full gap-2" disabled={isSubmitting} onClick={() => setIsScanOpen(true)}>
+          <ScanLine className="w-4 h-4" aria-hidden="true" />
+          {t('loyalty_scan.button')}
+        </Button>
       )}
 
       {!canModify && (
@@ -736,6 +777,8 @@ export default function CaptainOrder() {
         loading={isTransferDestinationsLoading}
         onConfirm={handleTableTransferConfirm}
       />
+
+      <CaptainScanDialog open={isScanOpen} onOpenChange={setIsScanOpen} onCode={handleScannedCard} />
 
       <CaptainTransferDialog
         open={isTransferCaptainOpen}

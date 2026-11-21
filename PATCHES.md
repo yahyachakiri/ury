@@ -3617,7 +3617,39 @@ order with Patch 47's toast and the phone says it was applied; with the till on 
 platform order the phone shows the till's refusal; with no till open the phone says no till answered. The USB scanner
 works as before.
 
-Patch file: `patches/81-one-open-till-phone-scan.patch`. Commit: pending.
+Patch file: `patches/81-one-open-till-phone-scan.patch`. Commit: c2e5e883.
+
+### Patch 82 — Waiter app: scan a loyalty card for the table's order
+
+Ticket 116 (owner 2026-11-21): a waiter scans the customer's card with the phone camera; the customer goes onto the
+table's order, also on a table already sent or served as "Client comptoir" (customers say who they are at checkout).
+
+Files touched: `pos/src/captain/components/CaptainScanDialog.tsx` (new), `pos/src/captain/pages/CaptainOrder.tsx`
+(button under the customer field, the dialog, `handleScannedCard`), locales (`loyalty_scan`).
+
+What it does: "Scanner une carte de fidélité" under the customer field opens a camera dialog (the browser's
+BarcodeDetector, else jsQR 1.4.0 loaded at runtime from erp_restaurant `public/js/vendor/jsqr-1.4.0.min.js`; the
+server's POS build runs no `yarn install`, so no new package), with a typed code as fallback. New order: erp_restaurant
+`loyalty.resolve_for_waiter`, then the customer is set before sending. Order already sent: `loyalty.set_order_customer`
+(unpaid, still on the POS Profile's default customer, a named customer never replaced; refusals translated), then the
+order's customer, and its `lastModifiedTime` only if this copy was current (`previous_modified`, as Patch 81). Open
+tills and other waiter apps follow through Patch 81's `erp_order_customer` listener. A refused code is not asked again
+for 3 s while the camera keeps seeing it. The button shows on every plan; on Essentiel or with loyalty off the server
+refuses with its message.
+
+Why not in `erp_restaurant` alone: the scan button and camera are in the waiter app's order screen, and a new order's
+customer lives only in its React state until sent. The order change, its checks and the jsQR file are erp_restaurant.
+
+Risk profile: low to medium. CaptainOrder.tsx gains one button, one dialog and one handler; the customer field and
+the send path are unchanged.
+
+Acceptance criteria and manual test: waiter, new table order: scan, then send: the order reaches the till and the
+kitchen with the customer. Table already sent as "Client comptoir": scan: the customer field shows the member, the
+till paying that table shows the member and the paid order gives the points once, also when the till had that order
+open in Orders; send another item afterwards from the waiter app: no "modified" refusal. A table with a named customer or a paid order: refused with the message. Unknown card: the message,
+nothing changed. Typed code works without a camera. fr, ar (right to left), en.
+
+Patch file: `patches/82-waiter-scan-loyalty-card.patch`. Commit: pending.
 
 ## Build and deploy
 

@@ -1,0 +1,355 @@
+diff --git a/pos/src/captain/components/CaptainScanDialog.tsx b/pos/src/captain/components/CaptainScanDialog.tsx
+new file mode 100644
+index 00000000..0c093e50
+--- /dev/null
++++ b/pos/src/captain/components/CaptainScanDialog.tsx
+@@ -0,0 +1,187 @@
++import { useEffect, useRef, useState } from 'react';
++import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@ury/ui';
++import { t } from '../../i18n';
++
++// Patch 82 (ticket 116, owner 2026-11-21): the waiter scans a customer's loyalty card with the phone's camera (or
++// types its code). The browser's own BarcodeDetector where it exists (Chrome on Android); else jsQR 1.4.0, served by
++// erp_restaurant (public/js/vendor, loaded only then: the server's POS build installs no new package).
++const CARD = /LOY[A-Z]{12}/;
++const JSQR_URL = '/assets/erp_restaurant/js/vendor/jsqr-1.4.0.min.js';
++const EVERY_MS = 250;
++const RETRY_AFTER_MS = 3000;
++
++type Detector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]> };
++type DetectorClass = { new (options: { formats: string[] }): Detector; getSupportedFormats?: () => Promise<string[]> };
++type JsQr = (data: Uint8ClampedArray, width: number, height: number, options?: { inversionAttempts?: string }) => { data: string } | null;
++
++async function nativeDetector(): Promise<Detector | null> {
++  const Native = (window as unknown as { BarcodeDetector?: DetectorClass }).BarcodeDetector;
++  if (!Native) return null;
++  try {
++    const formats = (await Native.getSupportedFormats?.()) ?? ['qr_code'];
++    return formats.includes('qr_code') ? new Native({ formats: ['qr_code'] }) : null;
++  } catch {
++    return null;
++  }
++}
++
++let jsQrPromise: Promise<JsQr | null> | null = null;
++function loadJsQr(): Promise<JsQr | null> {
++  const ready = (window as unknown as { jsQR?: JsQr }).jsQR;
++  if (ready) return Promise.resolve(ready);
++  if (!jsQrPromise) {
++    jsQrPromise = new Promise((resolve) => {
++      const script = document.createElement('script');
++      script.src = JSQR_URL;
++      script.async = true;
++      script.onload = () => resolve((window as unknown as { jsQR?: JsQr }).jsQR ?? null);
++      script.onerror = () => {
++        jsQrPromise = null;
++        resolve(null);
++      };
++      document.head.appendChild(script);
++    });
++  }
++  return jsQrPromise;
++}
++
++interface CaptainScanDialogProps {
++  open: boolean;
++  onOpenChange: (open: boolean) => void;
++  /** Called with a card code; resolves once applied, throws when refused (the caller shows the message). */
++  onCode: (code: string) => Promise<void>;
++}
++
++export default function CaptainScanDialog({ open, onOpenChange, onCode }: CaptainScanDialogProps) {
++  const video = useRef<HTMLVideoElement>(null);
++  const [camera, setCamera] = useState<'starting' | 'on' | 'off'>('starting');
++  const [typed, setTyped] = useState('');
++  const [busy, setBusy] = useState(false);
++  const [attempt, setAttempt] = useState(0);
++  const busyRef = useRef(false);
++  // The last code that failed, and when: the camera keeps seeing it, so it is skipped for a few seconds.
++  const failedRef = useRef<{ code: string; at: number } | null>(null);
++  const onCodeRef = useRef(onCode);
++  onCodeRef.current = onCode;
++
++  const submit = async (code: string, fromCamera = false) => {
++    if (busyRef.current) return;
++    const failed = failedRef.current;
++    if (fromCamera && failed && failed.code === code && Date.now() - failed.at < RETRY_AFTER_MS) return;
++    busyRef.current = true;
++    setBusy(true);
++    try {
++      await onCodeRef.current(code);
++      failedRef.current = null;
++    } catch {
++      failedRef.current = { code, at: Date.now() };
++    } finally {
++      busyRef.current = false;
++      setBusy(false);
++    }
++  };
++
++  useEffect(() => {
++    if (!open) return;
++    let stream: MediaStream | null = null;
++    let timer = 0;
++    let stopped = false;
++    const canvas = document.createElement('canvas');
++    const context = canvas.getContext('2d', { willReadFrequently: true });
++
++    const start = async () => {
++      setCamera('starting');
++      if (!navigator.mediaDevices?.getUserMedia) return setCamera('off');
++      try {
++        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
++      } catch {
++        return setCamera('off');
++      }
++      if (stopped || !video.current) {
++        stream.getTracks().forEach((track) => track.stop());
++        return;
++      }
++      video.current.srcObject = stream;
++      await video.current.play().catch(() => undefined);
++      setCamera('on');
++      const detector = await nativeDetector();
++      const jsQR = detector ? null : await loadJsQr();
++      const tick = async () => {
++        if (stopped) return;
++        const v = video.current;
++        let text: string | null = null;
++        if (!busyRef.current && v && v.readyState >= 2 && v.videoWidth) {
++          try {
++            if (detector) {
++              text = (await detector.detect(v)).map((r) => r.rawValue).find((value) => CARD.test(value)) ?? null;
++            } else if (jsQR && context) {
++              const scale = Math.min(1, 640 / v.videoWidth);
++              canvas.width = Math.round(v.videoWidth * scale);
++              canvas.height = Math.round(v.videoHeight * scale);
++              context.drawImage(v, 0, 0, canvas.width, canvas.height);
++              const image = context.getImageData(0, 0, canvas.width, canvas.height);
++              const found = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
++              text = found && CARD.test(found.data) ? found.data : null;
++            }
++          } catch {
++            text = null;
++          }
++        }
++        const match = text?.match(CARD)?.[0];
++        if (match) await submit(match, true);
++        timer = window.setTimeout(tick, EVERY_MS);
++      };
++      void tick();
++    };
++    void start();
++    return () => {
++      stopped = true;
++      window.clearTimeout(timer);
++      stream?.getTracks().forEach((track) => track.stop());
++    };
++  }, [open, attempt]);
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent className="max-w-md">
++        <DialogHeader>
++          <DialogTitle>{t('loyalty_scan.title')}</DialogTitle>
++          <DialogDescription>{t('loyalty_scan.hint')}</DialogDescription>
++        </DialogHeader>
++        <div className="relative overflow-hidden rounded-lg bg-black">
++          <video ref={video} muted playsInline autoPlay className="aspect-[4/3] w-full object-cover" />
++          {camera !== 'on' && (
++            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-sm text-white">
++              <p>{t(camera === 'starting' ? 'loyalty_scan.camera_starting' : 'loyalty_scan.camera_off')}</p>
++              {camera === 'off' && (
++                <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
++                  {t('loyalty_scan.camera_retry')}
++                </Button>
++              )}
++            </div>
++          )}
++        </div>
++        <form
++          className="flex gap-2"
++          onSubmit={(event) => {
++            event.preventDefault();
++            const code = typed.replace(/\s/g, '').toUpperCase();
++            if (CARD.test(code)) void submit(code).then(() => setTyped(''));
++          }}
++        >
++          <Input
++            value={typed}
++            onChange={(e) => setTyped(e.target.value)}
++            placeholder={t('loyalty_scan.code_placeholder')}
++            aria-label={t('loyalty_scan.code_placeholder')}
++            autoComplete="off"
++            className="flex-1"
++          />
++          <Button type="submit" disabled={busy || !CARD.test(typed.replace(/\s/g, '').toUpperCase())}>
++            {t('loyalty_scan.apply')}
++          </Button>
++        </form>
++      </DialogContent>
++    </Dialog>
++  );
++}
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index fa670611..7e791e8a 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -1,8 +1,8 @@
+ import { useEffect, useMemo, useState } from 'react';
+ import { useNavigate, useParams } from 'react-router-dom';
+-import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react';
++import { ChevronLeft, ClipboardList, Loader2, ScanLine, UtensilsCrossed } from 'lucide-react';
+ import { Button, Spinner, cn, showToast } from '@ury/ui';
+-import { formatCurrency, parseFrappeError } from '@ury/core';
++import { call, formatCurrency, parseFrappeError } from '@ury/core';
+ import { usePOSStore } from '../../store/pos-store';
+ import { useRootStore, RootState } from '../../store/root-store';
+ import {
+@@ -25,6 +25,7 @@ import CommentDialog from '../../components/CommentDialog';
+ import TableTransferDialog from '../../components/TableTransferDialog';
+ import CaptainTransferDialog from '../../components/CaptainTransferDialog';
+ import { CustomerSelect } from '../../components/CustomerSelect';
++import CaptainScanDialog from '../components/CaptainScanDialog';
+ import { t } from '../../i18n';
+ 
+ type Mode = 'menu' | 'order';
+@@ -92,6 +93,8 @@ export default function CaptainOrder() {
+   const [transferDestinations, setTransferDestinations] = useState<Table[]>([]);
+   const [isTransferDestinationsLoading, setIsTransferDestinationsLoading] = useState(false);
+   const [isTransferCaptainOpen, setIsTransferCaptainOpen] = useState(false);
++  // Patch 82 (ticket 116): the loyalty card scan of this table's customer.
++  const [isScanOpen, setIsScanOpen] = useState(false);
+ 
+   // Default to the Order view for a table that already has a baseline
+   // order, Menu for a fresh table — matches PLAN §5 ("free table: menu
+@@ -365,6 +368,38 @@ export default function CaptainOrder() {
+     navigate('/order');
+   };
+ 
++  // Patch 82 (ticket 116, owner 2026-11-21): a scanned card puts its customer on this table's order. A new order
++  // takes it before it is sent; an order already sent or served on the till's default customer ("Client comptoir")
++  // takes it on the server (erp_restaurant loyalty.set_order_customer: unpaid only, a named customer is never
++  // replaced), and the order's new time is kept so the next update is not refused as modified.
++  const handleScannedCard = async (code: string) => {
++    const pos = usePOSStore.getState();
++    type Member = { customer: string; customer_name: string; phone?: string; points?: number };
++    try {
++      if (!pos.isUpdatingOrder || !pos.orderId) {
++        const r = await call.get<{ message: Member }>('erp_restaurant.erp_restaurant.loyalty.resolve_for_waiter', { code });
++        pos.setSelectedCustomer({ id: r.message.customer, name: r.message.customer_name, phone: r.message.phone || '' });
++        showToast.success(t('loyalty_scan.customer_set', { name: r.message.customer_name }));
++      } else {
++        const r = await call.post<{ message: { customer: string; customer_name: string; modified: string; previous_modified: string } }>(
++          'erp_restaurant.erp_restaurant.loyalty.set_order_customer',
++          { invoice: pos.orderId, code }
++        );
++        // The new time only if this copy was current (Patch 06's check stays meaningful).
++        const current = pos.lastModifiedTime === r.message.previous_modified;
++        usePOSStore.setState({
++          selectedCustomer: { id: r.message.customer, name: r.message.customer_name, phone: '' },
++          lastModifiedTime: current ? r.message.modified : pos.lastModifiedTime,
++        });
++        showToast.success(t('loyalty_scan.order_customer_set', { name: r.message.customer_name }));
++      }
++      setIsScanOpen(false);
++    } catch (err) {
++      showToast.error(parseFrappeError(err, t('loyalty_scan.failed')));
++      throw err; // the dialog skips this code for a few seconds instead of asking again at every frame
++    }
++  };
++
+   const MIN_PAX = 1;
+   const MAX_PAX = 50;
+ 
+@@ -377,6 +412,12 @@ export default function CaptainOrder() {
+         // validation error. Reused as-is from the Cashier OrderPanel.
+         <CustomerSelect disabled={isInteractionDisabled} />
+       )}
++      {canModify && (
++        <Button variant="outline" className="w-full gap-2" disabled={isSubmitting} onClick={() => setIsScanOpen(true)}>
++          <ScanLine className="w-4 h-4" aria-hidden="true" />
++          {t('loyalty_scan.button')}
++        </Button>
++      )}
+ 
+       {!canModify && (
+         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
+@@ -737,6 +778,8 @@ export default function CaptainOrder() {
+         onConfirm={handleTableTransferConfirm}
+       />
+ 
++      <CaptainScanDialog open={isScanOpen} onOpenChange={setIsScanOpen} onCode={handleScannedCard} />
++
+       <CaptainTransferDialog
+         open={isTransferCaptainOpen}
+         onOpenChange={setIsTransferCaptainOpen}
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 2f0fa486..06af5d24 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -733,5 +733,18 @@
+     "text": "تُفتح نقطة البيع على حاسوب أو لوحة. من هذا الهاتف، امسح بطاقات الوفاء: يُضاف الزبون إلى الطلب المفتوح في نقطة البيع الخاصة بك.",
+     "scan": "مسح بطاقة",
+     "logout": "تسجيل الخروج"
++  },
++  "loyalty_scan": {
++    "button": "مسح بطاقة الوفاء",
++    "title": "بطاقة الوفاء",
++    "hint": "وجّه الكاميرا نحو بطاقة الزبون، أو أدخل رمزها.",
++    "camera_starting": "جارٍ فتح الكاميرا…",
++    "camera_off": "الكاميرا غير متاحة. أدخل رمز البطاقة أسفله.",
++    "camera_retry": "إعادة المحاولة",
++    "code_placeholder": "رمز البطاقة (LOY…)",
++    "apply": "تأكيد",
++    "customer_set": "الزبون: {{name}}",
++    "order_customer_set": "{{name}} الآن على طلب هذه الطاولة.",
++    "failed": "تعذّر تطبيق البطاقة. حاول مرة أخرى."
+   }
+ }
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 09c72e91..d8e8baad 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -726,5 +726,18 @@
+     "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
+     "scan": "Scan a card",
+     "logout": "Log out"
++  },
++  "loyalty_scan": {
++    "button": "Scan a loyalty card",
++    "title": "Loyalty card",
++    "hint": "Point the camera at the customer's card, or type its code.",
++    "camera_starting": "Opening the camera…",
++    "camera_off": "The camera is not available. Type the card's code below.",
++    "camera_retry": "Try again",
++    "code_placeholder": "Card code (LOY…)",
++    "apply": "Apply",
++    "customer_set": "Customer: {{name}}",
++    "order_customer_set": "{{name}} is now on this table's order.",
++    "failed": "The card could not be applied. Try again."
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index dce20197..2ea1dd81 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -726,5 +726,18 @@
+     "text": "La caisse s'ouvre sur un ordinateur ou une tablette. Depuis ce téléphone, scannez les cartes de fidélité : le client est mis sur la commande en cours de votre caisse.",
+     "scan": "Scanner une carte",
+     "logout": "Se déconnecter"
++  },
++  "loyalty_scan": {
++    "button": "Scanner une carte de fidélité",
++    "title": "Carte de fidélité",
++    "hint": "Visez la carte du client avec la caméra, ou saisissez son code.",
++    "camera_starting": "Ouverture de la caméra…",
++    "camera_off": "La caméra n'est pas disponible. Saisissez le code de la carte ci-dessous.",
++    "camera_retry": "Réessayer",
++    "code_placeholder": "Code de la carte (LOY…)",
++    "apply": "Valider",
++    "customer_set": "Client : {{name}}",
++    "order_customer_set": "{{name}} est maintenant sur la commande de cette table.",
++    "failed": "La carte n'a pas pu être prise. Réessayez."
+   }
+ }

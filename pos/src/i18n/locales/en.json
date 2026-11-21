@@ -726,5 +726,18 @@
     "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
     "scan": "Scan a card",
     "logout": "Log out"
+  },
+  "loyalty_scan": {
+    "button": "Scan a loyalty card",
+    "title": "Loyalty card",
+    "hint": "Point the camera at the customer's card, or type its code.",
+    "camera_starting": "Opening the camera…",
+    "camera_off": "The camera is not available. Type the card's code below.",
+    "camera_retry": "Try again",
+    "code_placeholder": "Card code (LOY…)",
+    "apply": "Apply",
+    "customer_set": "Customer: {{name}}",
+    "order_customer_set": "{{name}} is now on this table's order.",
+    "failed": "The card could not be applied. Try again."
   }
 }
