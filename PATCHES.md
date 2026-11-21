@@ -3649,7 +3649,7 @@ till paying that table shows the member and the paid order gives the points once
 open in Orders; send another item afterwards from the waiter app: no "modified" refusal. A table with a named customer or a paid order: refused with the message. Unknown card: the message,
 nothing changed. Typed code works without a camera. fr, ar (right to left), en.
 
-Patch file: `patches/82-waiter-scan-loyalty-card.patch`. Commit: pending.
+Patch file: `patches/82-waiter-scan-loyalty-card.patch`. Commit: 7e6543a6.
 
 ## Build and deploy
 
