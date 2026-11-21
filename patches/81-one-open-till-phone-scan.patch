@@ -1,0 +1,362 @@
+diff --git a/pos/src/App.tsx b/pos/src/App.tsx
+index d610e0ca..e733c4cd 100644
+--- a/pos/src/App.tsx
++++ b/pos/src/App.tsx
+@@ -11,6 +11,7 @@ import ScreenSizeProvider from './components/ScreenSizeProvider';
+ import KotAlertListener from './components/KotAlertListener';
+ import SelfOrderListener, { OpenOrderBridge } from './components/SelfOrderListener';
+ import LoyaltyScanListener from './components/LoyaltyScanListener';
++import TillGuard from './components/TillGuard';
+ import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
+ import CaptainTables from './captain/pages/CaptainTables';
+ import CaptainOrder from './captain/pages/CaptainOrder';
+@@ -40,6 +41,8 @@ function App() {
+       <KotAlertListener />
+       <SelfOrderListener />
+       <LoyaltyScanListener />
++      {/* Patch 81: one open till per till and per cashier. */}
++      <TillGuard />
+       <ScreenSizeProvider>
+         <AuthGuard>
+           <POSOpeningProvider>
+diff --git a/pos/src/components/LoyaltyScanListener.tsx b/pos/src/components/LoyaltyScanListener.tsx
+index c33b22cc..83c058ce 100644
+--- a/pos/src/components/LoyaltyScanListener.tsx
++++ b/pos/src/components/LoyaltyScanListener.tsx
+@@ -2,6 +2,9 @@ import { useEffect } from 'react';
+ import { call, parseFrappeError } from '@ury/core';
+ import { showToast } from '@ury/ui';
+ import { usePOSStore } from '../store/pos-store';
++import { useRootStore } from '../store/root-store';
++import { getRealtimeSocket } from '../lib/realtime';
++import { isTillScreen } from './TillGuard';
+ import { t } from '../i18n';
+ 
+ // Patch 47 (ticket 39): a USB scanner types a loyalty card's code like a keyboard, fast,
+@@ -29,6 +32,16 @@ function clearTyped(el: Element | null, typed: string) {
+   el.dispatchEvent(new Event('input', { bubbles: true }));
+ }
+ 
++/** Why a card cannot go onto the till's current order now (a translated message), else null. Patch 47's rules. */
++function whyNot(): string | null {
++  const { selectedOrderType, isUpdatingOrder } = usePOSStore.getState();
++  if (window.location.pathname.replace(/\/$/, '') !== ORDER_SCREEN) return t('loyalty.scan_on_order_screen');
++  // A sent order keeps its customer (the till's customer picker is locked too).
++  if (isUpdatingOrder) return t('loyalty.order_already_sent');
++  if (selectedOrderType === 'Aggregators') return t('loyalty.not_for_platforms');
++  return null;
++}
++
+ const LoyaltyScanListener: React.FC = () => {
+   useEffect(() => {
+     let buffer = '';
+@@ -60,18 +73,10 @@ const LoyaltyScanListener: React.FC = () => {
+     };
+ 
+     const resolve = async (code: string) => {
+-      const { selectedOrderType, setSelectedCustomer, isUpdatingOrder } = usePOSStore.getState();
+-      if (window.location.pathname.replace(/\/$/, '') !== ORDER_SCREEN) {
+-        showToast.error(t('loyalty.scan_on_order_screen'));
+-        return;
+-      }
+-      // A sent order keeps its customer (the till's customer picker is locked too).
+-      if (isUpdatingOrder) {
+-        showToast.error(t('loyalty.order_already_sent'));
+-        return;
+-      }
+-      if (selectedOrderType === 'Aggregators') {
+-        showToast.error(t('loyalty.not_for_platforms'));
++      const { setSelectedCustomer } = usePOSStore.getState();
++      const refusal = whyNot();
++      if (refusal) {
++        showToast.error(refusal);
+         return;
+       }
+       try {
+@@ -84,9 +89,63 @@ const LoyaltyScanListener: React.FC = () => {
+       }
+     };
+ 
++    // Patch 81 (ticket 116): a card scanned on the cashier's phone (erp_restaurant loyalty.send_to_till) arrives
++    // here, on the till of the same account, and goes through the same rules as a USB scan; the phone gets the
++    // answer (loyalty.scan_result).
++    const onPhoneScan = (p: { scan_id: string; customer: string; customer_name: string; phone?: string; points?: number }) => {
++      if (!isTillScreen() || !p?.scan_id) return; // a phone or the waiter app never answers for the till
++      const refusal = whyNot();
++      if (!refusal) {
++        usePOSStore.getState().setSelectedCustomer({ id: p.customer, name: p.customer_name, phone: p.phone || '' });
++        showToast.success(t('loyalty.customer_set', { name: p.customer_name, points: p.points ?? 0 }));
++      } else {
++        showToast.error(refusal);
++      }
++      call
++        .post('erp_restaurant.erp_restaurant.loyalty.scan_result', { scan_id: p.scan_id, status: refusal ? 'refused' : 'applied', message: refusal || '' })
++        .catch(() => undefined);
++    };
++
++    // Patch 81 / 82: a waiter scanned a card on a served "Client comptoir" order (loyalty.set_order_customer): an
++    // open till or waiter app showing that order takes the customer and the order's new time (its next update would
++    // be refused as modified otherwise); the Orders list reloads so the payment sends the new customer.
++    const onOrderCustomer = (p: { invoice: string; customer: string; customer_name: string; modified?: string; previous_modified?: string }) => {
++      const pos = usePOSStore.getState();
++      if (pos.orderId && pos.orderId === p.invoice) {
++        // The new time only if this copy was current: else the next update must still be refused as modified
++        // (Patch 06), rather than overwrite lines another device sent meanwhile.
++        const current = !!p.modified && pos.lastModifiedTime === p.previous_modified;
++        usePOSStore.setState({
++          selectedCustomer: { id: p.customer, name: p.customer_name, phone: '' },
++          lastModifiedTime: current ? p.modified : pos.lastModifiedTime,
++        });
++      }
++      if (window.location.pathname.startsWith('/pos/orders')) {
++        const root = useRootStore.getState();
++        root.fetchOrders(root.pagination.currentPage).catch(() => undefined);
++        if (root.selectedOrder?.name === p.invoice) root.selectOrder(root.selectedOrder).catch(() => undefined);
++      }
++    };
++
++    let socket: Awaited<ReturnType<typeof getRealtimeSocket>> | null = null;
++    let stopped = false;
++    getRealtimeSocket()
++      .then((s) => {
++        if (stopped) return;
++        socket = s;
++        s.on('erp_loyalty_scan', onPhoneScan);
++        s.on('erp_order_customer', onOrderCustomer);
++      })
++      .catch(() => undefined);
++
+     // Capture phase: the Enter must not also submit the field the scanner typed into.
+     document.addEventListener('keydown', onKeyDown, true);
+-    return () => document.removeEventListener('keydown', onKeyDown, true);
++    return () => {
++      stopped = true;
++      document.removeEventListener('keydown', onKeyDown, true);
++      socket?.off('erp_loyalty_scan', onPhoneScan);
++      socket?.off('erp_order_customer', onOrderCustomer);
++    };
+   }, []);
+ 
+   return null;
+diff --git a/pos/src/components/PhoneTillScreen.tsx b/pos/src/components/PhoneTillScreen.tsx
+new file mode 100644
+index 00000000..e91ccffc
+--- /dev/null
++++ b/pos/src/components/PhoneTillScreen.tsx
+@@ -0,0 +1,32 @@
++import { LogOut, ScanLine } from 'lucide-react';
++import { Button } from '@ury/ui';
++import { t } from '../i18n';
++
++// Patch 81 (ticket 116, owner 2026-11-21): a cashier opening the till on a phone gets this screen instead of URY's
++// "Desktop Only" dialog. The scan button opens erp_restaurant's scan page in "send to the till" mode (/scan?till=1):
++// the scanned customer goes onto the order open on the till of the same account (Patch 81 LoyaltyScanListener).
++const PhoneTillScreen = () => {
++  const logout = () => {
++    fetch('/api/method/logout', { credentials: 'include' })
++      .catch(() => undefined)
++      .finally(() => window.location.assign('/login'));
++  };
++  return (
++    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6 text-center">
++      <div className="space-y-2">
++        <h1 className="text-xl font-semibold text-gray-900">{t('phone_till.title')}</h1>
++        <p className="text-sm text-gray-600">{t('phone_till.text')}</p>
++      </div>
++      <Button className="h-14 w-full max-w-xs gap-2 text-base" onClick={() => window.location.assign('/scan?till=1')}>
++        <ScanLine className="h-5 w-5" aria-hidden="true" />
++        {t('phone_till.scan')}
++      </Button>
++      <Button variant="ghost" onClick={logout} className="gap-2 text-sm text-gray-500">
++        <LogOut className="h-4 w-4" aria-hidden="true" />
++        {t('phone_till.logout')}
++      </Button>
++    </div>
++  );
++};
++
++export default PhoneTillScreen;
+diff --git a/pos/src/components/ScreenSizeProvider.tsx b/pos/src/components/ScreenSizeProvider.tsx
+index 4371c366..5097b523 100644
+--- a/pos/src/components/ScreenSizeProvider.tsx
++++ b/pos/src/components/ScreenSizeProvider.tsx
+@@ -1,5 +1,5 @@
+ import { useState, useEffect } from 'react';
+-import ScreenSizeDialog from './ScreenSizeDialog';
++import PhoneTillScreen from './PhoneTillScreen';
+ 
+ interface ScreenSizeProviderProps {
+   children: React.ReactNode;
+@@ -41,9 +41,9 @@ const ScreenSizeProvider = ({ children }: ScreenSizeProviderProps) => {
+     };
+   }, []);
+ 
+-  // Show dialog if screen is too small
++  // Patch 81 (ticket 116): a phone gets the scan screen (scan for the till of the same account), not "Desktop Only".
+   if (isScreenTooSmall) {
+-    return <ScreenSizeDialog />;
++    return <PhoneTillScreen />;
+   }
+ 
+   // Render children if screen size is acceptable
+diff --git a/pos/src/components/TillGuard.tsx b/pos/src/components/TillGuard.tsx
+new file mode 100644
+index 00000000..6d014475
+--- /dev/null
++++ b/pos/src/components/TillGuard.tsx
+@@ -0,0 +1,106 @@
++import { useEffect } from 'react';
++import { call } from '@ury/core';
++import { usePOSStore } from '../store/pos-store';
++import { getRealtimeSocket } from '../lib/realtime';
++
++// Patch 81 (ticket 116, owner 2026-11-21): one open till per till (POS Profile) and per cashier. The till screen
++// claims erp_restaurant till_lock when its POS Profile is known and renews it every 20 s; a refused claim, a lost
++// lock or another device's "Prendre la main" (erp_till_taken) sends this tab to the "till already open" page
++// (/scan?busy=<till>, erp_restaurant owner app), which can scan cards for the open till or take it over.
++// The device is a random ID per tab (sessionStorage), read by that page too. The waiter app and the phone screen
++// (under 1024 px, Patch 81 PhoneTillScreen) take no lock.
++const LOCK = 'erp_restaurant.erp_restaurant.till_lock';
++export const DEVICE_KEY = 'erp_till_device';
++const RENEW_MS = 20_000;
++
++export function tillDeviceId(): string {
++  const fresh = () =>
++    typeof crypto !== 'undefined' && 'randomUUID' in crypto
++      ? crypto.randomUUID()
++      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
++  try {
++    const saved = sessionStorage.getItem(DEVICE_KEY);
++    if (saved) return saved;
++    const id = fresh();
++    sessionStorage.setItem(DEVICE_KEY, id);
++    return id;
++  } catch {
++    return fresh();
++  }
++}
++
++/** The till screen (not the waiter app /pos/order, not a phone). /pos/orders (the till's Orders page) is the till. */
++export const isTillScreen = () => {
++  const path = window.location.pathname.replace(/\/$/, '');
++  return window.innerWidth >= 1024 && path !== '/pos/order' && !path.startsWith('/pos/order/');
++};
++
++type Claim = { ok: boolean; reason?: string };
++
++const TillGuard: React.FC = () => {
++  const tillName = usePOSStore((s) => s.posProfile?.name);
++
++  useEffect(() => {
++    if (!tillName || !isTillScreen()) return;
++    const device = tillDeviceId();
++    let stopped = false;
++    let timer = 0;
++
++    const leave = () => {
++      if (stopped) return;
++      stopped = true;
++      window.location.assign(`/scan?busy=${encodeURIComponent(tillName)}`);
++    };
++
++    const tick = async () => {
++      if (stopped) return;
++      try {
++        const r = await call.post<{ message: Claim }>(`${LOCK}.claim`, { pos_profile: tillName, device_id: device });
++        if (!r.message.ok) return leave();
++      } catch {
++        // Network or server error: keep the till usable and try again at the next renewal.
++      }
++      timer = window.setTimeout(tick, RENEW_MS);
++    };
++    void tick();
++
++    // Best effort: a closed tab frees the till at once instead of after the lock's minute.
++    const release = () => {
++      if (stopped) return;
++      fetch(`/api/method/${LOCK}.release`, {
++        method: 'POST',
++        keepalive: true,
++        credentials: 'include',
++        headers: {
++          'Content-Type': 'application/json',
++          'X-Frappe-CSRF-Token': (window as unknown as { csrf_token?: string }).csrf_token || '',
++        },
++        body: JSON.stringify({ pos_profile: tillName, device_id: device }),
++      }).catch(() => undefined);
++    };
++    window.addEventListener('pagehide', release);
++
++    const onTaken = (payload: { device?: string }) => {
++      if (payload?.device === device) leave();
++    };
++    let socket: Awaited<ReturnType<typeof getRealtimeSocket>> | null = null;
++    getRealtimeSocket()
++      .then((s) => {
++        if (stopped) return;
++        socket = s;
++        s.on('erp_till_taken', onTaken);
++      })
++      .catch(() => undefined);
++
++    return () => {
++      stopped = true;
++      window.clearTimeout(timer);
++      window.removeEventListener('pagehide', release);
++      socket?.off('erp_till_taken', onTaken);
++    };
++  }, [tillName]);
++
++  return null;
++};
++
++export default TillGuard;
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index e972a8cf..2f0fa486 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -727,5 +727,11 @@
+         "card_image_failed": "تعذر إنشاء صورة البطاقة: اطبعها بدلا من ذلك.",
+         "points_exceed_max": "الحد الأقصى {{max}} نقطة في هذا الطلب.",
+         "remove_points": "عدم استعمال النقاط"
+-    }
++    },
++  "phone_till": {
++    "title": "نقطة البيع على الهاتف",
++    "text": "تُفتح نقطة البيع على حاسوب أو لوحة. من هذا الهاتف، امسح بطاقات الوفاء: يُضاف الزبون إلى الطلب المفتوح في نقطة البيع الخاصة بك.",
++    "scan": "مسح بطاقة",
++    "logout": "تسجيل الخروج"
++  }
+ }
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index f3d4c5be..09c72e91 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -720,5 +720,11 @@
+     "card_image_failed": "The card picture could not be made: print it instead.",
+     "points_exceed_max": "At most {{max}} points on this order.",
+     "remove_points": "Do not use points"
++  },
++  "phone_till": {
++    "title": "Till on a phone",
++    "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
++    "scan": "Scan a card",
++    "logout": "Log out"
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 82349cb9..dce20197 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -720,5 +720,11 @@
+     "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt.",
+     "points_exceed_max": "Au plus {{max}} points sur cette commande.",
+     "remove_points": "Ne pas utiliser de points"
++  },
++  "phone_till": {
++    "title": "Caisse sur téléphone",
++    "text": "La caisse s'ouvre sur un ordinateur ou une tablette. Depuis ce téléphone, scannez les cartes de fidélité : le client est mis sur la commande en cours de votre caisse.",
++    "scan": "Scanner une carte",
++    "logout": "Se déconnecter"
+   }
+ }

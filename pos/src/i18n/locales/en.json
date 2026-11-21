@@ -720,5 +720,11 @@
     "card_image_failed": "The card picture could not be made: print it instead.",
     "points_exceed_max": "At most {{max}} points on this order.",
     "remove_points": "Do not use points"
+  },
+  "phone_till": {
+    "title": "Till on a phone",
+    "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
+    "scan": "Scan a card",
+    "logout": "Log out"
   }
 }

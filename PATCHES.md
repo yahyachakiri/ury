@@ -3557,6 +3557,68 @@ reload with the network off, then on: the order is still there.
 
 Patch file: `patches/80-qr-resume-session.patch`. Commit: 79e8de66.
 
+### Patch 81 — One open till per till and per cashier; phone scan screen; a phone scan reaches the till
+
+Ticket 116 (owner 2026-11-21): a cashier on a phone gets a scan button instead of URY's "Desktop Only" dialog; a card
+scanned on that phone goes onto the order open on the till of the same account, in real time; two tills cannot be
+open at the same time, per till (POS Profile) and per cashier: the second device goes to a "till already open" page
+with the scan button and "Prendre la main".
+
+Files touched: `pos/src/components/TillGuard.tsx` (new), `pos/src/components/PhoneTillScreen.tsx` (new),
+`pos/src/components/ScreenSizeProvider.tsx` (renders PhoneTillScreen instead of ScreenSizeDialog),
+`pos/src/App.tsx` (mounts TillGuard), `pos/src/components/LoyaltyScanListener.tsx` (Patch 47's rules in `whyNot()`;
+two realtime listeners), locales (`phone_till`).
+
+What it does:
+1. TillGuard: on the till screen (1024 px or more, not the waiter app), once the POS Profile is known, claims
+   erp_restaurant `till_lock.claim(pos_profile, device_id)` and renews it every 20 s (the lock lives 60 s); the
+   device is a random ID per tab (sessionStorage `erp_till_device`, read by the erp_restaurant page too). A refused
+   claim, or the realtime event `erp_till_taken` for this device (another device took the till), sends the tab to
+   `/scan?busy=<till>` (erp_restaurant owner app: who holds the till, the scan for that till, "Prendre la main" for
+   the owner, managers and the same account). `pagehide` releases the lock (fetch keepalive). A network error at a
+   renewal keeps the till usable and retries.
+2. PhoneTillScreen: under 1024 px on the cashier routes, a screen with "Scanner une carte" (opens
+   `/scan?till=1`, erp_restaurant: the phone sends the card with `loyalty.send_to_till`) and logout, in place of
+   "Desktop Only" and its link to the old /urypos. The waiter routes were already exempt.
+3. LoyaltyScanListener: `erp_loyalty_scan` (sent to the scanning user only) is applied on the till screen with
+   Patch 47's rules (order screen, new order, not a platform order) and answered with `loyalty.scan_result`
+   (applied, or refused with the till's message, shown on the phone). `erp_order_customer` (a waiter scanned a card
+   on a served "Client comptoir" order, Patch 82): when that order is loaded in pos-store (till or waiter app) its
+   customer is replaced, and its `lastModifiedTime` takes the server's new time only when the local copy was current
+   (`previous_modified`): a stale copy keeps its old time, so its next update is still refused as modified (Patch 06)
+   instead of overwriting lines another device sent. The Orders page reloads its list and the selected order, so the
+   payment sends the new customer (URY's make_invoice takes the customer from the till). The event is published only
+   to the till's users, the order's waiter and owner (no customer phone in it).
+
+Why not in `erp_restaurant` alone: the phone screen replaces a dialog rendered by the till bundle (the server does
+not know the screen width), and the current order's customer exists only in the till's React state. TillGuard could
+be a script injected by erp_restaurant (release_watch already adds one to /pos), reading the till's internal
+`sessionStorage.posProfile`; kept in the fork because it depends on that internal key otherwise, it shares
+`isTillScreen` with the scan listener, and it is one new file plus three lines in App.tsx (low conflict risk). The
+server side (lock, send to till, scan answers, order customer change) and the phone pages are erp_restaurant.
+
+Applies to every role under 1024 px off the waiter routes: a waiter who lands on /pos on a phone also sees the scan
+screen (staff_routes normally sends waiters to /pos/order), and on a site without loyalty the scan page refuses with
+its own message. Upstream's `isCaptainRoute` (`includes('/order')`) also matches /pos/orders: on a phone the Orders
+page is not covered by the phone screen (upstream code, left as is).
+
+Risk profile: medium. `LoyaltyScanListener.tsx` (Patch 47) gains listeners; pos-store is written with
+`usePOSStore.setState` (no setter exists for `lastModifiedTime` alone) for `selectedCustomer` and `lastModifiedTime` of
+the loaded order only; held tabs (`orderTabs`) keep the old customer and time, so restoring one gives URY's "Order has
+been modified" refusal (safe). A tab widened from phone to desktop width claims the till only after a reload. A till whose lock is lost (network gone
+over a minute while another device opens the same till) leaves for the blocked page at its next renewal. Two tabs
+of the same browser are two devices (the second is blocked).
+
+Acceptance criteria and manual test: till "Caisse 1" open on a computer; open it on a second computer or tablet,
+or the same cashier opens any till elsewhere: the "till already open" page; another cashier opens "Caisse 2":
+normal; close the first tab: the till opens elsewhere within a minute; "Prendre la main" as a manager: the first
+device leaves at once. On a phone, /pos shows the scan screen; a scan puts the customer on the computer till's new
+order with Patch 47's toast and the phone says it was applied; with the till on Orders, on a sent order or on a
+platform order the phone shows the till's refusal; with no till open the phone says no till answered. The USB scanner
+works as before.
+
+Patch file: `patches/81-one-open-till-phone-scan.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

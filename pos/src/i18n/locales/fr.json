@@ -720,5 +720,11 @@
     "card_image_failed": "L'image de la carte n'a pas pu être créée : imprimez-la plutôt.",
     "points_exceed_max": "Au plus {{max}} points sur cette commande.",
     "remove_points": "Ne pas utiliser de points"
+  },
+  "phone_till": {
+    "title": "Caisse sur téléphone",
+    "text": "La caisse s'ouvre sur un ordinateur ou une tablette. Depuis ce téléphone, scannez les cartes de fidélité : le client est mis sur la commande en cours de votre caisse.",
+    "scan": "Scanner une carte",
+    "logout": "Se déconnecter"
   }
 }

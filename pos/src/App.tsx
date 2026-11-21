@@ -11,6 +11,7 @@ import ScreenSizeProvider from './components/ScreenSizeProvider';
 import KotAlertListener from './components/KotAlertListener';
 import SelfOrderListener, { OpenOrderBridge } from './components/SelfOrderListener';
 import LoyaltyScanListener from './components/LoyaltyScanListener';
+import TillGuard from './components/TillGuard';
 import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
 import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
@@ -40,6 +41,8 @@ function App() {
       <KotAlertListener />
       <SelfOrderListener />
       <LoyaltyScanListener />
+      {/* Patch 81: one open till per till and per cashier. */}
+      <TillGuard />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import ScreenSizeDialog from './ScreenSizeDialog';
+import PhoneTillScreen from './PhoneTillScreen';
 
 interface ScreenSizeProviderProps {
   children: React.ReactNode;
@@ -41,9 +41,9 @@ const ScreenSizeProvider = ({ children }: ScreenSizeProviderProps) => {
     };
   }, []);
 
-  // Show dialog if screen is too small
+  // Patch 81 (ticket 116): a phone gets the scan screen (scan for the till of the same account), not "Desktop Only".
   if (isScreenTooSmall) {
-    return <ScreenSizeDialog />;
+    return <PhoneTillScreen />;
   }
 
   // Render children if screen size is acceptable

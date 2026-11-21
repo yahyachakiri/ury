@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import { call, parseFrappeError } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
+import { getRealtimeSocket } from '../lib/realtime';
+import { isTillScreen } from './TillGuard';
 import { t } from '../i18n';
 
 // Patch 47 (ticket 39): a USB scanner types a loyalty card's code like a keyboard, fast,
@@ -27,6 +30,16 @@ function clearTyped(el: Element | null, typed: string) {
   const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
   Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, el.value.slice(0, -typed.length));
   el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** Why a card cannot go onto the till's current order now (a translated message), else null. Patch 47's rules. */
+function whyNot(): string | null {
+  const { selectedOrderType, isUpdatingOrder } = usePOSStore.getState();
+  if (window.location.pathname.replace(/\/$/, '') !== ORDER_SCREEN) return t('loyalty.scan_on_order_screen');
+  // A sent order keeps its customer (the till's customer picker is locked too).
+  if (isUpdatingOrder) return t('loyalty.order_already_sent');
+  if (selectedOrderType === 'Aggregators') return t('loyalty.not_for_platforms');
+  return null;
 }
 
 const LoyaltyScanListener: React.FC = () => {
@@ -60,18 +73,10 @@ const LoyaltyScanListener: React.FC = () => {
     };
 
     const resolve = async (code: string) => {
-      const { selectedOrderType, setSelectedCustomer, isUpdatingOrder } = usePOSStore.getState();
-      if (window.location.pathname.replace(/\/$/, '') !== ORDER_SCREEN) {
-        showToast.error(t('loyalty.scan_on_order_screen'));
-        return;
-      }
-      // A sent order keeps its customer (the till's customer picker is locked too).
-      if (isUpdatingOrder) {
-        showToast.error(t('loyalty.order_already_sent'));
-        return;
-      }
-      if (selectedOrderType === 'Aggregators') {
-        showToast.error(t('loyalty.not_for_platforms'));
+      const { setSelectedCustomer } = usePOSStore.getState();
+      const refusal = whyNot();
+      if (refusal) {
+        showToast.error(refusal);
         return;
       }
       try {
@@ -84,9 +89,63 @@ const LoyaltyScanListener: React.FC = () => {
       }
     };
 
+    // Patch 81 (ticket 116): a card scanned on the cashier's phone (erp_restaurant loyalty.send_to_till) arrives
+    // here, on the till of the same account, and goes through the same rules as a USB scan; the phone gets the
+    // answer (loyalty.scan_result).
+    const onPhoneScan = (p: { scan_id: string; customer: string; customer_name: string; phone?: string; points?: number }) => {
+      if (!isTillScreen() || !p?.scan_id) return; // a phone or the waiter app never answers for the till
+      const refusal = whyNot();
+      if (!refusal) {
+        usePOSStore.getState().setSelectedCustomer({ id: p.customer, name: p.customer_name, phone: p.phone || '' });
+        showToast.success(t('loyalty.customer_set', { name: p.customer_name, points: p.points ?? 0 }));
+      } else {
+        showToast.error(refusal);
+      }
+      call
+        .post('erp_restaurant.erp_restaurant.loyalty.scan_result', { scan_id: p.scan_id, status: refusal ? 'refused' : 'applied', message: refusal || '' })
+        .catch(() => undefined);
+    };
+
+    // Patch 81 / 82: a waiter scanned a card on a served "Client comptoir" order (loyalty.set_order_customer): an
+    // open till or waiter app showing that order takes the customer and the order's new time (its next update would
+    // be refused as modified otherwise); the Orders list reloads so the payment sends the new customer.
+    const onOrderCustomer = (p: { invoice: string; customer: string; customer_name: string; modified?: string; previous_modified?: string }) => {
+      const pos = usePOSStore.getState();
+      if (pos.orderId && pos.orderId === p.invoice) {
+        // The new time only if this copy was current: else the next update must still be refused as modified
+        // (Patch 06), rather than overwrite lines another device sent meanwhile.
+        const current = !!p.modified && pos.lastModifiedTime === p.previous_modified;
+        usePOSStore.setState({
+          selectedCustomer: { id: p.customer, name: p.customer_name, phone: '' },
+          lastModifiedTime: current ? p.modified : pos.lastModifiedTime,
+        });
+      }
+      if (window.location.pathname.startsWith('/pos/orders')) {
+        const root = useRootStore.getState();
+        root.fetchOrders(root.pagination.currentPage).catch(() => undefined);
+        if (root.selectedOrder?.name === p.invoice) root.selectOrder(root.selectedOrder).catch(() => undefined);
+      }
+    };
+
+    let socket: Awaited<ReturnType<typeof getRealtimeSocket>> | null = null;
+    let stopped = false;
+    getRealtimeSocket()
+      .then((s) => {
+        if (stopped) return;
+        socket = s;
+        s.on('erp_loyalty_scan', onPhoneScan);
+        s.on('erp_order_customer', onOrderCustomer);
+      })
+      .catch(() => undefined);
+
     // Capture phase: the Enter must not also submit the field the scanner typed into.
     document.addEventListener('keydown', onKeyDown, true);
-    return () => document.removeEventListener('keydown', onKeyDown, true);
+    return () => {
+      stopped = true;
+      document.removeEventListener('keydown', onKeyDown, true);
+      socket?.off('erp_loyalty_scan', onPhoneScan);
+      socket?.off('erp_order_customer', onOrderCustomer);
+    };
   }, []);
 
   return null;
