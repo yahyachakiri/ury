@@ -320,8 +320,10 @@ export default function Orders() {
   }
 
 
-  async function handlePrintOrder() {
-    if (!selectedOrder || !posStore.posProfile) return;
+  // Patch 83: returns whether the order now counts as printed, so a pay button can print first.
+  // keepSelection: an Unbilled order moved to Draft is selected again there (the pay window needs it).
+  async function handlePrintOrder(options?: { keepSelection?: boolean }): Promise<boolean> {
+    if (!selectedOrder || !posStore.posProfile) return false;
     setIsPrinting(true);
     let printed = false;
     try {
@@ -341,21 +343,36 @@ export default function Orders() {
     } finally {
       setIsPrinting(false);
     }
-    if (!printed) return;
+    if (!printed) return false;
     // Patch 56: a QR pickup order's kitchen ticket goes out with its bill.
     printQrPickupKitchenTicket({ invoice: selectedOrder.name, posProfile: posStore.posProfile }).catch((err) => {
       showToast.error(err instanceof Error ? err.message : String(err));
     });
-    // Locally update selectedOrder.invoice_printed to 1
-    if (selectedOrder && typeof selectedOrder === 'object') {
+    const keepInDraft = selectedStatus === 'Unbilled' && options?.keepSelection;
+    // Locally update selectedOrder.invoice_printed to 1 (Patch 83: done after the tab change when keepInDraft)
+    if (!keepInDraft && selectedOrder && typeof selectedOrder === 'object') {
       selectOrder({ ...selectedOrder, invoice_printed: 1 });
     }
     // If order was Unbilled, set to Draft and reload draft orders
     if (selectedStatus === 'Unbilled') {
       showToast.info(t('success.order_moved_to_draft'));
-      setSelectedStatus('Draft');
-      fetchOrders();
+      if (keepInDraft) {
+        await setSelectedStatus('Draft');
+        await selectOrder({ ...selectedOrder, invoice_printed: 1 });
+      } else {
+        setSelectedStatus('Draft');
+        fetchOrders();
+      }
     }
+    return true;
+  }
+
+  // Patch 83: the pay buttons print the bill first when it is not printed yet (Print stays for reprints).
+  async function ensurePrinted(): Promise<boolean> {
+    if (!selectedOrder) return false;
+    if (String(selectedOrder.invoice_printed) !== '0') return true;
+    if (isPrinting) return false;
+    return handlePrintOrder({ keepSelection: true });
   }
 
   // Patch 10: reprint every kitchen ticket of the selected order.
@@ -905,7 +922,7 @@ export default function Orders() {
                   variant="outline"
                   size="icon"
                   className="flex-shrink-0"
-                  onClick={handlePrintOrder}
+                  onClick={() => void handlePrintOrder()}
                   aria-label={t('order.print')}
                   disabled={isPrinting}
                 >
@@ -918,13 +935,10 @@ export default function Orders() {
                   <Button
                     className="flex-auto"
                     variant={confirmHandOver ? 'destructive' : 'default'}
-                    disabled={handingOver}
+                    disabled={handingOver || isPrinting}
                     onBlur={() => setConfirmHandOver(false)}
                     onClick={async () => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
+                      if (!(await ensurePrinted())) return;
                       if (!confirmHandOver) {
                         setConfirmHandOver(true);
                         return;
@@ -943,12 +957,9 @@ export default function Orders() {
                   <Button
                     className="flex-auto"
                     variant="outline"
-                    disabled={handingOver}
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
+                    disabled={handingOver || isPrinting}
+                    onClick={async () => {
+                      if (!(await ensurePrinted())) return;
                       void posStore.fetchPaymentModes();
                       setPaidNowAmount(String(orderTotal(selectedOrder)));
                       setPaidNowMode('');
@@ -966,11 +977,9 @@ export default function Orders() {
                 {isOrderEditable(selectedOrder.status) && (selectedOrder.order_type !== 'Aggregators' || isMergedBill(selectedOrder)) && (
                   <Button
                     className="flex-1"
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
+                    disabled={isPrinting}
+                    onClick={async () => {
+                      if (!(await ensurePrinted())) return;
                       setShowPaymentDialog(true);
                     }}
                   >

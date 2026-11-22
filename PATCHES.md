@@ -2308,7 +2308,7 @@ Files touched: `pos/src/pages/Orders.tsx` (`handlePrintOrder`), `pos/src/pages/T
 (table print), `pos/src/i18n/locales/en.json`, `fr.json`, `ar.json`
 (`errors.print_failed_pay_anyway`)
 
-What it does: the cashier still has to tap Print first. When the bill print from Orders or
+What it does: the cashier still has to tap Print first (since Patch 83, Payment prints first on its own). When the bill print from Orders or
 from the Tables page fails, the page calls URY's `qz_print_update` (`updatePrintStatus`, the
 call a successful print makes: order marked printed, table freed) and shows "Addition non
 imprimée : … Vous pouvez quand même encaisser."; Orders unlocks Payment as after a print
@@ -3650,6 +3650,35 @@ open in Orders; send another item afterwards from the waiter app: no "modified" 
 nothing changed. Typed code works without a camera. fr, ar (right to left), en.
 
 Patch file: `patches/82-waiter-scan-loyalty-card.patch`. Commit: 7e6543a6.
+
+### Patch 83 — Payment prints the bill first, then opens the payment window
+
+Ticket 118 (owner 2026-11-22): on an order whose bill is not printed yet, Payment (and the platform buttons "Remis au
+livreur" and "Payé sur place") answered "please print first", so every order took Print, then Payment.
+
+Files touched: `pos/src/pages/Orders.tsx` only.
+
+What it does: `handlePrintOrder` returns whether the order now counts as printed (a print, or a failed print still
+marked printed by Patch 53; false when the server cannot be reached). New `ensurePrinted`: an order already printed
+goes on at once; otherwise it runs the same print (Patch 56's QR pickup kitchen ticket included) and goes on only when
+it returned true. Payment, "Remis au livreur" (Patch 31, still asks its confirm tap) and "Payé sur place" (Patch 33)
+call it instead of refusing, and are disabled while a print runs. An Unbilled order printed from a pay button is moved
+to Draft and selected again there (`keepSelection`), since the tab change clears the selection the payment window
+needs. The Print button is unchanged (reprint, or print without paying). No new text.
+
+Why not in `erp_restaurant`: it is what a till button does in the React app; there is no configuration point.
+
+Risk profile: low to medium. One file, but `Orders.tsx` is busy upstream and `handlePrintOrder` carries Patches 10,
+53 and 56. On an upstream update keep Patch 53's catch block, Patch 56's `printQrPickupKitchenTicket` call, the
+true / false result and the `keepSelection` branch.
+
+Acceptance criteria and manual test: unprinted takeaway order, one tap on Payment: bill printed, payment window open;
+Cancel then Payment again: no reprint. Printer off or QZ Tray closed: Patch 53's message and the window opens. Server
+unreachable: print error, no window. QR pickup order: bill and kitchen ticket printed once, none at payment. Print
+alone: no window. Platform order: both buttons print first. fr, ar (right to left), en. Known gap kept: a QZ print
+waiting on QZ Tray's Allow prompt holds the window until answered.
+
+Patch file: `patches/83-payment-prints-first.patch`. Commit: not committed yet.
 
 ## Build and deploy
 
