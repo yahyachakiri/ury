@@ -1079,6 +1079,8 @@ On a conflict keep the `t('...')` calls; new upstream texts need keys in `i18n.t
 
 ### Patch 25 — Sold-out meals greyed in the POS and the waiter app
 
+Since Patch 84 (ticket 119) a sold-out card can be tapped again: a window names the missing ingredients and the staff may order it anyway.
+
 Feature (owner request 2026-10-20).
 
 Files touched:
@@ -1468,6 +1470,8 @@ Acceptance criteria:
 Patch file: `patches/36-options-not-on-menu.patch`.
 
 ### Patch 37 — Sizes and extras grouped under their meal
+
+Since Patch 84 (ticket 119) the size dialog marks sold-out sizes and asks the customer before switching to one.
 
 Owner request (ticket 28, 2026-10-28). Sizes ("Tacos Poulet XL") and extras
 ("Supplément fromage") are ordinary menu meals, so each was its own card on the
@@ -3681,6 +3685,54 @@ waiting on QZ Tray's Allow prompt holds the window until answered.
 Patch file: `patches/83-payment-prints-first.patch`. Commit: 64797cf9.
 
 Browser check 2026-11-22 (test-dev.reflowgo.ma, Administrator, French, QZ Tray printing on this Mac): unprinted takeaway INV-00090, one tap on Payment showed "Imprimé avec succès" and opened the payment window; closed, Payment again opened the window at once with no print (invoice_printed 1); INV-00091 Print alone printed and opened no window; both cancelled. Not checked: printer off / QZ Tray closed, server unreachable, a QR pickup order, platform buttons, an Unbilled table order, Arabic, English, paper output.
+
+### Patch 84 — A sold-out meal can be ordered after the customer accepts the missing ingredients
+
+Ticket 119 (owner 2026-11-22, rule B): Patch 25 made a sold-out meal untappable. The staff now tap it, see what is
+short for one portion and, if the customer agrees, order it anyway; the sale then passes payment and closing with the
+ingredients going below zero (erp_restaurant).
+
+Files touched: `pos/src/components/ShortStockDialog.tsx` (new), `pos/src/components/MenuCard.tsx` (a sold-out card is
+no longer blocked, only lighter), `pos/src/pages/POS.tsx` and `pos/src/captain/components/CaptainMenu.tsx` (a tap on a
+sold-out meal opens the window; "Commander quand même" continues the normal tap with `short_stock_ok`, a meal with
+sizes or choices opens its dialog with the flag carried by `selectedItem`), `pos/src/components/ProductDialog.tsx`
+(sizes marked "Épuisé"; picking a sold-out size opens the same window and confirms that size on its own; picking an
+available size drops the flag, since it is not short), `pos/src/store/pos-store.ts`
+(`MenuItem.short_stock_ok`, kept when a line is merged), `pos/src/components/OrderPanel.tsx` and
+`pos/src/captain/pages/CaptainOrder.tsx` (the flag sent per line to `sync_order`), `pos/src/lib/order-api.ts` (type),
+locales (`short_stock`).
+
+What it does: the window loads erp_restaurant `short_stock.get_missing_ingredients` (ingredient, quantity needed for one
+portion, quantity left, stock UOM), says the stock goes below zero if ordered anyway, and offers "Annuler" / "Commander
+quand même". The line is sent with `short_stock_ok: 1`; erp_restaurant `combo_pricing.py` copies it onto POS Invoice
+Item `custom_short_stock_ok` and `short_stock.stamp_confirmations` keeps it on later sends of the same draft (the till
+forgets it when it reloads an order) and stamps who, when and the missing ingredients. The stock checks on save and
+payment skip such lines (`pos_stock_message.py`), and at closing the ingredients of those lines post below zero while
+every other item keeps ERPNext's check (`consolidated_rounding.py`, `short_stock.closing_short_ingredients`). The QR customer app is unchanged (sold-out meals hidden
+and refused). Choice options marked sold out inside a combo dialog stay blocked.
+
+Why not in `erp_restaurant` alone: the card, the window and the per-line flag live in the till's React state before the
+order is sent; every rule (what is short, the checks, the closing) is erp_restaurant.
+
+Risk profile: medium. pos-store.ts and OrderPanel.tsx are high-risk files (Patches 06, 25, 47); the change there is one
+optional field. The cards keep Patch 25's badge.
+
+Acceptance criteria and manual test: a sold-out meal can be tapped on the till and in the waiter app; the window lists
+each missing ingredient; "Annuler" adds nothing; "Commander quand même" adds the line, which saves (also with "Validate
+Stock on Save"), is paid and is consolidated at closing with the ingredients below zero; a second send of the same
+order keeps it accepted; a meal with sizes or choices opens its dialog after the window, and a sold-out size asks
+again; the QR app still hides the meal. fr, ar (right to left), en. Step by step: the ticket's "Manual test" section
+(`tasks/119-order-sold-out-meal-with-warning.md`).
+
+Notes: the window is `@ury/ui` Dialog (focus trap, Escape, labelled title); numbers and units are isolated inside the
+Arabic sentence. "Commander quand même" stays disabled while the list loads or after a failed load. Opened from the
+size dialog, Escape closes both windows (both listen to the key). A sold-out meal with extras only is added without
+its extras dialog; extras are added by editing the line (the flag is kept).
+
+Patch file: `patches/84-sold-out-order-anyway.patch`. Commit: not committed yet.
+
+Browser check: not run, needs server test. Checked locally: tsc (no new error), eslint (same findings as before),
+yarn build.
 
 ## Build and deploy
 

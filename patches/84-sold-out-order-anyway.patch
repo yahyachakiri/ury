@@ -1,0 +1,458 @@
+diff --git a/pos/src/captain/components/CaptainMenu.tsx b/pos/src/captain/components/CaptainMenu.tsx
+index a6247e8e..ab787b73 100644
+--- a/pos/src/captain/components/CaptainMenu.tsx
++++ b/pos/src/captain/components/CaptainMenu.tsx
+@@ -4,6 +4,7 @@ import { usePOSStore } from '../../store/pos-store';
+ import { cn, Spinner } from '@ury/ui';
+ import MenuCard from '../../components/MenuCard';
+ import ProductDialog from '../../components/ProductDialog';
++import ShortStockDialog from '../../components/ShortStockDialog';
+ import { t } from '../../i18n';
+ import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
+ 
+@@ -35,7 +36,10 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+     addToOrder,
+     setSelectedItem,
+     isOrderInteractionDisabled,
++    posProfile,
+   } = usePOSStore();
++  // Patch 84: a sold-out meal tapped waits for the customer's answer.
++  const [shortStockItem, setShortStockItem] = useState<(typeof menuItems)[number] | null>(null);
+   // Patch 37: a tap on a meal with sizes or extras opens its dialog (no double tap on touch).
+   const [choosing, setChoosing] = useState(false);
+ 
+@@ -60,7 +64,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+   const disabled = !canAddItems || isOrderInteractionDisabled();
+ 
+   const handleTap = (item: (typeof menuItems)[number]) => {
+-    if (disabled || item.sold_out) return;
++    if (disabled) return;
++    if (item.sold_out && !item.short_stock_ok) {
++      if (posProfile) setShortStockItem(item);
++      return;
++    }
+     if (item.has_sizes || item.has_extras || item.has_choices) {
+       setSelectedItem(item);
+       setChoosing(true);
+@@ -150,6 +158,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
+           }}
+         />
+       )}
++      {shortStockItem && posProfile && (
++        <ShortStockDialog
++          item={shortStockItem}
++          posProfile={posProfile.name}
++          onClose={() => setShortStockItem(null)}
++          onConfirm={() => handleTap({ ...shortStockItem, short_stock_ok: true })}
++        />
++      )}
+     </div>
+   );
+ };
+diff --git a/pos/src/captain/pages/CaptainOrder.tsx b/pos/src/captain/pages/CaptainOrder.tsx
+index 7e791e8a..0067e05b 100644
+--- a/pos/src/captain/pages/CaptainOrder.tsx
++++ b/pos/src/captain/pages/CaptainOrder.tsx
+@@ -213,6 +213,7 @@ export default function CaptainOrder() {
+           rate: item.selectedVariant?.price || item.price,
+           qty: item.quantity,
+           comment: item.comment || undefined,
++          short_stock_ok: item.short_stock_ok ? (1 as const) : undefined, // Patch 84
+         })),
+         no_of_pax: noOfPax,
+         pos_profile: posProfile.name,
+diff --git a/pos/src/components/MenuCard.tsx b/pos/src/components/MenuCard.tsx
+index 3e14b590..56c0a06d 100644
+--- a/pos/src/components/MenuCard.tsx
++++ b/pos/src/components/MenuCard.tsx
+@@ -30,13 +30,15 @@ const MenuCard: FC<MenuCardProps> = ({
+   portionsLeft,
+   soldOut
+ }) => {
+-  const blocked = disabled || soldOut;
++  // Patch 84: a sold-out meal stays tappable (the till asks the customer first); only disabled blocks.
++  const blocked = disabled;
+   const low = !soldOut && portionsLeft != null && portionsLeft <= LOW_PORTIONS;
+   return (
+     <div
+       className={cn(
+         "relative bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+-        blocked && "opacity-50 cursor-not-allowed pointer-events-none"
++        blocked && "opacity-50 cursor-not-allowed pointer-events-none",
++        !blocked && soldOut && "opacity-60"
+       )}
+       onClick={blocked ? undefined : onClick}
+       aria-disabled={blocked || undefined}
+diff --git a/pos/src/components/OrderPanel.tsx b/pos/src/components/OrderPanel.tsx
+index b025c762..28795b5d 100644
+--- a/pos/src/components/OrderPanel.tsx
++++ b/pos/src/components/OrderPanel.tsx
+@@ -118,7 +118,8 @@ const OrderPanel = () => {
+           item_name: item.name,
+           rate: item.selectedVariant?.price || item.price,
+           qty: item.quantity,
+-          comment: item.comment || undefined
++          comment: item.comment || undefined,
++          short_stock_ok: item.short_stock_ok ? (1 as const) : undefined // Patch 84
+         })),
+         no_of_pax: noOfPax,
+         pos_profile: posProfile.name,
+diff --git a/pos/src/components/ProductDialog.tsx b/pos/src/components/ProductDialog.tsx
+index 166b1534..6902a1e8 100644
+--- a/pos/src/components/ProductDialog.tsx
++++ b/pos/src/components/ProductDialog.tsx
+@@ -1,9 +1,10 @@
+ import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
+ import { X, Plus, Minus } from 'lucide-react';
+-import { OrderItem, usePOSStore } from '../store/pos-store';
++import { MenuItem, OrderItem, usePOSStore } from '../store/pos-store';
+ import { cn } from '@ury/ui';
+ import { formatCurrency } from '@ury/core';
+ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
++import ShortStockDialog from './ShortStockDialog';
+ import { db } from '@ury/core';
+ import { t } from '../i18n';
+ 
+@@ -45,8 +46,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+     setSelectedItem, 
+     getItemQuantityFromCart,
+     activeOrders,
+-    menuItems
++    menuItems,
++    posProfile
+   } = usePOSStore();
++  // Patch 84: a sold-out size picked here asks the customer first, like a sold-out card.
++  const [shortStockVariant, setShortStockVariant] = useState<MenuItem | null>(null);
+   
+ 
+   // State for the full item doc (used for all dialog content)
+@@ -372,9 +376,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+   // Handler to switch to a variant item
+   const handleVariantClick = (variantId: string) => {
+     const menuVariant = menuItems.find((m: any) => m.item === variantId);
+-    if (menuVariant) {
+-      setSelectedItem(menuVariant);
++    if (!menuVariant) return;
++    // Patch 84: the same meal keeps its confirmation; another sold-out size is confirmed on its own.
++    if (menuVariant.item === selectedItem?.item) return;
++    if (menuVariant.sold_out && posProfile) {
++      setShortStockVariant(menuVariant);
++      return;
+     }
++    setSelectedItem(menuVariant);
+   };
+ 
+   return (
+@@ -499,7 +508,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+                           : 'border-gray-200 hover:border-blue-200'
+                       )}
+                     >
+-                      <div className="font-medium">{variant.name}</div>
++                      <div className="font-medium">
++                        {variant.name}
++                        {menuVariant?.sold_out && (
++                          <span className="ms-2 text-xs font-semibold text-red-600">{t('menu.sold_out')}</span>
++                        )}
++                      </div>
+                       <div className="text-sm text-gray-500">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
+                     </button>
+                   );
+@@ -590,6 +604,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+           </div>
+         </div>
+       </DialogContent>
++      {shortStockVariant && posProfile && (
++        <ShortStockDialog
++          item={shortStockVariant}
++          posProfile={posProfile.name}
++          onClose={() => setShortStockVariant(null)}
++          onConfirm={() => setSelectedItem({ ...shortStockVariant, short_stock_ok: true })}
++        />
++      )}
+     </Dialog>
+   );
+ };
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index 06af5d24..df453dbc 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -746,5 +746,15 @@
+     "customer_set": "الزبون: {{name}}",
+     "order_customer_set": "{{name}} الآن على طلب هذه الطاولة.",
+     "failed": "تعذّر تطبيق البطاقة. حاول مرة أخرى."
++  },
++  "short_stock": {
++    "title": "{{name}} نفد",
++    "missing": "الناقص لحصة واحدة:",
++    "qty_line": "يلزم {{needed}} {{uom}}، المتبقي {{available}}",
++    "none_listed": "المخزون لم يعد يُظهر مكوّنًا ناقصًا.",
++    "ask_customer": "اسأل الزبون إن كان يريده رغم ذلك. عند الطلب رغم ذلك، ينزل مخزون هذه المكونات تحت الصفر حتى التوريد أو الجرد القادم.",
++    "order_anyway": "اطلب رغم ذلك",
++    "load_failed": "تعذّر تحميل المكونات الناقصة.",
++    "close": "إغلاق"
+   }
+ }
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index d8e8baad..9bf5a66d 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -739,5 +739,15 @@
+     "customer_set": "Customer: {{name}}",
+     "order_customer_set": "{{name}} is now on this table's order.",
+     "failed": "The card could not be applied. Try again."
++  },
++  "short_stock": {
++    "title": "{{name}} is sold out",
++    "missing": "Missing for one portion:",
++    "qty_line": "needs {{needed}} {{uom}}, {{available}} left",
++    "none_listed": "The stock no longer shows a missing ingredient.",
++    "ask_customer": "Ask the customer if they still want it. Ordered anyway, the stock of these ingredients goes below zero until the next delivery or count.",
++    "order_anyway": "Order anyway",
++    "load_failed": "Could not load the missing ingredients.",
++    "close": "Close"
+   }
+ }
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 2ea1dd81..82bd703d 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -739,5 +739,15 @@
+     "customer_set": "Client : {{name}}",
+     "order_customer_set": "{{name}} est maintenant sur la commande de cette table.",
+     "failed": "La carte n'a pas pu être prise. Réessayez."
++  },
++  "short_stock": {
++    "title": "{{name}} est épuisé",
++    "missing": "Il manque pour une portion :",
++    "qty_line": "il faut {{needed}} {{uom}}, reste {{available}}",
++    "none_listed": "Le stock n'indique plus d'ingrédient manquant.",
++    "ask_customer": "Demandez au client s'il le veut quand même. Commandé quand même, le stock de ces ingrédients passe sous zéro jusqu'à la prochaine livraison ou au prochain comptage.",
++    "order_anyway": "Commander quand même",
++    "load_failed": "Impossible de charger les ingrédients manquants.",
++    "close": "Fermer"
+   }
+ }
+diff --git a/pos/src/lib/order-api.ts b/pos/src/lib/order-api.ts
+index a5d0c0c0..3eccda76 100644
+--- a/pos/src/lib/order-api.ts
++++ b/pos/src/lib/order-api.ts
+@@ -74,6 +74,8 @@ export interface SyncOrderRequest {
+     rate: number;
+     qty: number;
+     comment?: string;
++    /** Patch 84: sold-out meal ordered anyway (erp_restaurant combo_pricing / short_stock). */
++    short_stock_ok?: 1;
+   }>;
+   no_of_pax: number;
+   mode_of_payment?: string;
+diff --git a/pos/src/pages/POS.tsx b/pos/src/pages/POS.tsx
+index 59717edb..fee58dd2 100644
+--- a/pos/src/pages/POS.tsx
++++ b/pos/src/pages/POS.tsx
+@@ -5,11 +5,12 @@ import InitialLoader from '../components/InitialLoader';
+ import MenuList from '../components/MenuList';
+ import OrderPanel from '../components/OrderPanel';
+ import ProductDialog from '../components/ProductDialog';
++import ShortStockDialog from '../components/ShortStockDialog';
+ import Sidebar from '../components/Sidebar';
+ import { Spinner } from '@ury/ui';
+ import { cn } from '@ury/ui';
+ import { t } from '../i18n';
+-import { usePOSStore } from '../store/pos-store';
++import { usePOSStore, type MenuItem } from '../store/pos-store';
+ 
+ const CATEGORIES_OPEN_KEY = 'pos_categories_open'; // Patch 67
+ 
+@@ -26,7 +27,10 @@ export default function POS() {
+     categories,
+     selectedCategory,
+     setSelectedCategory,
++    posProfile,
+   } = usePOSStore();
++  // Patch 84: a sold-out meal tapped waits here until the customer accepts the missing ingredients.
++  const [shortStockItem, setShortStockItem] = useState<MenuItem | null>(null);
+ 
+   // Patch 67: the categories column can be closed to leave its width to the dishes (iPad).
+   // Closed, the categories are chips in the filter row. The choice is kept on the device;
+@@ -71,6 +75,10 @@ export default function POS() {
+ 
+   const handleItemClick = (item: any) => {
+     if (isMenuInteractionDisabled()) return;
++    if (item.sold_out && !item.short_stock_ok) {
++      setShortStockItem(item);
++      return;
++    }
+     
+     clickCountRef.current += 1;
+     
+@@ -216,6 +224,23 @@ export default function POS() {
+       </div>
+       <OrderPanel />
+       {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
++      {shortStockItem && posProfile && (
++        <ShortStockDialog
++          item={shortStockItem}
++          posProfile={posProfile.name}
++          onClose={() => setShortStockItem(null)}
++          onConfirm={() => {
++            if (isMenuInteractionDisabled()) return;
++            const confirmed = { ...shortStockItem, short_stock_ok: true };
++            if (confirmed.has_sizes || confirmed.has_choices) {
++              setSelectedItem(confirmed);
++              setIsDialogOpen(true);
++            } else {
++              addToOrder({ ...confirmed, quantity: 1 });
++            }
++          }}
++        />
++      )}
+     </div>
+   );
+ }
+diff --git a/pos/src/store/pos-store.ts b/pos/src/store/pos-store.ts
+index 01af6d9c..17773485 100644
+--- a/pos/src/store/pos-store.ts
++++ b/pos/src/store/pos-store.ts
+@@ -42,6 +42,8 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
+   /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
+   portions_left?: number | null;
+   sold_out?: boolean;
++  /** Patch 84: the customer accepted this sold-out meal; sent with the line (erp_restaurant short_stock.py). */
++  short_stock_ok?: boolean;
+   /** Patch 37: an extra or size of another meal (hidden from the grid), and whether this meal offers sizes / extras. */
+   is_option?: boolean;
+   has_sizes?: boolean;
+@@ -564,7 +566,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
+         newOrders[existingItemIndex] = {
+           ...existingItem,
+           quantity: newQuantity,
+-          comment: newComment
++          comment: newComment,
++          // Patch 84: a sold-out meal confirmed once stays confirmed on its line.
++          short_stock_ok: existingItem.short_stock_ok || item.short_stock_ok || undefined
+         };
+         
+         set({ activeOrders: newOrders });
+diff --git a/pos/src/components/ShortStockDialog.tsx b/pos/src/components/ShortStockDialog.tsx
+new file mode 100644
+index 00000000..6503dd5c
+--- /dev/null
++++ b/pos/src/components/ShortStockDialog.tsx
+@@ -0,0 +1,117 @@
++import { useEffect, useState } from 'react';
++import { AlertTriangle } from 'lucide-react';
++import { call, numberLocale } from '@ury/core';
++import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Spinner } from '@ury/ui';
++import { t } from '../i18n';
++
++// Patch 84 (ticket 119): a sold-out meal can still be ordered once the customer accepts the missing
++// ingredients. The list comes from erp_restaurant short_stock.get_missing_ingredients; the line is then
++// sent with short_stock_ok so payment and closing accept it (stock may go below zero).
++
++interface MissingRow {
++  item_code: string;
++  item_name: string;
++  uom: string;
++  needed: number;
++  available: number;
++}
++
++interface ShortStockDialogProps {
++  item: { item: string; name: string };
++  posProfile: string;
++  onConfirm: () => void;
++  onClose: () => void;
++}
++
++// Numbers and units kept left to right inside the Arabic sentence (first strong isolate).
++const isolate = (text: string) => `⁨${text}⁩`;
++const formatQty = (value: number) => new Intl.NumberFormat(numberLocale(), { maximumFractionDigits: 3 }).format(value);
++
++const ShortStockDialog = ({ item, posProfile, onConfirm, onClose }: ShortStockDialogProps) => {
++  const [loading, setLoading] = useState(true);
++  const [missing, setMissing] = useState<MissingRow[]>([]);
++  const [error, setError] = useState('');
++
++  useEffect(() => {
++    let alive = true;
++    call
++      .get('erp_restaurant.erp_restaurant.short_stock.get_missing_ingredients', { item: item.item, pos_profile: posProfile, qty: 1 })
++      .then((res: { message?: { missing?: MissingRow[] } }) => {
++        if (alive) setMissing(res?.message?.missing || []);
++      })
++      .catch(() => {
++        if (alive) setError(t('short_stock.load_failed'));
++      })
++      .finally(() => {
++        if (alive) setLoading(false);
++      });
++    return () => {
++      alive = false;
++    };
++  }, [item.item, posProfile]);
++
++  return (
++    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
++      <DialogContent onClose={onClose}>
++        <DialogHeader>
++          <DialogTitle>
++            <span className="flex items-center gap-2">
++              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" aria-hidden="true" />
++              {t('short_stock.title', { name: item.name })}
++            </span>
++          </DialogTitle>
++        </DialogHeader>
++
++        <div className="px-6 pb-2 text-sm text-gray-700" aria-live="polite">
++          {loading ? (
++            <Spinner className="w-5 h-5" message={t('common.loading')} />
++          ) : error ? (
++            <p className="text-red-600">{error}</p>
++          ) : (
++            <>
++              <p className="mb-2 font-medium">{t('short_stock.missing')}</p>
++              {missing.length ? (
++                <ul className="space-y-1 mb-3">
++                  {missing.map((row) => (
++                    <li key={row.item_code} className="flex justify-between gap-3">
++                      <span>{row.item_name}</span>
++                      <span className="text-gray-500 whitespace-nowrap">
++                        {t('short_stock.qty_line', {
++                          needed: isolate(formatQty(row.needed)),
++                          available: isolate(formatQty(row.available)),
++                          uom: isolate(row.uom),
++                        })}
++                      </span>
++                    </li>
++                  ))}
++                </ul>
++              ) : (
++                <p className="mb-3 text-gray-500">{t('short_stock.none_listed')}</p>
++              )}
++              <p>{t('short_stock.ask_customer')}</p>
++            </>
++          )}
++        </div>
++
++        <DialogFooter>
++          <Button variant="outline" onClick={onClose}>
++            {t('common.cancel')}
++          </Button>
++          {/* Not offered until the staff have seen what is missing (a failed load: tap the meal again). */}
++          <Button
++            variant="destructive"
++            disabled={loading || Boolean(error)}
++            onClick={() => {
++              onConfirm();
++              onClose();
++            }}
++          >
++            {t('short_stock.order_anyway')}
++          </Button>
++        </DialogFooter>
++      </DialogContent>
++    </Dialog>
++  );
++};
++
++export default ShortStockDialog;

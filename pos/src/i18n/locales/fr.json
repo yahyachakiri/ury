@@ -739,5 +739,15 @@
     "customer_set": "Client : {{name}}",
     "order_customer_set": "{{name}} est maintenant sur la commande de cette table.",
     "failed": "La carte n'a pas pu être prise. Réessayez."
+  },
+  "short_stock": {
+    "title": "{{name}} est épuisé",
+    "missing": "Il manque pour une portion :",
+    "qty_line": "il faut {{needed}} {{uom}}, reste {{available}}",
+    "none_listed": "Le stock n'indique plus d'ingrédient manquant.",
+    "ask_customer": "Demandez au client s'il le veut quand même. Commandé quand même, le stock de ces ingrédients passe sous zéro jusqu'à la prochaine livraison ou au prochain comptage.",
+    "order_anyway": "Commander quand même",
+    "load_failed": "Impossible de charger les ingrédients manquants.",
+    "close": "Fermer"
   }
 }

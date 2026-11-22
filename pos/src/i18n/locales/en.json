@@ -739,5 +739,15 @@
     "customer_set": "Customer: {{name}}",
     "order_customer_set": "{{name}} is now on this table's order.",
     "failed": "The card could not be applied. Try again."
+  },
+  "short_stock": {
+    "title": "{{name}} is sold out",
+    "missing": "Missing for one portion:",
+    "qty_line": "needs {{needed}} {{uom}}, {{available}} left",
+    "none_listed": "The stock no longer shows a missing ingredient.",
+    "ask_customer": "Ask the customer if they still want it. Ordered anyway, the stock of these ingredients goes below zero until the next delivery or count.",
+    "order_anyway": "Order anyway",
+    "load_failed": "Could not load the missing ingredients.",
+    "close": "Close"
   }
 }

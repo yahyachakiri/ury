@@ -42,6 +42,8 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   /** Patch 25: portions the stock allows (null = not limited), from erp_restaurant. */
   portions_left?: number | null;
   sold_out?: boolean;
+  /** Patch 84: the customer accepted this sold-out meal; sent with the line (erp_restaurant short_stock.py). */
+  short_stock_ok?: boolean;
   /** Patch 37: an extra or size of another meal (hidden from the grid), and whether this meal offers sizes / extras. */
   is_option?: boolean;
   has_sizes?: boolean;
@@ -564,7 +566,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         newOrders[existingItemIndex] = {
           ...existingItem,
           quantity: newQuantity,
-          comment: newComment
+          comment: newComment,
+          // Patch 84: a sold-out meal confirmed once stays confirmed on its line.
+          short_stock_ok: existingItem.short_stock_ok || item.short_stock_ok || undefined
         };
         
         set({ activeOrders: newOrders });

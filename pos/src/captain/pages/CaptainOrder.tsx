@@ -213,6 +213,7 @@ export default function CaptainOrder() {
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
           comment: item.comment || undefined,
+          short_stock_ok: item.short_stock_ok ? (1 as const) : undefined, // Patch 84
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,

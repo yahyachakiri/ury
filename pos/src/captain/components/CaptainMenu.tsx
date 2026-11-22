@@ -4,6 +4,7 @@ import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner } from '@ury/ui';
 import MenuCard from '../../components/MenuCard';
 import ProductDialog from '../../components/ProductDialog';
+import ShortStockDialog from '../../components/ShortStockDialog';
 import { t } from '../../i18n';
 import { useMenuStockRefresh } from '../../hooks/useMenuStockRefresh';
 
@@ -35,7 +36,10 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     addToOrder,
     setSelectedItem,
     isOrderInteractionDisabled,
+    posProfile,
   } = usePOSStore();
+  // Patch 84: a sold-out meal tapped waits for the customer's answer.
+  const [shortStockItem, setShortStockItem] = useState<(typeof menuItems)[number] | null>(null);
   // Patch 37: a tap on a meal with sizes or extras opens its dialog (no double tap on touch).
   const [choosing, setChoosing] = useState(false);
 
@@ -60,7 +64,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
   const disabled = !canAddItems || isOrderInteractionDisabled();
 
   const handleTap = (item: (typeof menuItems)[number]) => {
-    if (disabled || item.sold_out) return;
+    if (disabled) return;
+    if (item.sold_out && !item.short_stock_ok) {
+      if (posProfile) setShortStockItem(item);
+      return;
+    }
     if (item.has_sizes || item.has_extras || item.has_choices) {
       setSelectedItem(item);
       setChoosing(true);
@@ -148,6 +156,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
             setChoosing(false);
             setSelectedItem(null);
           }}
+        />
+      )}
+      {shortStockItem && posProfile && (
+        <ShortStockDialog
+          item={shortStockItem}
+          posProfile={posProfile.name}
+          onClose={() => setShortStockItem(null)}
+          onConfirm={() => handleTap({ ...shortStockItem, short_stock_ok: true })}
         />
       )}
     </div>

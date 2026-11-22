@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
-import { OrderItem, usePOSStore } from '../store/pos-store';
+import { MenuItem, OrderItem, usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+import ShortStockDialog from './ShortStockDialog';
 import { db } from '@ury/core';
 import { t } from '../i18n';
 
@@ -45,8 +46,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     setSelectedItem, 
     getItemQuantityFromCart,
     activeOrders,
-    menuItems
+    menuItems,
+    posProfile
   } = usePOSStore();
+  // Patch 84: a sold-out size picked here asks the customer first, like a sold-out card.
+  const [shortStockVariant, setShortStockVariant] = useState<MenuItem | null>(null);
   
 
   // State for the full item doc (used for all dialog content)
@@ -372,9 +376,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   // Handler to switch to a variant item
   const handleVariantClick = (variantId: string) => {
     const menuVariant = menuItems.find((m: any) => m.item === variantId);
-    if (menuVariant) {
-      setSelectedItem(menuVariant);
+    if (!menuVariant) return;
+    // Patch 84: the same meal keeps its confirmation; another sold-out size is confirmed on its own.
+    if (menuVariant.item === selectedItem?.item) return;
+    if (menuVariant.sold_out && posProfile) {
+      setShortStockVariant(menuVariant);
+      return;
     }
+    setSelectedItem(menuVariant);
   };
 
   return (
@@ -499,7 +508,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                           : 'border-gray-200 hover:border-blue-200'
                       )}
                     >
-                      <div className="font-medium">{variant.name}</div>
+                      <div className="font-medium">
+                        {variant.name}
+                        {menuVariant?.sold_out && (
+                          <span className="ms-2 text-xs font-semibold text-red-600">{t('menu.sold_out')}</span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
                     </button>
                   );
@@ -590,6 +604,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           </div>
         </div>
       </DialogContent>
+      {shortStockVariant && posProfile && (
+        <ShortStockDialog
+          item={shortStockVariant}
+          posProfile={posProfile.name}
+          onClose={() => setShortStockVariant(null)}
+          onConfirm={() => setSelectedItem({ ...shortStockVariant, short_stock_ok: true })}
+        />
+      )}
     </Dialog>
   );
 };

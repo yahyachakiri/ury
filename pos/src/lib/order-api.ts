@@ -74,6 +74,8 @@ export interface SyncOrderRequest {
     rate: number;
     qty: number;
     comment?: string;
+    /** Patch 84: sold-out meal ordered anyway (erp_restaurant combo_pricing / short_stock). */
+    short_stock_ok?: 1;
   }>;
   no_of_pax: number;
   mode_of_payment?: string;

@@ -30,13 +30,15 @@ const MenuCard: FC<MenuCardProps> = ({
   portionsLeft,
   soldOut
 }) => {
-  const blocked = disabled || soldOut;
+  // Patch 84: a sold-out meal stays tappable (the till asks the customer first); only disabled blocks.
+  const blocked = disabled;
   const low = !soldOut && portionsLeft != null && portionsLeft <= LOW_PORTIONS;
   return (
     <div
       className={cn(
         "relative bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
-        blocked && "opacity-50 cursor-not-allowed pointer-events-none"
+        blocked && "opacity-50 cursor-not-allowed pointer-events-none",
+        !blocked && soldOut && "opacity-60"
       )}
       onClick={blocked ? undefined : onClick}
       aria-disabled={blocked || undefined}

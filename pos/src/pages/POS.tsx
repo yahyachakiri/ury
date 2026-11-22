@@ -5,11 +5,12 @@ import InitialLoader from '../components/InitialLoader';
 import MenuList from '../components/MenuList';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
+import ShortStockDialog from '../components/ShortStockDialog';
 import Sidebar from '../components/Sidebar';
 import { Spinner } from '@ury/ui';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 
 const CATEGORIES_OPEN_KEY = 'pos_categories_open'; // Patch 67
 
@@ -26,7 +27,10 @@ export default function POS() {
     categories,
     selectedCategory,
     setSelectedCategory,
+    posProfile,
   } = usePOSStore();
+  // Patch 84: a sold-out meal tapped waits here until the customer accepts the missing ingredients.
+  const [shortStockItem, setShortStockItem] = useState<MenuItem | null>(null);
 
   // Patch 67: the categories column can be closed to leave its width to the dishes (iPad).
   // Closed, the categories are chips in the filter row. The choice is kept on the device;
@@ -71,6 +75,10 @@ export default function POS() {
 
   const handleItemClick = (item: any) => {
     if (isMenuInteractionDisabled()) return;
+    if (item.sold_out && !item.short_stock_ok) {
+      setShortStockItem(item);
+      return;
+    }
     
     clickCountRef.current += 1;
     
@@ -216,6 +224,23 @@ export default function POS() {
       </div>
       <OrderPanel />
       {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
+      {shortStockItem && posProfile && (
+        <ShortStockDialog
+          item={shortStockItem}
+          posProfile={posProfile.name}
+          onClose={() => setShortStockItem(null)}
+          onConfirm={() => {
+            if (isMenuInteractionDisabled()) return;
+            const confirmed = { ...shortStockItem, short_stock_ok: true };
+            if (confirmed.has_sizes || confirmed.has_choices) {
+              setSelectedItem(confirmed);
+              setIsDialogOpen(true);
+            } else {
+              addToOrder({ ...confirmed, quantity: 1 });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
