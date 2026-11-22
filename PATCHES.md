@@ -3680,6 +3680,8 @@ waiting on QZ Tray's Allow prompt holds the window until answered.
 
 Patch file: `patches/83-payment-prints-first.patch`. Commit: 64797cf9.
 
+Browser check 2026-11-22 (test-dev.reflowgo.ma, Administrator, French, QZ Tray printing on this Mac): unprinted takeaway INV-00090, one tap on Payment showed "Imprimé avec succès" and opened the payment window; closed, Payment again opened the window at once with no print (invoice_printed 1); INV-00091 Print alone printed and opened no window; both cancelled. Not checked: printer off / QZ Tray closed, server unreachable, a QR pickup order, platform buttons, an Unbilled table order, Arabic, English, paper output.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
