@@ -3678,7 +3678,7 @@ unreachable: print error, no window. QR pickup order: bill and kitchen ticket pr
 alone: no window. Platform order: both buttons print first. fr, ar (right to left), en. Known gap kept: a QZ print
 waiting on QZ Tray's Allow prompt holds the window until answered.
 
-Patch file: `patches/83-payment-prints-first.patch`. Commit: not committed yet.
+Patch file: `patches/83-payment-prints-first.patch`. Commit: 64797cf9.
 
 ## Build and deploy
 
