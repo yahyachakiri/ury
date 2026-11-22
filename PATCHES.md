@@ -3731,8 +3731,7 @@ its extras dialog; extras are added by editing the line (the flag is kept).
 
 Patch file: `patches/84-sold-out-order-anyway.patch`. Commit: b6350d9e.
 
-Browser check: not run, needs server test. Checked locally: tsc (no new error), eslint (same findings as before),
-yarn build.
+Browser check 2026-11-22 (test-dev.reflowgo.ma, Administrator, French, till): Frites Fromage made sold out by a test wastage of Sauce fromagère (MAT-STE-2026-00004); card "Épuisé" and tappable; window "Frites Fromage est épuisé" with "Sauce fromagère, il faut 0,04 Litre, reste 0"; Annuler added nothing; "Commander quand même" added the line; INV-00092 saved with the line stamped (Administrator, 15:59:34, "Sauce fromagère (0.04 Litre, 0)"); a drink added and sent again kept the first stamp and time; payment accepted (no stock refusal); the first closing was refused by erp_restaurant's closing pre-check (fixed in 00e2369, redeployed); the retry submitted POS-CLO-2026-00006, INV-00092 consolidated into ACC-SINV-2026-00022 and Sauce fromagère went to -0.04; test wastage cancelled (stock 3.47). Not checked: waiter app, the size dialog, a second customer or second till on the same ingredient in one closing, an ingredient never received, split bill, return, Arabic, English, the QR app. The till now asks to open a new shift on Test Dev (the closed one had been open since 15/11).
 
 ## Build and deploy
 
