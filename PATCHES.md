@@ -3729,7 +3729,7 @@ Arabic sentence. "Commander quand même" stays disabled while the list loads or 
 size dialog, Escape closes both windows (both listen to the key). A sold-out meal with extras only is added without
 its extras dialog; extras are added by editing the line (the flag is kept).
 
-Patch file: `patches/84-sold-out-order-anyway.patch`. Commit: not committed yet.
+Patch file: `patches/84-sold-out-order-anyway.patch`. Commit: b6350d9e.
 
 Browser check: not run, needs server test. Checked locally: tsc (no new error), eslint (same findings as before),
 yarn build.
