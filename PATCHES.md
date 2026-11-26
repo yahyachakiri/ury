@@ -3775,7 +3775,7 @@ Notes: the flag is kept for the page's life. After an upgrade the till keeps the
 (safe: features hidden, the server allows them); after a downgrade the buttons stay until a reload and the server
 refuses them. A plan change does not trigger the release watcher's reload (ticket 50 watches builds only).
 
-Patch file: `patches/85-comptoir-till.patch`. Commit: (filled after the commit).
+Patch file: `patches/85-comptoir-till.patch`. Commit: e399db62.
 
 ## Build and deploy
 
