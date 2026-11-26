@@ -366,7 +366,8 @@
     },
     "close_tab": "Close order",
     "edit_order": "Edit order",
-    "qty": "Qty: {{qty}}"
+    "qty": "Qty: {{qty}}",
+    "till_only_history": "Paid orders: today and yesterday"
   },
   "tables": {
     "layout_view": "Layout View",

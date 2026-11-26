@@ -1,0 +1,274 @@
+diff --git a/pos/src/App.tsx b/pos/src/App.tsx
+index e733c4cd..734273d0 100644
+--- a/pos/src/App.tsx
++++ b/pos/src/App.tsx
+@@ -18,8 +18,16 @@ import CaptainOrder from './captain/pages/CaptainOrder';
+ import { ToastProvider } from '@ury/ui';
+ import { usePOSStore } from './store/pos-store';
+ import { useEffect } from 'react';
++import { useTillOnlyState } from './lib/plan-flags';
+ import { getActiveLanguage } from './i18n';
+ 
++// Patch 85: on the Comptoir plan the Tables page goes back to the order screen.
++function TablesRoute() {
++  const tillOnly = useTillOnlyState();
++  if (tillOnly === undefined) return null;
++  return tillOnly ? <Navigate to="/pos" replace /> : <Table />;
++}
++
+ function App() {
+   const {
+     initializeApp
+@@ -54,7 +62,7 @@ function App() {
+                   <Route index element={<Navigate to="/dashboard" replace />} />
+                   <Route path="/dashboard" element={<Dashboard />} />
+                   <Route path="/pos" element={<POS />} />
+-                  <Route path="/tables" element={<Table />} />
++                  <Route path="/tables" element={<TablesRoute />} />
+                   <Route path="/orders" element={<Orders />} />
+                   <Route path="/settings" element={<Settings />} />
+                 </Route>
+diff --git a/pos/src/components/Footer.tsx b/pos/src/components/Footer.tsx
+index 68b7b1fe..b179482e 100644
+--- a/pos/src/components/Footer.tsx
++++ b/pos/src/components/Footer.tsx
+@@ -8,13 +8,16 @@ import {
+ } from 'lucide-react';
+ import { cn } from '@ury/ui';
+ import { t } from '../i18n';
++import { useTillOnly } from '../lib/plan-flags';
+ 
+ const Footer = () => {
++  // Patch 85: no Tables page on the Comptoir plan (counter and takeaway only).
++  const tillOnly = useTillOnly();
+ 
+   const navItems = [
+     { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
+     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
+-    { icon: Table, label: t('footer.tables'), path: '/tables' },
++    { icon: Table, label: t('footer.tables'), path: '/tables', hidden: tillOnly },
+     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
+     { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
+   ].filter((item) => !item.hidden);
+diff --git a/pos/src/components/OrderStatusSidebar.tsx b/pos/src/components/OrderStatusSidebar.tsx
+index 5f6181f0..02480703 100644
+--- a/pos/src/components/OrderStatusSidebar.tsx
++++ b/pos/src/components/OrderStatusSidebar.tsx
+@@ -4,6 +4,7 @@ import { Button } from '@ury/ui';
+ import { getOrderStatusTypes, OrderStatusType } from '../data/order-types';
+ import { usePOSStore } from '../store/pos-store';
+ import { t } from '../i18n';
++import { useTillOnly } from '../lib/plan-flags';
+ 
+ interface OrderStatusSidebarProps {
+   disabled?: boolean;
+@@ -21,6 +22,8 @@ const OrderStatusSidebar = ({
+   
+   // Get the appropriate status types based on POS profile settings
+   const statusTypes = getOrderStatusTypes(posProfile?.view_all_status, posProfile?.paid_limit);
++  // Patch 85: on the Comptoir plan the paid lists hold today and yesterday (erp_restaurant filters them).
++  const tillOnly = useTillOnly();
+ 
+   return (
+     <div className={cn(
+@@ -60,6 +63,7 @@ const OrderStatusSidebar = ({
+               </Button>
+             ))}
+           </div>
++          {tillOnly && <p className="mt-3 px-1 text-xs text-gray-500">{t('orders.till_only_history')}</p>}
+         </div>
+       </nav>
+     </div>
+diff --git a/pos/src/components/OrderTypeSelect.tsx b/pos/src/components/OrderTypeSelect.tsx
+index 244b6220..0b9c75f9 100644
+--- a/pos/src/components/OrderTypeSelect.tsx
++++ b/pos/src/components/OrderTypeSelect.tsx
+@@ -1,4 +1,4 @@
+-import { useState } from 'react';
++import { useEffect, useState } from 'react';
+ import { usePOSStore } from '../store/pos-store';
+ import { useRootStore } from '../store/root-store';
+ import { cn } from '@ury/ui';
+@@ -9,18 +9,31 @@ import { HandPlatter } from 'lucide-react';
+ import { isUserRestrictedFromTableOrders } from '@ury/core';
+ import { formatMergedTableLabel } from '../lib/table-utils';
+ import { t } from '../i18n';
++import { useTillOnly } from '../lib/plan-flags';
+ 
+ interface OrderTypeSelectProps {
+   disabled?: boolean;
+ }
+ 
+ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
+-  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder } = usePOSStore();
++  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder, activeOrders } = usePOSStore();
+   const { user } = useRootStore();
+   const [showTableDialog, setShowTableDialog] = useState(false);
+ 
+   // Check if user is restricted from table orders
+   const isRestrictedFromTableOrders = isUserRestrictedFromTableOrders(user, posProfile);
++  // Patch 85: the Comptoir plan takes takeaway orders only (the server refuses Dine In and platforms).
++  const tillOnly = useTillOnly();
++  // An order opened for editing keeps its own type shown (a table order from before the plan change).
++  const orderTypes = tillOnly
++    ? ORDER_TYPES.filter(({ value }) => value === DEFAULT_ORDER_TYPE || (isUpdatingOrder && value === selectedOrderType))
++    : ORDER_TYPES;
++  // Switching the type empties the cart (pos-store setSelectedOrderType): only on an empty new order.
++  useEffect(() => {
++    if (tillOnly && !isUpdatingOrder && activeOrders.length === 0 && selectedOrderType !== DEFAULT_ORDER_TYPE) {
++      setSelectedOrderType(DEFAULT_ORDER_TYPE);
++    }
++  }, [tillOnly, isUpdatingOrder, activeOrders.length, selectedOrderType, setSelectedOrderType]);
+ 
+   const handleOrderTypeSelect = (type: OrderType) => {
+     // Prevent selecting "Dine In" if user is restricted
+@@ -57,7 +70,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
+     <div>
+       {/* Patch 63: the order types wrap instead of scrolling, so the last one ("Plateformes") is never cut. */}
+       <div className="flex flex-wrap gap-2 pb-2">
+-        {ORDER_TYPES.map(({ value, icon: Icon }) => {
++        {orderTypes.map(({ value, icon: Icon }) => {
+           const isDineIn = value === DINE_IN;
+           
+           let isUpdatingDisabled = isUpdatingOrder;
+diff --git a/pos/src/components/ProductDialog.tsx b/pos/src/components/ProductDialog.tsx
+index 6902a1e8..fd4bc909 100644
+--- a/pos/src/components/ProductDialog.tsx
++++ b/pos/src/components/ProductDialog.tsx
+@@ -7,6 +7,7 @@ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+ import ShortStockDialog from './ShortStockDialog';
+ import { db } from '@ury/core';
+ import { t } from '../i18n';
++import { useTillOnly } from '../lib/plan-flags';
+ 
+ interface Variant {
+   id: string;
+@@ -82,8 +83,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+   }, [selectedItem]);
+ 
+   
+-  const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
+-    ? itemDoc.custom_pos_add_on_items
++  // Patch 85: no extras, sizes or choices on the Comptoir plan (the menu still holds the dishes they point to).
++  const tillOnly = useTillOnly();
++  const optionsDoc = tillOnly ? null : itemDoc;
++  const addonDetails = Array.isArray(optionsDoc?.custom_pos_add_on_items)
++    ? optionsDoc.custom_pos_add_on_items
+         .map((entry: any) => {
+           const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+           // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
+@@ -99,8 +103,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+         .filter(Boolean)
+     : [];
+ 
+-  const variantDetails = Array.isArray(itemDoc?.custom_pos_item_variants)
+-    ? itemDoc.custom_pos_item_variants
++  const variantDetails = Array.isArray(optionsDoc?.custom_pos_item_variants)
++    ? optionsDoc.custom_pos_item_variants
+         .map((entry: any) => {
+           const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+           // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
+@@ -219,7 +223,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
+   const choiceGroups: Array<{ group: string; options: Array<{ id: string; name: string; price: number; soldOut?: boolean }> }> = [];
+   // Only the shown item's own document counts (not the previous item's while a size switch loads).
+   const docReady = Boolean(itemDoc) && itemDoc.name === selectedItem?.item;
+-  (docReady && Array.isArray(itemDoc.custom_meal_choices) ? itemDoc.custom_meal_choices : []).forEach((row: any) => {
++  (docReady && !tillOnly && Array.isArray(itemDoc.custom_meal_choices) ? itemDoc.custom_meal_choices : []).forEach((row: any) => {
+     let entry = choiceGroups.find(g => g.group === row.choice_group);
+     if (!entry) {
+       entry = { group: row.choice_group, options: [] };
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index df453dbc..ade639a8 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -373,7 +373,8 @@
+         },
+         "close_tab": "إغلاق الطلب",
+         "edit_order": "تعديل الطلب",
+-        "qty": "الكمية: {{qty}}"
++        "qty": "الكمية: {{qty}}",
++        "till_only_history": "الطلبات المدفوعة: اليوم وأمس"
+     },
+     "tables": {
+         "layout_view": "عرض المخطط",
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index 9bf5a66d..ccbe578b 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -366,7 +366,8 @@
+     },
+     "close_tab": "Close order",
+     "edit_order": "Edit order",
+-    "qty": "Qty: {{qty}}"
++    "qty": "Qty: {{qty}}",
++    "till_only_history": "Paid orders: today and yesterday"
+   },
+   "tables": {
+     "layout_view": "Layout View",
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 82bd703d..8fa72f01 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -366,7 +366,8 @@
+     },
+     "close_tab": "Fermer la commande",
+     "edit_order": "Modifier la commande",
+-    "qty": "Qté : {{qty}}"
++    "qty": "Qté : {{qty}}",
++    "till_only_history": "Commandes payées : aujourd'hui et hier"
+   },
+   "tables": {
+     "layout_view": "Vue de mise en page",
+diff --git a/pos/src/lib/plan-flags.ts b/pos/src/lib/plan-flags.ts
+new file mode 100644
+index 00000000..bb8ce399
+--- /dev/null
++++ b/pos/src/lib/plan-flags.ts
+@@ -0,0 +1,47 @@
++import { useEffect, useState } from 'react';
++import { call } from '@ury/core';
++
++// Patch 85 (ticket 124): the restaurant's plan as the till needs it. On the "Comptoir" plan (the till and the
++// daily closing only, erp_restaurant plans.py) the till offers takeaway only, has no Tables page, asks no
++// extras, sizes or choices, and its paid order lists hold today and yesterday (filtered on the server).
++// Read once per page load; a failed call counts as "not Comptoir", so the till never loses a feature
++// because of a network error (the server still refuses what the plan does not have).
++let pending: Promise<boolean> | null = null;
++// The answer once known, so a component mounted later starts from it (no frame with the wrong value).
++let resolved: boolean | undefined;
++
++export function fetchTillOnly(): Promise<boolean> {
++  if (!pending) {
++    pending = call
++      .get<{ message: { till_only?: boolean } }>('erp_restaurant.erp_restaurant.plans.till_flags')
++      .then((r) => {
++        resolved = Boolean(r.message?.till_only);
++        return resolved;
++      })
++      .catch(() => {
++        pending = null;
++        return false;
++      });
++  }
++  return pending;
++}
++
++/** The flag, false until known (a site that is not Comptoir never changes). */
++export function useTillOnly(): boolean {
++  return useTillOnlyState() ?? false;
++}
++
++/** The flag, or undefined while the first call runs. */
++export function useTillOnlyState(): boolean | undefined {
++  const [tillOnly, setTillOnly] = useState<boolean | undefined>(() => resolved);
++  useEffect(() => {
++    let alive = true;
++    fetchTillOnly().then((value) => {
++      if (alive) setTillOnly(value);
++    });
++    return () => {
++      alive = false;
++    };
++  }, []);
++  return tillOnly;
++}

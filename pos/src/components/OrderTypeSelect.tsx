@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { cn } from '@ury/ui';
@@ -9,18 +9,31 @@ import { HandPlatter } from 'lucide-react';
 import { isUserRestrictedFromTableOrders } from '@ury/core';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+import { useTillOnly } from '../lib/plan-flags';
 
 interface OrderTypeSelectProps {
   disabled?: boolean;
 }
 
 const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
-  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder } = usePOSStore();
+  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder, activeOrders } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
 
   // Check if user is restricted from table orders
   const isRestrictedFromTableOrders = isUserRestrictedFromTableOrders(user, posProfile);
+  // Patch 85: the Comptoir plan takes takeaway orders only (the server refuses Dine In and platforms).
+  const tillOnly = useTillOnly();
+  // An order opened for editing keeps its own type shown (a table order from before the plan change).
+  const orderTypes = tillOnly
+    ? ORDER_TYPES.filter(({ value }) => value === DEFAULT_ORDER_TYPE || (isUpdatingOrder && value === selectedOrderType))
+    : ORDER_TYPES;
+  // Switching the type empties the cart (pos-store setSelectedOrderType): only on an empty new order.
+  useEffect(() => {
+    if (tillOnly && !isUpdatingOrder && activeOrders.length === 0 && selectedOrderType !== DEFAULT_ORDER_TYPE) {
+      setSelectedOrderType(DEFAULT_ORDER_TYPE);
+    }
+  }, [tillOnly, isUpdatingOrder, activeOrders.length, selectedOrderType, setSelectedOrderType]);
 
   const handleOrderTypeSelect = (type: OrderType) => {
     // Prevent selecting "Dine In" if user is restricted
@@ -57,7 +70,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
     <div>
       {/* Patch 63: the order types wrap instead of scrolling, so the last one ("Plateformes") is never cut. */}
       <div className="flex flex-wrap gap-2 pb-2">
-        {ORDER_TYPES.map(({ value, icon: Icon }) => {
+        {orderTypes.map(({ value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
           
           let isUpdatingDisabled = isUpdatingOrder;

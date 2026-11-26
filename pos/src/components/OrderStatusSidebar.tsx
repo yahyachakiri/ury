@@ -4,6 +4,7 @@ import { Button } from '@ury/ui';
 import { getOrderStatusTypes, OrderStatusType } from '../data/order-types';
 import { usePOSStore } from '../store/pos-store';
 import { t } from '../i18n';
+import { useTillOnly } from '../lib/plan-flags';
 
 interface OrderStatusSidebarProps {
   disabled?: boolean;
@@ -21,6 +22,8 @@ const OrderStatusSidebar = ({
   
   // Get the appropriate status types based on POS profile settings
   const statusTypes = getOrderStatusTypes(posProfile?.view_all_status, posProfile?.paid_limit);
+  // Patch 85: on the Comptoir plan the paid lists hold today and yesterday (erp_restaurant filters them).
+  const tillOnly = useTillOnly();
 
   return (
     <div className={cn(
@@ -60,6 +63,7 @@ const OrderStatusSidebar = ({
               </Button>
             ))}
           </div>
+          {tillOnly && <p className="mt-3 px-1 text-xs text-gray-500">{t('orders.till_only_history')}</p>}
         </div>
       </nav>
     </div>

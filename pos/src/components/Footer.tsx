@@ -8,13 +8,16 @@ import {
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
+import { useTillOnly } from '../lib/plan-flags';
 
 const Footer = () => {
+  // Patch 85: no Tables page on the Comptoir plan (counter and takeaway only).
+  const tillOnly = useTillOnly();
 
   const navItems = [
     { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
-    { icon: Table, label: t('footer.tables'), path: '/tables' },
+    { icon: Table, label: t('footer.tables'), path: '/tables', hidden: tillOnly },
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
     { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
   ].filter((item) => !item.hidden);

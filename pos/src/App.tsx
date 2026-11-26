@@ -18,7 +18,15 @@ import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
+import { useTillOnlyState } from './lib/plan-flags';
 import { getActiveLanguage } from './i18n';
+
+// Patch 85: on the Comptoir plan the Tables page goes back to the order screen.
+function TablesRoute() {
+  const tillOnly = useTillOnlyState();
+  if (tillOnly === undefined) return null;
+  return tillOnly ? <Navigate to="/pos" replace /> : <Table />;
+}
 
 function App() {
   const {
@@ -54,7 +62,7 @@ function App() {
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/pos" element={<POS />} />
-                  <Route path="/tables" element={<Table />} />
+                  <Route path="/tables" element={<TablesRoute />} />
                   <Route path="/orders" element={<Orders />} />
                   <Route path="/settings" element={<Settings />} />
                 </Route>

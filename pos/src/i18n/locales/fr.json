@@ -366,7 +366,8 @@
     },
     "close_tab": "Fermer la commande",
     "edit_order": "Modifier la commande",
-    "qty": "Qté : {{qty}}"
+    "qty": "Qté : {{qty}}",
+    "till_only_history": "Commandes payées : aujourd'hui et hier"
   },
   "tables": {
     "layout_view": "Vue de mise en page",

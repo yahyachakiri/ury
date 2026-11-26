@@ -3733,6 +3733,50 @@ Patch file: `patches/84-sold-out-order-anyway.patch`. Commit: b6350d9e.
 
 Browser check 2026-11-22 (test-dev.reflowgo.ma, Administrator, French, till): Frites Fromage made sold out by a test wastage of Sauce fromagère (MAT-STE-2026-00004); card "Épuisé" and tappable; window "Frites Fromage est épuisé" with "Sauce fromagère, il faut 0,04 Litre, reste 0"; Annuler added nothing; "Commander quand même" added the line; INV-00092 saved with the line stamped (Administrator, 15:59:34, "Sauce fromagère (0.04 Litre, 0)"); a drink added and sent again kept the first stamp and time; payment accepted (no stock refusal); the first closing was refused by erp_restaurant's closing pre-check (fixed in 00e2369, redeployed); the retry submitted POS-CLO-2026-00006, INV-00092 consolidated into ACC-SINV-2026-00022 and Sauce fromagère went to -0.04; test wastage cancelled (stock 3.47). Not checked: waiter app, the size dialog, a second customer or second till on the same ingredient in one closing, an ingredient never received, split bill, return, Arabic, English, the QR app. The till now asks to open a new shift on Test Dev (the closed one had been open since 15/11).
 
+### Patch 85 — Comptoir plan: the till takes takeaway orders, without tables, extras, sizes or choices
+
+Ticket 124 part B (owner 2026-11-25 and 2026-11-26): the plan "Comptoir" gives the till and the daily closing only
+(erp_restaurant plans.py). The server already refuses what the plan does not have; this patch keeps the till from
+offering it, so the cashier never meets a button that fails on send.
+
+Files touched: `pos/src/lib/plan-flags.ts` (new: `useTillOnly` / `useTillOnlyState`, one call to erp_restaurant
+`plans.till_flags` per page load, the answer kept for components mounted later), `pos/src/components/OrderTypeSelect.tsx`
+(only "À emporter"; an order opened for editing keeps its own type shown; an empty new order is switched to À emporter,
+never a cart with lines, since pos-store's setSelectedOrderType empties the cart), `pos/src/App.tsx` (`TablesRoute`:
+/tables goes to /pos, nothing drawn while the flag loads), `pos/src/components/Footer.tsx` (no Tables entry),
+`pos/src/components/ProductDialog.tsx` (extras, sizes and choice groups not read from the Item: `optionsDoc` null),
+`pos/src/components/OrderStatusSidebar.tsx` (a line under the tabs), locales (`orders.till_only_history`, en / fr / ar).
+
+What it does: on a Comptoir site the order type row shows À emporter only, the bottom bar has no Tables, a double tap on a
+dish opens its window with the note and quantity only, and Orders says "Commandes payées : aujourd'hui et hier". A failed
+`till_flags` call counts as "not Comptoir": the till never loses a feature because of a network error. Other plans are
+unchanged (the flag is false and never flips).
+
+Why not in erp_restaurant alone: the order types are hardcoded (`pos/src/data/order-types.ts`) and drawn with no
+switch; the Tables entry and route have no condition; the dish window reads extras, sizes and choices from the Item
+document in the browser (`db.getDoc`), so the server cannot stop it offering them. What the server does
+(erp_restaurant, ticket 124): `ury_compat.getPosInvoice` / `searchPosInvoice` limit the paid lists and their search to
+today and yesterday (Draft and Unbilled never), `getPosInvoiceItems` / `get_split_group` refuse an older paid order,
+`get_baseline` returns no comparison (the till hides it by itself), POS Invoice before_insert refuses a new Dine In or
+platform order, `getRestaurantMenu` drops the option flags. The header links to /ury and /app are left: erp_restaurant
+sends both pages to the owner app on this plan.
+
+Risk profile: low to medium. OrderTypeSelect.tsx shares lines with Patch 63; ProductDialog.tsx with Patches 36-40 and
+84 (keep their filters, then add `optionsDoc`). App.tsx and Footer.tsx: low. pos-store.ts and OrderPanel.tsx are not
+touched.
+
+Acceptance criteria and manual test: on a Comptoir site the till shows À emporter only, no Tables, no extras, sizes or
+choices (also in the waiter app's dish window), the Orders line in fr / ar (right to left) / en, and the paid lists of
+today and yesterday only while an older draft stays listed and payable; on an Essentiel site everything is as before; a
+held tab with lines is never emptied. Step by step: the "Manual test" section of
+`tasks/124-comptoir-plan-till-and-closing.md`.
+
+Notes: the flag is kept for the page's life. After an upgrade the till keeps the Comptoir limits until it is reloaded
+(safe: features hidden, the server allows them); after a downgrade the buttons stay until a reload and the server
+refuses them. A plan change does not trigger the release watcher's reload (ticket 50 watches builds only).
+
+Patch file: `patches/85-comptoir-till.patch`. Commit: (filled after the commit).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

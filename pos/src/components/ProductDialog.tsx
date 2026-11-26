@@ -7,6 +7,7 @@ import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 import ShortStockDialog from './ShortStockDialog';
 import { db } from '@ury/core';
 import { t } from '../i18n';
+import { useTillOnly } from '../lib/plan-flags';
 
 interface Variant {
   id: string;
@@ -82,8 +83,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   }, [selectedItem]);
 
   
-  const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
-    ? itemDoc.custom_pos_add_on_items
+  // Patch 85: no extras, sizes or choices on the Comptoir plan (the menu still holds the dishes they point to).
+  const tillOnly = useTillOnly();
+  const optionsDoc = tillOnly ? null : itemDoc;
+  const addonDetails = Array.isArray(optionsDoc?.custom_pos_add_on_items)
+    ? optionsDoc.custom_pos_add_on_items
         .map((entry: any) => {
           const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
           // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
@@ -99,8 +103,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         .filter(Boolean)
     : [];
 
-  const variantDetails = Array.isArray(itemDoc?.custom_pos_item_variants)
-    ? itemDoc.custom_pos_item_variants
+  const variantDetails = Array.isArray(optionsDoc?.custom_pos_item_variants)
+    ? optionsDoc.custom_pos_item_variants
         .map((entry: any) => {
           const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
           // Patch 36: an extra or size missing from the loaded menu (switched off, deleted, or another
@@ -219,7 +223,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const choiceGroups: Array<{ group: string; options: Array<{ id: string; name: string; price: number; soldOut?: boolean }> }> = [];
   // Only the shown item's own document counts (not the previous item's while a size switch loads).
   const docReady = Boolean(itemDoc) && itemDoc.name === selectedItem?.item;
-  (docReady && Array.isArray(itemDoc.custom_meal_choices) ? itemDoc.custom_meal_choices : []).forEach((row: any) => {
+  (docReady && !tillOnly && Array.isArray(itemDoc.custom_meal_choices) ? itemDoc.custom_meal_choices : []).forEach((row: any) => {
     let entry = choiceGroups.find(g => g.group === row.choice_group);
     if (!entry) {
       entry = { group: row.choice_group, options: [] };
