@@ -3829,7 +3829,7 @@ Not changed: URY's 1024 px floor, so a tablet held upright (768 to 834 px) still
 "Caisse sur téléphone"; and the whole till is taken down and loaded again each time the window crosses 1024 px
 (ScreenSizeProvider, upstream).
 
-Patch file: `patches/86-phone-screen-without-loyalty-lock-on-resize.patch`. Commit: pending.
+Patch file: `patches/86-phone-screen-without-loyalty-lock-on-resize.patch`. Commit: b002032a.
 
 ## Build and deploy
 
