@@ -3831,6 +3831,8 @@ Not changed: URY's 1024 px floor, so a tablet held upright (768 to 834 px) still
 
 Patch file: `patches/86-phone-screen-without-loyalty-lock-on-resize.patch`. Commit: b002032a.
 
+Browser check 2026-11-26 (test-dev.reflowgo.ma on Comptoir, Administrator, Chrome, after the dev deploy of b5f0b63d): nothing of this patch could be seen. The window could not be made narrower than 1024 px by the automation, and the till "Test Dev" was held by another device, so /pos went to the "till already open" page (holder and time shown, "Prendre la main" not tapped). Not checked: every acceptance step (phone screen without the scan button, a Pro site's screen, the claim after widening, narrowing and widening again, the waiter app), Arabic, English.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
