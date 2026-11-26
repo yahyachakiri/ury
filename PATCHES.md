@@ -3777,6 +3777,8 @@ refuses them. A plan change does not trigger the release watcher's reload (ticke
 
 Patch file: `patches/85-comptoir-till.patch`. Commit: e399db62.
 
+Browser check 2026-11-26 (test-dev2.reflowgo.ma switched to Comptoir, Karim (owner), French, till): À emporter only, no Tables in the bottom bar, /pos/tables back to the order screen, Cheese Burger and Menu Burger windows with note and quantity only, the Orders line shown, an older unpaid table order still under "Non facturé", a takeaway order created and cancelled, session closed. Not checked: Arabic (no language switch in the till's menu), the waiter app, a held tab with lines when the site drops to Comptoir, an Essentiel site's till after this build (test-dev was not opened).
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this
