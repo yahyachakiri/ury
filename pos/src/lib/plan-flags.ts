@@ -6,16 +6,20 @@ import { call } from '@ury/core';
 // extras, sizes or choices, and its paid order lists hold today and yesterday (filtered on the server).
 // Read once per page load; a failed call counts as "not Comptoir", so the till never loses a feature
 // because of a network error (the server still refuses what the plan does not have).
+// Patch 86: the same call also says whether the plan has loyalty (the phone screen's scan button). An older
+// erp_restaurant without the key, or a failed call, counts as "has loyalty": the button stays as before.
 let pending: Promise<boolean> | null = null;
 // The answer once known, so a component mounted later starts from it (no frame with the wrong value).
 let resolved: boolean | undefined;
+let resolvedLoyalty: boolean | undefined;
 
 export function fetchTillOnly(): Promise<boolean> {
   if (!pending) {
     pending = call
-      .get<{ message: { till_only?: boolean } }>('erp_restaurant.erp_restaurant.plans.till_flags')
+      .get<{ message: { till_only?: boolean; loyalty?: boolean } }>('erp_restaurant.erp_restaurant.plans.till_flags')
       .then((r) => {
         resolved = Boolean(r.message?.till_only);
+        resolvedLoyalty = r.message?.loyalty !== false;
         return resolved;
       })
       .catch(() => {
@@ -24,6 +28,21 @@ export function fetchTillOnly(): Promise<boolean> {
       });
   }
   return pending;
+}
+
+/** Patch 86: whether the plan has loyalty, or undefined while the first call runs (true after a failed call). */
+export function useLoyaltyPlanState(): boolean | undefined {
+  const [loyalty, setLoyalty] = useState<boolean | undefined>(() => resolvedLoyalty);
+  useEffect(() => {
+    let alive = true;
+    fetchTillOnly().then(() => {
+      if (alive) setLoyalty(resolvedLoyalty ?? true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return loyalty;
 }
 
 /** The flag, false until known (a site that is not Comptoir never changes). */

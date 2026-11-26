@@ -3779,6 +3779,58 @@ Patch file: `patches/85-comptoir-till.patch`. Commit: e399db62.
 
 Browser check 2026-11-26 (test-dev2.reflowgo.ma switched to Comptoir, Karim (owner), French, till): À emporter only, no Tables in the bottom bar, /pos/tables back to the order screen, Cheese Burger and Menu Burger windows with note and quantity only, the Orders line shown, an older unpaid table order still under "Non facturé", a takeaway order created and cancelled, session closed. Not checked: Arabic (no language switch in the till's menu), the waiter app, a held tab with lines when the site drops to Comptoir, an Essentiel site's till after this build (test-dev was not opened).
 
+### Patch 86 — Phone screen without a scan button on a plan without loyalty; the till lock starts when the window widens
+
+Owner 2026-11-26, from a screen recording on test-dev (Comptoir, a cashier, a window resized between phone and
+computer widths). Two faults of Patch 81:
+1. The phone screen always offered "Scanner une carte". On a plan without loyalty (Essentiel, Comptoir) the scan page
+   (/scan?till=1, erp_restaurant owner app) refuses a cashier with "Accès réservé" and an "Ouvrir la caisse" button,
+   which led back to the phone screen: a loop with no way out but the logout.
+2. TillGuard read the window width once. A page loaded under 1024 px and then widened (a resized window, a tablet
+   turned to landscape) showed the till without ever claiming the lock, so the same till could be open on two
+   devices under one account.
+
+Files touched: `pos/src/lib/plan-flags.ts` (Patch 85's file: the same `plans.till_flags` call also keeps `loyalty`;
+new `useLoyaltyPlanState`), `pos/src/components/PhoneTillScreen.tsx` (text and scan button only with loyalty),
+`pos/src/components/TillGuard.tsx` (a `tillScreen` state that turns true on a resize to 1024 px or more; the claim
+effect depends on it), locales (`phone_till.text_no_scan`, en / fr / ar).
+
+What it does: on a plan without loyalty the phone screen shows the title, "La caisse s'ouvre sur un ordinateur ou une
+tablette." and the logout, with no scan button; with loyalty it is unchanged. Until the plan is known only the title
+and the logout are drawn, so the button never flashes. An older erp_restaurant without the `loyalty` key, or a failed call, counts as
+"has loyalty" (the screen stays as before). A till page that becomes wide enough claims the lock at that moment: a
+refused claim sends it to the "till already open" page like any other till. A till that narrows afterwards keeps its
+lock and its renewals (a tablet turned for a moment does not lose its till); a page that stays narrow still takes
+none.
+
+Why not in erp_restaurant alone: the phone screen and the lock's start are React code in the POS bundle; the server
+cannot remove a button it draws or make it claim. erp_restaurant side: `plans.till_flags` returns `loyalty`
+(loyalty.plan_includes_loyalty), nothing else.
+
+Risk profile: low. Files added by Patches 81 and 85, plus one key in the three upstream locale files (inside the
+fork's own `phone_till` block); pos-store.ts and OrderPanel.tsx are not touched. plan-flags.ts keeps `useTillOnly` / `useTillOnlyState` as they were.
+
+Acceptance criteria and manual test:
+1. Comptoir or Essentiel site, a cashier, window under 1024 px: /pos shows "Caisse sur téléphone" with the one
+   sentence and "Se déconnecter", no "Scanner une carte"; fr, ar (right to left), en.
+2. Pro or Max site: the same screen with the scan text and button, as before.
+3. Same account, till already open in another tab: load /pos under 1024 px, widen the window past 1024 px: the tab
+   goes to the "till already open" page instead of showing a second till.
+4. Till free: load /pos under 1024 px, widen: the till opens and holds the lock (a second tab is sent to the busy
+   page).
+5. A till open at full width, narrowed under 1024 px for a moment and widened again: still on the till, a second tab
+   still refused.
+6. Waiter app: /pos/order loaded under 1024 px and widened claims no lock (the same account's till stays open
+   elsewhere).
+
+Notes: the plan is read once per page load (as Patch 85): after a plan change the phone screen follows at the next
+load. With loyalty switched off in Settings on a Pro site the button stays and the scan page says the program is off.
+Not changed: URY's 1024 px floor, so a tablet held upright (768 to 834 px) still gets the phone screen, titled
+"Caisse sur téléphone"; and the whole till is taken down and loaded again each time the window crosses 1024 px
+(ScreenSizeProvider, upstream).
+
+Patch file: `patches/86-phone-screen-without-loyalty-lock-on-resize.patch`. Commit: pending.
+
 ## Build and deploy
 
 `pos/vite.config.ts` builds directly into `ury/public/pos` inside this

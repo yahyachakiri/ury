@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { call } from '@ury/core';
 import { usePOSStore } from '../store/pos-store';
 import { getRealtimeSocket } from '../lib/realtime';
@@ -9,6 +9,10 @@ import { getRealtimeSocket } from '../lib/realtime';
 // (/scan?busy=<till>, erp_restaurant owner app), which can scan cards for the open till or take it over.
 // The device is a random ID per tab (sessionStorage), read by that page too. The waiter app and the phone screen
 // (under 1024 px, Patch 81 PhoneTillScreen) take no lock.
+// Patch 86 (owner 2026-11-26): the width was read once, so a page loaded narrow and then widened (a rotated tablet, a
+// resized window) showed the till with no lock, next to the same till open elsewhere. The claim now starts when the
+// screen becomes a till screen. A till that narrows afterwards keeps its lock (a tablet turned for a moment does not
+// lose its till).
 const LOCK = 'erp_restaurant.erp_restaurant.till_lock';
 export const DEVICE_KEY = 'erp_till_device';
 const RENEW_MS = 20_000;
@@ -39,9 +43,19 @@ type Claim = { ok: boolean; reason?: string };
 
 const TillGuard: React.FC = () => {
   const tillName = usePOSStore((s) => s.posProfile?.name);
+  const [tillScreen, setTillScreen] = useState(isTillScreen);
 
   useEffect(() => {
-    if (!tillName || !isTillScreen()) return;
+    if (tillScreen) return;
+    const onResize = () => {
+      if (isTillScreen()) setTillScreen(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [tillScreen]);
+
+  useEffect(() => {
+    if (!tillName || !tillScreen) return;
     const device = tillDeviceId();
     let stopped = false;
     let timer = 0;
@@ -98,7 +112,7 @@ const TillGuard: React.FC = () => {
       window.removeEventListener('pagehide', release);
       socket?.off('erp_till_taken', onTaken);
     };
-  }, [tillName]);
+  }, [tillName, tillScreen]);
 
   return null;
 };

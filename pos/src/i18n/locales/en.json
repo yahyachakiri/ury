@@ -725,6 +725,7 @@
   "phone_till": {
     "title": "Till on a phone",
     "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
+    "text_no_scan": "The till opens on a computer or tablet.",
     "scan": "Scan a card",
     "logout": "Log out"
   },

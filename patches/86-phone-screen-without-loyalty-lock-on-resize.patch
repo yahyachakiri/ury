@@ -1,0 +1,178 @@
+diff --git a/pos/src/components/PhoneTillScreen.tsx b/pos/src/components/PhoneTillScreen.tsx
+index e91ccffc..a0c6f7a0 100644
+--- a/pos/src/components/PhoneTillScreen.tsx
++++ b/pos/src/components/PhoneTillScreen.tsx
+@@ -1,11 +1,16 @@
+ import { LogOut, ScanLine } from 'lucide-react';
+ import { Button } from '@ury/ui';
+ import { t } from '../i18n';
++import { useLoyaltyPlanState } from '../lib/plan-flags';
+ 
+ // Patch 81 (ticket 116, owner 2026-11-21): a cashier opening the till on a phone gets this screen instead of URY's
+ // "Desktop Only" dialog. The scan button opens erp_restaurant's scan page in "send to the till" mode (/scan?till=1):
+ // the scanned customer goes onto the order open on the till of the same account (Patch 81 LoyaltyScanListener).
++// Patch 86 (owner 2026-11-26): on a plan without loyalty (Essentiel, Comptoir) there is no card to scan, and the scan
++// page refused the cashier with an "open the till" button that led back here. The screen then says only where the
++// till opens; until the plan is known only the title and the logout are drawn, so the button never flashes.
+ const PhoneTillScreen = () => {
++  const loyalty = useLoyaltyPlanState();
+   const logout = () => {
+     fetch('/api/method/logout', { credentials: 'include' })
+       .catch(() => undefined)
+@@ -15,12 +20,16 @@ const PhoneTillScreen = () => {
+     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6 text-center">
+       <div className="space-y-2">
+         <h1 className="text-xl font-semibold text-gray-900">{t('phone_till.title')}</h1>
+-        <p className="text-sm text-gray-600">{t('phone_till.text')}</p>
++        {loyalty !== undefined && (
++          <p className="text-sm text-gray-600">{t(loyalty ? 'phone_till.text' : 'phone_till.text_no_scan')}</p>
++        )}
+       </div>
+-      <Button className="h-14 w-full max-w-xs gap-2 text-base" onClick={() => window.location.assign('/scan?till=1')}>
+-        <ScanLine className="h-5 w-5" aria-hidden="true" />
+-        {t('phone_till.scan')}
+-      </Button>
++      {loyalty && (
++        <Button className="h-14 w-full max-w-xs gap-2 text-base" onClick={() => window.location.assign('/scan?till=1')}>
++          <ScanLine className="h-5 w-5" aria-hidden="true" />
++          {t('phone_till.scan')}
++        </Button>
++      )}
+       <Button variant="ghost" onClick={logout} className="gap-2 text-sm text-gray-500">
+         <LogOut className="h-4 w-4" aria-hidden="true" />
+         {t('phone_till.logout')}
+diff --git a/pos/src/components/TillGuard.tsx b/pos/src/components/TillGuard.tsx
+index 6d014475..442ecca0 100644
+--- a/pos/src/components/TillGuard.tsx
++++ b/pos/src/components/TillGuard.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect } from 'react';
++import { useEffect, useState } from 'react';
+ import { call } from '@ury/core';
+ import { usePOSStore } from '../store/pos-store';
+ import { getRealtimeSocket } from '../lib/realtime';
+@@ -9,6 +9,10 @@ import { getRealtimeSocket } from '../lib/realtime';
+ // (/scan?busy=<till>, erp_restaurant owner app), which can scan cards for the open till or take it over.
+ // The device is a random ID per tab (sessionStorage), read by that page too. The waiter app and the phone screen
+ // (under 1024 px, Patch 81 PhoneTillScreen) take no lock.
++// Patch 86 (owner 2026-11-26): the width was read once, so a page loaded narrow and then widened (a rotated tablet, a
++// resized window) showed the till with no lock, next to the same till open elsewhere. The claim now starts when the
++// screen becomes a till screen. A till that narrows afterwards keeps its lock (a tablet turned for a moment does not
++// lose its till).
+ const LOCK = 'erp_restaurant.erp_restaurant.till_lock';
+ export const DEVICE_KEY = 'erp_till_device';
+ const RENEW_MS = 20_000;
+@@ -39,9 +43,19 @@ type Claim = { ok: boolean; reason?: string };
+ 
+ const TillGuard: React.FC = () => {
+   const tillName = usePOSStore((s) => s.posProfile?.name);
++  const [tillScreen, setTillScreen] = useState(isTillScreen);
+ 
+   useEffect(() => {
+-    if (!tillName || !isTillScreen()) return;
++    if (tillScreen) return;
++    const onResize = () => {
++      if (isTillScreen()) setTillScreen(true);
++    };
++    window.addEventListener('resize', onResize);
++    return () => window.removeEventListener('resize', onResize);
++  }, [tillScreen]);
++
++  useEffect(() => {
++    if (!tillName || !tillScreen) return;
+     const device = tillDeviceId();
+     let stopped = false;
+     let timer = 0;
+@@ -98,7 +112,7 @@ const TillGuard: React.FC = () => {
+       window.removeEventListener('pagehide', release);
+       socket?.off('erp_till_taken', onTaken);
+     };
+-  }, [tillName]);
++  }, [tillName, tillScreen]);
+ 
+   return null;
+ };
+diff --git a/pos/src/i18n/locales/ar.json b/pos/src/i18n/locales/ar.json
+index ade639a8..f002d251 100644
+--- a/pos/src/i18n/locales/ar.json
++++ b/pos/src/i18n/locales/ar.json
+@@ -732,6 +732,7 @@
+   "phone_till": {
+     "title": "نقطة البيع على الهاتف",
+     "text": "تُفتح نقطة البيع على حاسوب أو لوحة. من هذا الهاتف، امسح بطاقات الوفاء: يُضاف الزبون إلى الطلب المفتوح في نقطة البيع الخاصة بك.",
++    "text_no_scan": "تُفتح نقطة البيع على حاسوب أو لوحة.",
+     "scan": "مسح بطاقة",
+     "logout": "تسجيل الخروج"
+   },
+diff --git a/pos/src/i18n/locales/en.json b/pos/src/i18n/locales/en.json
+index ccbe578b..fa845d77 100644
+--- a/pos/src/i18n/locales/en.json
++++ b/pos/src/i18n/locales/en.json
+@@ -725,6 +725,7 @@
+   "phone_till": {
+     "title": "Till on a phone",
+     "text": "The till opens on a computer or tablet. From this phone, scan loyalty cards: the customer goes onto the order open on your till.",
++    "text_no_scan": "The till opens on a computer or tablet.",
+     "scan": "Scan a card",
+     "logout": "Log out"
+   },
+diff --git a/pos/src/i18n/locales/fr.json b/pos/src/i18n/locales/fr.json
+index 8fa72f01..83b29522 100644
+--- a/pos/src/i18n/locales/fr.json
++++ b/pos/src/i18n/locales/fr.json
+@@ -725,6 +725,7 @@
+   "phone_till": {
+     "title": "Caisse sur téléphone",
+     "text": "La caisse s'ouvre sur un ordinateur ou une tablette. Depuis ce téléphone, scannez les cartes de fidélité : le client est mis sur la commande en cours de votre caisse.",
++    "text_no_scan": "La caisse s'ouvre sur un ordinateur ou une tablette.",
+     "scan": "Scanner une carte",
+     "logout": "Se déconnecter"
+   },
+diff --git a/pos/src/lib/plan-flags.ts b/pos/src/lib/plan-flags.ts
+index bb8ce399..1eed419e 100644
+--- a/pos/src/lib/plan-flags.ts
++++ b/pos/src/lib/plan-flags.ts
+@@ -6,16 +6,20 @@ import { call } from '@ury/core';
+ // extras, sizes or choices, and its paid order lists hold today and yesterday (filtered on the server).
+ // Read once per page load; a failed call counts as "not Comptoir", so the till never loses a feature
+ // because of a network error (the server still refuses what the plan does not have).
++// Patch 86: the same call also says whether the plan has loyalty (the phone screen's scan button). An older
++// erp_restaurant without the key, or a failed call, counts as "has loyalty": the button stays as before.
+ let pending: Promise<boolean> | null = null;
+ // The answer once known, so a component mounted later starts from it (no frame with the wrong value).
+ let resolved: boolean | undefined;
++let resolvedLoyalty: boolean | undefined;
+ 
+ export function fetchTillOnly(): Promise<boolean> {
+   if (!pending) {
+     pending = call
+-      .get<{ message: { till_only?: boolean } }>('erp_restaurant.erp_restaurant.plans.till_flags')
++      .get<{ message: { till_only?: boolean; loyalty?: boolean } }>('erp_restaurant.erp_restaurant.plans.till_flags')
+       .then((r) => {
+         resolved = Boolean(r.message?.till_only);
++        resolvedLoyalty = r.message?.loyalty !== false;
+         return resolved;
+       })
+       .catch(() => {
+@@ -26,6 +30,21 @@ export function fetchTillOnly(): Promise<boolean> {
+   return pending;
+ }
+ 
++/** Patch 86: whether the plan has loyalty, or undefined while the first call runs (true after a failed call). */
++export function useLoyaltyPlanState(): boolean | undefined {
++  const [loyalty, setLoyalty] = useState<boolean | undefined>(() => resolvedLoyalty);
++  useEffect(() => {
++    let alive = true;
++    fetchTillOnly().then(() => {
++      if (alive) setLoyalty(resolvedLoyalty ?? true);
++    });
++    return () => {
++      alive = false;
++    };
++  }, []);
++  return loyalty;
++}
++
+ /** The flag, false until known (a site that is not Comptoir never changes). */
+ export function useTillOnly(): boolean {
+   return useTillOnlyState() ?? false;

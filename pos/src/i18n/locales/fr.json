@@ -725,6 +725,7 @@
   "phone_till": {
     "title": "Caisse sur téléphone",
     "text": "La caisse s'ouvre sur un ordinateur ou une tablette. Depuis ce téléphone, scannez les cartes de fidélité : le client est mis sur la commande en cours de votre caisse.",
+    "text_no_scan": "La caisse s'ouvre sur un ordinateur ou une tablette.",
     "scan": "Scanner une carte",
     "logout": "Se déconnecter"
   },
